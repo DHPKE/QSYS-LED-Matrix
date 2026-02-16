@@ -1,0 +1,66 @@
+-- PluginInfo section
+PLUGIN_INFO = {
+    Name = "Olimex~LED Matrix Controller",
+    Version = "1.1.0",
+    Id = "dhpke.olimex.led.matrix.1.1.0",
+    Description = "Professional UDP controller for Olimex ESP32 Gateway 64x32 LED Matrix with dark-themed UI"
+}
+
+-- GetProperties function
+function GetProperties()
+    return {
+        { Name = "IP Address", Type = "string", Default = "192.168.1.100" },
+        { Name = "Port", Type = "integer", Default = 8888 },
+        { Name = "Brightness", Type = "integer", Default = 100, Min = 0, Max = 100 }
+    }
+end
+
+-- GetControls function
+function GetControls()
+    return {
+        { Name = "Segment 1", Type = "group" },
+        { Name = "Segment 2", Type = "group" },
+        { Name = "Segment 3", Type = "group" },
+        { Name = "Segment 4", Type = "group" },
+        { Name = "Global Controls", Type = "group" }
+    }
+end
+
+-- GetControlLayout function
+function GetControlLayout()
+    return {
+        Header = { Title = "Olimex LED Matrix Controller", ConnectionStatus = "Disconnected" },
+        ConnectionSection = { { Name = "IP Address", Placeholder = "Enter IP" }, { Name = "Port", Placeholder = "Enter Port" } },
+        SegmentControls = {
+            { Segment = 1, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font1", EffectDropdown = "Effect1", SendButton = "Send", ClearButton = "Clear" },
+            { Segment = 2, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font2", EffectDropdown = "Effect2", SendButton = "Send", ClearButton = "Clear" },
+            { Segment = 3, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font3", EffectDropdown = "Effect3", SendButton = "Send", ClearButton = "Clear" },
+            { Segment = 4, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font4", EffectDropdown = "Effect4", SendButton = "Send", ClearButton = "Clear" }
+        },
+        GlobalControls = { BrightnessSlider = "Brightness", ClearAllButton = "Clear All" }
+    }
+end
+
+-- Runtime script for UDP handling
+local socket = require("socket")
+local udp = socket.udp()
+
+function Initialize()
+    udp:settimeout(0)
+end
+
+function SendData(ip, port, data)
+    udp:send(ip, port, data)
+end
+
+function ReceiveData()
+    local data, msg = udp:receive()
+    if data then
+        -- Process incoming data
+    end
+end
+
+function Update()
+    -- Update the UI elements based on the incoming data
+    ReceiveData()
+end
