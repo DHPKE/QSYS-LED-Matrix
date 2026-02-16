@@ -1,89 +1,68 @@
--- Q-SYS Plugin Code for Olimex LED Matrix Display
+// Q-SYS Plugin: OlimexLEDMatrix.qplug
+// This plugin controls an LED matrix via UDP with dark theme UI.
 
--- Plugin Info
-local PluginInfo = {
-    Name="Olimex~LED Matrix Display",
-    Version="2.0.0",
-    Id="",
-    Description="",
-    ShowDebug=true,
-    Author="DHPKE"
+PluginInfo {
+    plugin_name = "Olimex LED Matrix",
+    plugin_type = "Custom",
+    plugin_version = "1.0",
+    vendor_name = "DHPKE",
 }
 
--- Function to Get Properties
-function GetProperties()
+int ipAddress = 0;
+int udpPort = 12345;
+int numberOfSegments = 4;
+
+function GetColor() {
+    return {30, 30, 30}; // Dark theme color
+}
+
+function GetProperties() {
     return {
-        IP_Address = {type="string", default="192.168.1.100"},
-        UDP_Port = {type="integer", min=1, max=65535, default=21324},
-        Number_of_Segments = {type="integer", min=1, max=4, default=4}
-    }
-end
+        IPAddress: ipAddress,
+        UDPPort: udpPort,
+        NumberOfSegments: numberOfSegments
+    };
+}
 
--- Function to Get Controls
-function GetControls(props)
-    local controls = {}
-    
-    -- Connection Controls
-    controls.ip_address = Text("IP Address")
-    controls.udp_port = Text("UDP Port")
-    controls.connection_status = Indicator("Status")
-    
-    for i = 1, props.Number_of_Segments.default do
-        controls["segment_" .. i] = {
-            text_input = Text("Text Input"),
-            color_hex_input = Text("Color Hex"),
-            font_dropdown = Dropdown("Font", {"roboto6", "roboto8", "roboto12", "roboto16", "roboto24", "digital12", "digital24", "mono9", "mono12"}),
-            effect_dropdown = Dropdown("Effect", {"none", "scroll", "blink", "fade", "rainbow"}),
-            alignment_buttons = { 
-                left = Button("Align Left"),
-                center = Button("Align Center"),
-                right = Button("Align Right")
-            },
-            send_trigger = Button("Send"),
-            clear_trigger = Button("Clear")
-        }
-    end
-    
-    -- Global Controls
-    controls.global_brightness = Knob("Global Brightness", {min=0, max=255})
-    controls.clear_all = Button("Clear All")
-    
-    return controls
-end
+function GetControls() {
+    return [
+        {type: "Input", name: "Connection", description: "UDP Connection"},
+        {type: "Segment", name: "Segments", count: numberOfSegments},
+        {type: "Global", name: "Controls"}
+    ];
+}
 
--- Function to Get Control Layout
-function GetControlLayout(props)
-    local layout = --[[Name your layout views using relevant Q-SYS Lua methods]]
-    {
-        BackgroundColor = "#2D2D30",
-        TitleColor = "#00D4AA",
-        Sections = {
-            Header = {},
-            Connection = {},
-            Segments = {},
-            Global = {}
-        }
-    }
+function GetControlLayout() {
+    return {
+        theme: "dark",
+        controls: [
+            {name: "Text Input", position: {x: 10, y: 10}},
+            {name: "Color Hex Input", position: {x: 10, y: 50}},
+            {name: "Font Selector", position: {x: 10, y: 90}},
+            {name: "Effect Selector", position: {x: 10, y: 130}},
+            {name: "Alignment Selector", position: {x: 10, y: 170}},
+            {name: "Send Button", position: {x: 10, y: 210}},
+            {name: "Clear Button", position: {x: 10, y: 250}}
+        ]
+    };
+}
 
-    for i = 1, props.Number_of_Segments.default do
-        layout.Sections.Segments[i] = {
-            PositionY = 150 + (i * 140),
-            Controls = GetControls(props)["segment_" .. i]
-        }
-    end
+function GetPins() {
+    return [
+        {name: "UDP Socket", type: "Udp"}
+    ];
+}
 
-    return layout
-end
+function Runtime() {
+    var socket = new UdpSocket(ipAddress, udpPort);
+    socket.onDataReceived = function(data) {
+        // Handle incoming UDP data
+    };
+    socket.onError = function(error) {
+        // Handle socket error
+    };
+    socket.initialize();
+}
 
--- Function to Get Pins
-function GetPins(props)
-    return GetControls(props)
-end
-
--- Runtime code - initialize on Controls
-if Controls then
-    -- UDP Socket Initialization
-    -- Implement SendCommand() function 
-    -- Event Handlers for Controls
-    -- Initialize() function setting defaults
-end
+// Initialize the plugin
+Runtime();
