@@ -13,7 +13,7 @@ private:
     uint8_t brightness;
     char packetBuffer[UDP_BUFFER_SIZE];
     
-    // Parse hex color to uint16_t (RGB565)
+    // Convert hex color to uint16_t (RGB565)
     uint16_t parseColor(const char* colorStr) {
         if (colorStr[0] == '#') colorStr++;
         
@@ -26,113 +26,139 @@ private:
         return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
     }
     
-    // Parse TEXT command
+public:
+    UDPHandler(SegmentManager* manager) : segmentManager(manager), brightness(DEFAULT_BRIGHTNESS) {}
+    
+    bool begin() {
+        return udp.begin(UDP_PORT);
+    }
+    
+    // Parse TEXT command with bounds checking
     // Format: TEXT|segment|content|color|font|size|align|effect
     void parseTextCommand(char* cmd) {
-        char* token;
-        int tokenIndex = 0;
-        uint8_t segmentId = 0;
-        char* content = nullptr;
-        char* color = nullptr;
-        char* font = nullptr;
-        char* size = nullptr;
-        char* align = nullptr;
-        char* effect = nullptr;
+        char* tokens[8] = {nullptr};
+        int tokenCount = 0;
         
-        token = strtok(cmd, "|");
-        while (token != nullptr && tokenIndex < 8) {
-            switch (tokenIndex) {
-                case 0: // Command (TEXT)
-                    break;
-                case 1: // Segment ID
-                    segmentId = atoi(token);
-                    break;
-                case 2: // Content
-                    content = token;
-                    break;
-                case 3: // Color
-                    color = token;
-                    break;
-                case 4: // Font
-                    font = token;
-                    break;
-                case 5: // Size
-                    size = token;
-                    break;
-                case 6: // Align
-                    align = token;
-                    break;
-                case 7: // Effect
-                    effect = token;
-                    break;
-            }
-            tokenIndex++;
+        // Safely tokenize with bounds checking
+        char* token = strtok(cmd, "|");
+        while (token != nullptr && tokenCount < 8) {
+            tokens[tokenCount++] = token;
             token = strtok(nullptr, "|");
         }
         
+        // Validate minimum required tokens (command, segment, content)
+        if (tokenCount < 3) {
+            Serial.println("ERROR: TEXT command requires at least segment and content");
+            return;
+        }
+        
+        // Parse tokens safely
+        uint8_t segmentId = atoi(tokens[1]);
+        char* content = tokens[2];
+        char* color = (tokenCount > 3) ? tokens[3] : nullptr;
+        char* font = (tokenCount > 4) ? tokens[4] : nullptr;
+        char* size = (tokenCount > 5) ? tokens[5] : nullptr;
+        char* align = (tokenCount > 6) ? tokens[6] : nullptr;
+        char* effect = (tokenCount > 7) ? tokens[7] : nullptr;
+        
+        // Validate segment ID
+        if (segmentId >= MAX_SEGMENTS) {
+            Serial.print("ERROR: Invalid segment ID: ");
+            Serial.println(segmentId);
+            return;
+        }
+        
         // Apply to segment
-        if (segmentId < MAX_SEGMENTS && content != nullptr) {
-            Segment* seg = segmentManager->getSegment(segmentId);
-            if (seg) {
-                segmentManager->updateSegmentText(segmentId, content);
-                segmentManager->activateSegment(segmentId, true);
-                
-                if (color) {
-                    seg->color = parseColor(color);
-                }
-                
-                if (font) {
-                    segmentManager->setSegmentFont(segmentId, font);
-                }
-                
-                if (size) {
-                    if (strcmp(size, "auto") == 0) {
-                        seg->autoSize = true;
-                    } else {
-                        seg->fontSize = atoi(size);
+        Segment* seg = segmentManager->getSegment(segmentId);
+        if (seg) {
+            segmentManager->updateSegmentText(segmentId, content);
+            segmentManager->activateSegment(segmentId, true);
+            
+            if (color) {
+                seg->color = parseColor(color);
+            }
+            
+            if (font) {
+                segmentManager->setSegmentFont(segmentId, font);
+            }
+            
+            if (size) {
+                if (strcmp(size, "auto") == 0) {
+                    seg->autoSize = true;
+                } else {
+                    int sizeVal = atoi(size);
+                    if (sizeVal > 0 && sizeVal <= 32) {
+                        seg->fontSize = sizeVal;
                         seg->autoSize = false;
                     }
                 }
-                
-                if (align) {
-                    if (strcmp(align, "L") == 0) seg->align = ALIGN_LEFT;
-                    else if (strcmp(align, "C") == 0) seg->align = ALIGN_CENTER;
-                    else if (strcmp(align, "R") == 0) seg->align = ALIGN_RIGHT;
-                }
-                
-                if (effect) {
-                    if (strcmp(effect, "scroll") == 0) seg->effect = EFFECT_SCROLL;
-                    else if (strcmp(effect, "blink") == 0) seg->effect = EFFECT_BLINK;
-                    else if (strcmp(effect, "fade") == 0) seg->effect = EFFECT_FADE;
-                    else if (strcmp(effect, "rainbow") == 0) seg->effect = EFFECT_RAINBOW;
-                    else seg->effect = EFFECT_NONE;
-                }
-                
-                seg->isDirty = true;
+            }
+            
+            if (align) {
+                if (strcmp(align, "L") == 0) seg->align = ALIGN_LEFT;
+                else if (strcmp(align, "C") == 0) seg->align = ALIGN_CENTER;
+                else if (strcmp(align, "R") == 0) seg->align = ALIGN_RIGHT;
+            }
+            
+            if (effect) {
+                if (strcmp(effect, "scroll") == 0) seg->effect = EFFECT_SCROLL;
+                else if (strcmp(effect, "blink") == 0) seg->effect = EFFECT_BLINK;
+                else if (strcmp(effect, "fade") == 0) seg->effect = EFFECT_FADE;
+                else if (strcmp(effect, "rainbow") == 0) seg->effect = EFFECT_RAINBOW;
+                else seg->effect = EFFECT_NONE;
+            }
+            
+            seg->isDirty = true;
+        }
+    }
+    
+    // Parse CLEAR command with validation
+    void parseClearCommand(char* cmd) {
+        char* token = strtok(cmd, "|");
+        if (!token) return;
+        
+        token = strtok(nullptr, "|"); // Get segment ID
+        if (token) {
+            uint8_t segmentId = atoi(token);
+            if (segmentId < MAX_SEGMENTS) {
+                segmentManager->clearSegment(segmentId);
+            } else {
+                Serial.print("ERROR: Invalid segment ID for CLEAR: ");
+                Serial.println(segmentId);
             }
         }
     }
     
-    // Parse CLEAR command
-    void parseClearCommand(char* cmd) {
+    // Parse BRIGHTNESS command
+    // Format: BRIGHTNESS|value
+    void parseBrightnessCommand(char* cmd) {
         char* token = strtok(cmd, "|");
-        token = strtok(nullptr, "|"); // Get segment ID
+        if (!token) return;
         
+        token = strtok(nullptr, "|"); // Get value
         if (token) {
-            uint8_t segmentId = atoi(token);
-            segmentManager->clearSegment(segmentId);
+            int value = atoi(token);
+            // Validate range
+            if (value >= 0 && value <= 255) {
+                brightness = (uint8_t)value;
+            }
         }
     }
     
-    // Parse CONFIG/BRIGHTNESS command
+    // Parse CONFIG command (legacy support)
+    // Format: CONFIG|brightness|value
     void parseConfigCommand(char* cmd) {
         char* token = strtok(cmd, "|");
-        token = strtok(nullptr, "|"); // Get config type
+        if (!token) return;
         
+        token = strtok(nullptr, "|"); // Get config type
         if (token && strcmp(token, "brightness") == 0) {
             token = strtok(nullptr, "|"); // Get value
             if (token) {
-                brightness = atoi(token);
+                int value = atoi(token);
+                if (value >= 0 && value <= 255) {
+                    brightness = (uint8_t)value;
+                }
             }
         }
     }
@@ -147,7 +173,15 @@ public:
     void process() {
         int packetSize = udp.parsePacket();
         if (packetSize > 0) {
-            int len = udp.read(packetBuffer, UDP_BUFFER_SIZE - 1);
+            // Bounds check packet size
+            if (packetSize > UDP_BUFFER_SIZE - 1) {
+                Serial.print("WARNING: UDP packet too large (");
+                Serial.print(packetSize);
+                Serial.println(" bytes), truncating");
+                packetSize = UDP_BUFFER_SIZE - 1;
+            }
+            
+            int len = udp.read(packetBuffer, packetSize);
             if (len > 0) {
                 packetBuffer[len] = '\0'; // Null terminate
                 
@@ -162,16 +196,20 @@ public:
                 Serial.print("UDP packet received: ");
                 Serial.println(packetBuffer);
                 
-                // Parse command
+                // Parse command with proper routing
                 if (strncmp(packetBuffer, "TEXT|", 5) == 0) {
                     parseTextCommand(packetBuffer);
                 } else if (strncmp(packetBuffer, "CLEAR|", 6) == 0) {
                     parseClearCommand(packetBuffer);
                 } else if (strcmp(packetBuffer, "CLEAR_ALL") == 0) {
                     segmentManager->clearAll();
-                } else if (strncmp(packetBuffer, "CONFIG|", 7) == 0 || 
-                          strncmp(packetBuffer, "BRIGHTNESS|", 11) == 0) {
+                } else if (strncmp(packetBuffer, "BRIGHTNESS|", 11) == 0) {
+                    parseBrightnessCommand(packetBuffer);
+                } else if (strncmp(packetBuffer, "CONFIG|", 7) == 0) {
                     parseConfigCommand(packetBuffer);
+                } else {
+                    Serial.print("ERROR: Unknown command: ");
+                    Serial.println(packetBuffer);
                 }
             }
         }
