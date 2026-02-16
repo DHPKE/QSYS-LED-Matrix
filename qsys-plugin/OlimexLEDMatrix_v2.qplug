@@ -401,11 +401,7 @@ function GetControlLayout(props)
     return layout, graphics
 end
 
--- Runtime script
-function GetPins(props)
-    return GetControls(props)
-end
-
+-- Runtime code starts here
 if Controls then
     -- UDP socket
     local socket = nil
