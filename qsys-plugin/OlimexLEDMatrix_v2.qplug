@@ -86,7 +86,7 @@ function GetControls(props)
         Name = "last_command",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Output"
     })
     
@@ -100,7 +100,7 @@ function GetControls(props)
             ControlType = "Indicator",
             IndicatorType = "LED",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Output"
         })
         
