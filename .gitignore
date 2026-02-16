@@ -1,0 +1,92 @@
+# PlatformIO
+.pio/
+.vscode/
+.pioenvs
+.piolibdeps
+.clang_complete
+.gcc-flags.json
+
+# Arduino IDE
+*.hex
+*.eep
+*.elf
+*.bin
+
+# Build artifacts
+*.o
+*.d
+*.a
+*.so
+*.dylib
+*.dll
+
+# Compiled files
+build/
+dist/
+*.pyc
+__pycache__/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Configuration (may contain sensitive data)
+# Uncomment if you want to exclude personal WiFi credentials
+# src/config.h
+
+# LittleFS/SPIFFS data (optional - uncomment if you want to exclude)
+# data/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# OS specific
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Package manager
+node_modules/
+vendor/
+
+# Python virtual environment
+venv/
+env/
+ENV/
+
+# Test coverage
+coverage/
+*.coverage
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Certificates and keys
+*.pem
+*.key
+*.cert
+*.crt
+
+# Local settings
+local_settings.py
+settings_local.py
+
+# Upload tools
+upload_port
+monitor_port
