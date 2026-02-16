@@ -23,71 +23,78 @@ A complete firmware solution for displaying dynamic text on a 64x32 pixel LED ma
 
 ## 🚀 Quick Start
 
-### For PlatformIO (Visual Studio Code) - Recommended
+### Arduino IDE Setup
 
-1. **Install VS Code and PlatformIO**
-   ```bash
-   # Install Visual Studio Code from https://code.visualstudio.com/
-   # Install PlatformIO extension from VS Code marketplace
-   ```
+1. **Install Arduino IDE**
+   - Download Arduino IDE 1.8.19+ or 2.x from [arduino.cc](https://www.arduino.cc/en/software)
+   - Install and launch the IDE
 
-2. **Clone and Open Project**
+2. **Install ESP32 Board Support**
+   - Open Arduino IDE
+   - Go to **File → Preferences**
+   - Add to "Additional Board Manager URLs":
+     ```
+     https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+     ```
+   - Go to **Tools → Board → Boards Manager**
+   - Search for "esp32"
+   - Install "esp32" by Espressif Systems (version 2.0.0 or later)
+
+3. **Install Required Libraries**
+   
+   From **Sketch → Include Library → Manage Libraries**, install:
+   - **ESP32 HUB75 LED MATRIX PANEL DMA Display** by mrfaptastic (version 3.0.0+)
+   - **Adafruit GFX Library** by Adafruit (version 1.11.0+)
+   - **ArduinoJson** by Benoit Blanchon (version 6.x - important!)
+   
+   Manual installation required for:
+   - **ESPAsyncWebServer**: Download from [GitHub](https://github.com/me-no-dev/ESPAsyncWebServer)
+     - Download as ZIP, extract to Arduino/libraries/ESPAsyncWebServer
+   - **AsyncTCP**: Download from [GitHub](https://github.com/me-no-dev/AsyncTCP)
+     - Download as ZIP, extract to Arduino/libraries/AsyncTCP
+
+4. **Clone and Open Project**
    ```bash
    git clone https://github.com/DHPKE/OlimexLED-Matrix.git
-   cd OlimexLED-Matrix
-   code .
    ```
+   - Open Arduino IDE
+   - Go to **File → Open**
+   - Navigate to `OlimexLED-Matrix/arduino/OlimexLED-Matrix/`
+   - Open `OlimexLED-Matrix.ino`
+   - All required header files are in the same directory
 
-3. **Configure WiFi**
-   - Edit `src/config.h`
-   - Set your WiFi SSID and password:
+5. **Configure WiFi**
+   - Open `config.h` tab in Arduino IDE
+   - Update your WiFi credentials:
      ```cpp
      #define WIFI_SSID "YourWiFiNetwork"
      #define WIFI_PASSWORD "YourPassword"
      ```
 
-4. **Build and Upload**
-   - Click "PlatformIO: Build" in VS Code
-   - Connect Olimex Gateway via USB
-   - Click "PlatformIO: Upload"
+6. **Configure Board Settings**
+   - **Tools → Board** → "ESP32 Dev Module"
+   - **Tools → Upload Speed** → "921600"
+   - **Tools → Flash Frequency** → "80MHz"
+   - **Tools → Flash Mode** → "QIO"
+   - **Tools → Flash Size** → "4MB (32Mb)"
+   - **Tools → Partition Scheme** → "Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)"
+   - **Tools → Core Debug Level** → "None"
+   - **Tools → Port** → Select your COM/Serial port
 
-5. **Monitor Serial Output**
-   - Click "PlatformIO: Serial Monitor"
+7. **Upload to Board**
+   - Connect Olimex ESP32 Gateway via USB
+   - Click **Verify** (✓) to compile and check for errors
+   - Click **Upload** (→) to flash the firmware
+   - Wait for "Done uploading" message
+
+8. **Monitor Serial Output**
+   - Open **Tools → Serial Monitor**
+   - Set baud rate to **115200**
+   - Wait for ESP32 to boot
    - Note the IP address displayed
+   - Access web interface at `http://[IP_ADDRESS]`
 
-### For Arduino IDE
-
-1. **Install ESP32 Board Support**
-   - Open Arduino IDE
-   - Go to File → Preferences
-   - Add to "Additional Board Manager URLs":
-     ```
-     https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-     ```
-   - Go to Tools → Board → Boards Manager
-   - Search and install "esp32" by Espressif Systems
-
-2. **Install Required Libraries**
-   - Go to Sketch → Include Library → Manage Libraries
-   - Install the following:
-     - ESP32 HUB75 LED MATRIX PANEL DMA Display (by mrfaptastic)
-     - Adafruit GFX Library
-     - ArduinoJson (version 6.x)
-   - Download and install manually:
-     - [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
-     - [AsyncTCP](https://github.com/me-no-dev/AsyncTCP)
-
-3. **Copy Files**
-   - Copy all `.h` files from `src/` to your Arduino sketch folder
-   - Copy `fonts.h` from `lib/fonts/` to your sketch folder
-
-4. **Configure Board**
-   - Tools → Board → "ESP32 Dev Module"
-   - Tools → Upload Speed → "921600"
-   - Tools → Partition Scheme → "Default 4MB with spiffs"
-
-5. **Upload**
-   - Click Upload button
+For detailed setup instructions, see [docs/ARDUINO_SETUP.md](docs/ARDUINO_SETUP.md).
 
 ## 🔌 Hardware Connection
 
@@ -207,35 +214,33 @@ See [docs/QSYS_INTEGRATION.md](docs/QSYS_INTEGRATION.md) for detailed setup inst
 
 ```
 OlimexLED-Matrix/
-├── platformio.ini              # PlatformIO configuration
-├── src/
-│   ├── main.cpp               # Main firmware (PlatformIO)
-│   ├── config.h               # Hardware pin configuration
-│   ├── segment_manager.h      # Segment layout management
-│   ├── text_renderer.h        # Text rendering engine
-│   └── udp_handler.h          # UDP protocol handler
-├── lib/
-│   └── fonts/
-│       └── fonts.h            # Font definitions
 ├── arduino/
 │   └── OlimexLED-Matrix/
-│       └── OlimexLED-Matrix.ino  # Arduino IDE version
-├── data/                      # Web interface files (optional)
+│       ├── OlimexLED-Matrix.ino  # Main Arduino sketch
+│       ├── config.h              # Hardware pin configuration
+│       ├── segment_manager.h     # Segment layout management
+│       ├── text_renderer.h       # Text rendering engine
+│       ├── udp_handler.h         # UDP protocol handler
+│       └── fonts.h               # Font definitions
+├── src/                          # Original source (for reference)
+├── lib/                          # Original libraries (for reference)
+├── data/                         # Web interface files (optional)
 ├── qsys-plugin/
-│   └── led_matrix_controller.lua  # Q-SYS plugin
+│   └── led_matrix_controller.lua # Q-SYS plugin
 ├── docs/
-│   ├── SETUP.md              # Detailed setup guide
-│   ├── UDP_PROTOCOL.md       # Complete protocol specification
-│   ├── QSYS_INTEGRATION.md   # Q-SYS integration guide
-│   └── PINOUT.md             # Hardware wiring diagram
-└── README.md                 # This file
+│   ├── ARDUINO_SETUP.md          # Arduino IDE setup guide
+│   ├── UDP_PROTOCOL.md           # Complete protocol specification
+│   ├── QSYS_INTEGRATION.md       # Q-SYS integration guide
+│   └── PINOUT.md                 # Hardware wiring diagram
+├── examples/                     # Example scripts for UDP control
+└── README.md                     # This file
 ```
 
 ## 🔧 Configuration
 
 ### WiFi Configuration
 
-Edit `src/config.h`:
+Edit `arduino/OlimexLED-Matrix/config.h`:
 ```cpp
 #define WIFI_SSID "YourNetwork"
 #define WIFI_PASSWORD "YourPassword"
@@ -243,24 +248,22 @@ Edit `src/config.h`:
 
 ### Matrix Size
 
-Default is 64x32. To change, edit `platformio.ini`:
-```ini
-build_flags = 
-    -D LED_MATRIX_WIDTH=64
-    -D LED_MATRIX_HEIGHT=32
+Default is 64x32. To change, edit `arduino/OlimexLED-Matrix/config.h`:
+```cpp
+#define LED_MATRIX_WIDTH 64
+#define LED_MATRIX_HEIGHT 32
 ```
 
 ### UDP Port
 
-Default is 21324. To change, edit `platformio.ini`:
-```ini
-build_flags = 
-    -D UDP_PORT=21324
+Default is 21324. To change, edit `arduino/OlimexLED-Matrix/config.h`:
+```cpp
+#define UDP_PORT 21324
 ```
 
 ### Pin Configuration
 
-If using different GPIO pins, edit the pin definitions in `src/config.h`.
+If using different GPIO pins, edit the pin definitions in `arduino/OlimexLED-Matrix/config.h`.
 
 ## 📊 Segment Layouts
 

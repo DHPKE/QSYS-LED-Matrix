@@ -5,6 +5,51 @@ All notable changes to the Olimex LED Matrix Text Display project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-16
+
+### Breaking Changes
+- **REMOVED**: PlatformIO support and configuration files
+- Project now exclusively uses Arduino IDE
+
+### Changed
+- **Restructured** project for Arduino IDE as primary development environment
+- **Moved** main firmware from `src/main.cpp` to `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+- **Copied** all header files and fonts to Arduino sketch directory
+- **Updated** all documentation to focus exclusively on Arduino IDE
+- **Renamed** `docs/SETUP.md` to `docs/HARDWARE_SETUP.md` for clarity
+
+### Added
+- **Comprehensive Arduino IDE setup guide** at `docs/ARDUINO_SETUP.md` (650+ lines)
+  - Detailed prerequisites and installation instructions
+  - Step-by-step board and library installation
+  - Complete board configuration settings
+  - Upload process and troubleshooting
+  - Serial monitor usage guide
+  - Extensive troubleshooting section
+- **Enhanced README.md** with expanded Arduino IDE quick start
+- Configuration now done via `config.h` defines instead of build flags
+
+### Removed
+- `platformio.ini` configuration file
+- PlatformIO-specific `.gitignore` entries
+- All PlatformIO references from documentation
+- PlatformIO build instructions
+
+### Updated Documentation
+- **README.md**: Removed PlatformIO section, expanded Arduino IDE instructions
+- **PROJECT_SUMMARY.md**: Updated to reflect Arduino IDE-only structure
+- **CONTRIBUTING.md**: Replaced PlatformIO setup with Arduino IDE guidelines
+- All file paths now reference Arduino sketch directory
+
+### Migration Notes
+For existing PlatformIO users:
+- All source files remain available in `src/` and `lib/` directories for reference
+- Arduino sketch in `arduino/OlimexLED-Matrix/` contains complete working project
+- WiFi credentials: Edit `arduino/OlimexLED-Matrix/config.h`
+- Matrix size: Edit `LED_MATRIX_WIDTH` and `LED_MATRIX_HEIGHT` in `config.h`
+- UDP port: Edit `UDP_PORT` in `config.h`
+- See `docs/ARDUINO_SETUP.md` for complete setup instructions
+
 ## [1.0.0] - 2026-02-16
 
 ### Added

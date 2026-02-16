@@ -1,16 +1,11 @@
-# PlatformIO
-.pio/
-.vscode/
-.pioenvs
-.piolibdeps
-.clang_complete
-.gcc-flags.json
-
 # Arduino IDE
 *.hex
 *.eep
 *.elf
 *.bin
+
+# CodeQL
+_codeql_detected_source_root
 
 # Build artifacts
 *.o

@@ -127,15 +127,15 @@ class segment_manager {
 
 ### Before Submitting PR
 
-1. **Build test**:
-   ```bash
-   pio run
-   ```
+1. **Build test** (Arduino IDE):
+   - Open the sketch in Arduino IDE
+   - Click Verify (✓) to compile
+   - Check for compilation errors
 
 2. **Upload test**:
-   ```bash
-   pio run --target upload
-   ```
+   - Connect Olimex ESP32 Gateway
+   - Upload to hardware
+   - Verify serial output shows no errors
 
 3. **Functional test**:
    - Test all modified features
@@ -245,10 +245,11 @@ Add screenshots showing UI changes or output
 
 ### Requirements
 
-- Visual Studio Code with PlatformIO extension
-- Or Arduino IDE with ESP32 support
-- Git
-- Hardware: Olimex ESP32 Gateway + LED Matrix
+- **Arduino IDE** 1.8.19+ or 2.x
+- **ESP32 board support** (version 2.0.0+)
+- **Required libraries** (see docs/ARDUINO_SETUP.md)
+- **Git**
+- **Hardware**: Olimex ESP32 Gateway + LED Matrix (for hardware testing)
 
 ### Setup Steps
 
@@ -258,23 +259,25 @@ Add screenshots showing UI changes or output
    cd OlimexLED-Matrix
    ```
 
-2. **Open in VS Code**:
-   ```bash
-   code .
-   ```
+2. **Install Arduino IDE**:
+   - Download from [arduino.cc](https://www.arduino.cc/en/software)
+   - Install ESP32 board support
+   - Install required libraries (see [docs/ARDUINO_SETUP.md](docs/ARDUINO_SETUP.md))
 
-3. **Install dependencies**:
-   PlatformIO will automatically install libraries
+3. **Open project**:
+   - Launch Arduino IDE
+   - Open `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+   - All header files should appear as tabs
 
-4. **Build**:
-   ```bash
-   pio run
-   ```
+4. **Configure**:
+   - Edit `config.h` with your WiFi credentials
+   - Select "ESP32 Dev Module" board
+   - Configure board settings (see docs/ARDUINO_SETUP.md)
 
-5. **Upload**:
-   ```bash
-   pio run --target upload
-   ```
+5. **Build and Upload**:
+   - Click Verify (✓) to compile
+   - Click Upload (→) to flash to hardware
+   - Open Serial Monitor (115200 baud) to verify
 
 ## License
 

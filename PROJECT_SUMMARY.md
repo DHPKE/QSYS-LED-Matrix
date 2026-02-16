@@ -11,16 +11,17 @@ Complete WLED-inspired firmware for displaying dynamic text on 64x32 HUB75 LED m
 - **Documentation**: ~7,500 words
 - **Files Created**: 22 files
 - **Languages**: C++, Lua, Python, JavaScript, Bash
-- **Build Systems**: PlatformIO, Arduino IDE
+- **Build System**: Arduino IDE
 
 ### Core Components
 
-#### 1. Firmware (`src/`)
-- **main.cpp** (589 lines) - Main application with embedded web interface
+#### 1. Firmware (`arduino/OlimexLED-Matrix/`)
+- **OlimexLED-Matrix.ino** (510 lines) - Main Arduino sketch with embedded web interface
 - **config.h** (64 lines) - Hardware pin configuration for Olimex Gateway
 - **segment_manager.h** (175 lines) - Multi-segment text layout system
 - **text_renderer.h** (158 lines) - Adafruit GFX-based rendering engine
 - **udp_handler.h** (180 lines) - UDP protocol parser and command handler
+- **fonts.h** (57 lines) - Font manager with multiple font families
 
 **Features**:
 - HUB75 matrix driver with DMA refresh
@@ -47,7 +48,13 @@ Complete WLED-inspired firmware for displaying dynamic text on 64x32 HUB75 LED m
 - **README.md** - Integration examples and use cases
 
 #### 4. Documentation (`docs/`)
-- **SETUP.md** (469 lines) - Complete hardware setup guide
+- **ARDUINO_SETUP.md** (650+ lines) - Complete Arduino IDE setup guide
+  - Prerequisites and installation
+  - Board and library installation
+  - Configuration and upload
+  - Detailed troubleshooting
+  
+- **HARDWARE_SETUP.md** (420 lines) - Complete hardware setup guide
   - Wiring diagrams
   - Pin mappings
   - Power requirements
@@ -79,15 +86,14 @@ Complete WLED-inspired firmware for displaying dynamic text on 64x32 HUB75 LED m
 - **LICENSE** - MIT License
 
 #### 6. Build Configuration
-- **platformio.ini** - PlatformIO build configuration
-- **arduino/OlimexLED-Matrix.ino** - Arduino IDE compatibility
+- **arduino/** - Arduino IDE project directory
 - **.gitignore** - Build artifact exclusions
 
-#### 7. Font System (`lib/fonts/`)
-- **fonts.h** (57 lines) - Font manager with multiple font families
-  - Roboto fonts (6-24pt)
-  - Digital LED fonts (12-24pt)
-  - Monospace fonts (9-12pt)
+#### 7. Font System
+Integrated in Arduino sketch directory with multiple font families:
+- Roboto fonts (6-24pt)
+- Digital LED fonts (12-24pt)
+- Monospace fonts (9-12pt)
 
 ## Key Features Implemented
 
@@ -142,8 +148,7 @@ Complete WLED-inspired firmware for displaying dynamic text on 64x32 HUB75 LED m
 - **Color Depth**: 24-bit RGB
 
 ### Compatibility
-- **PlatformIO**: ✅ Full support
-- **Arduino IDE**: ✅ Compatible
+- **Arduino IDE**: ✅ Full support (1.8.19+ or 2.x)
 - **Q-SYS**: ✅ Version 8.0+
 - **Python**: ✅ 3.6+
 - **Node.js**: ✅ 12+
@@ -153,17 +158,16 @@ Complete WLED-inspired firmware for displaying dynamic text on 64x32 HUB75 LED m
 
 ```
 OlimexLED-Matrix/
-├── src/                      # Firmware source code
-│   ├── main.cpp             # Main application (589 lines)
-│   ├── config.h             # Hardware config
-│   ├── segment_manager.h    # Segment system
-│   ├── text_renderer.h      # Rendering engine
-│   └── udp_handler.h        # UDP protocol
-├── lib/fonts/               # Font definitions
-│   └── fonts.h
-├── arduino/                 # Arduino IDE version
+├── arduino/                 # Arduino IDE project
 │   └── OlimexLED-Matrix/
-│       └── OlimexLED-Matrix.ino
+│       ├── OlimexLED-Matrix.ino  # Main sketch (510 lines)
+│       ├── config.h         # Hardware config
+│       ├── segment_manager.h  # Segment system
+│       ├── text_renderer.h  # Rendering engine
+│       ├── udp_handler.h    # UDP protocol
+│       └── fonts.h          # Font definitions
+├── src/                     # Original source (for reference)
+├── lib/                     # Original libraries (for reference)
 ├── qsys-plugin/            # Q-SYS plugin
 │   └── led_matrix_controller.lua
 ├── examples/               # Example scripts
@@ -172,11 +176,11 @@ OlimexLED-Matrix/
 │   ├── led_matrix_client.js  # Node.js module
 │   └── README.md
 ├── docs/                   # Documentation
-│   ├── SETUP.md           # Hardware setup (469 lines)
+│   ├── ARDUINO_SETUP.md   # Arduino IDE setup (650+ lines)
+│   ├── HARDWARE_SETUP.md  # Hardware setup (420 lines)
 │   ├── UDP_PROTOCOL.md    # Protocol spec (452 lines)
 │   ├── QSYS_INTEGRATION.md  # Q-SYS guide (596 lines)
 │   └── PINOUT.md          # Pinout reference (494 lines)
-├── platformio.ini         # PlatformIO config
 ├── README.md              # Main documentation (430 lines)
 ├── CONTRIBUTING.md        # Contribution guide
 ├── CHANGELOG.md           # Version history
@@ -187,18 +191,16 @@ OlimexLED-Matrix/
 ## How to Use
 
 ### 1. Build and Upload
-```bash
-# PlatformIO
-pio run --target upload
 
-# Arduino IDE
-# Open arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino
-# Select ESP32 Dev Module
-# Upload
-```
+**Arduino IDE**:
+1. Open `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+2. Install required libraries (see docs/ARDUINO_SETUP.md)
+3. Select "ESP32 Dev Module" board
+4. Configure board settings (see docs/ARDUINO_SETUP.md)
+5. Upload to Olimex ESP32 Gateway
 
 ### 2. Configure WiFi
-Edit `src/config.h`:
+Edit `arduino/OlimexLED-Matrix/config.h`:
 ```cpp
 #define WIFI_SSID "YourNetwork"
 #define WIFI_PASSWORD "YourPassword"
@@ -261,7 +263,7 @@ Navigate to `http://[ESP32_IP_ADDRESS]` in browser
 - AsyncTCP (Git)
 
 ### Development Tools
-- PlatformIO (or Arduino IDE)
+- Arduino IDE 1.8.19+ or 2.x
 - Python 3.6+ (for examples)
 - Node.js 12+ (for examples)
 - Bash 4.0+ (for examples)
@@ -330,27 +332,25 @@ Navigate to `http://[ESP32_IP_ADDRESS]` in browser
 - Changelog
 
 ✅ **Project Files**
-- PlatformIO configuration
+- Arduino IDE project structure
 - Build system setup
 - License (MIT)
 - .gitignore
 
 ## Build Instructions Summary
 
-### PlatformIO (Recommended)
-1. Install VS Code + PlatformIO
-2. Clone repository
-3. Edit `src/config.h` for WiFi
-4. Build: `pio run`
-5. Upload: `pio run --target upload`
-
 ### Arduino IDE
-1. Install ESP32 board support
-2. Install required libraries
-3. Copy header files to sketch folder
-4. Edit config.h for WiFi
-5. Select "ESP32 Dev Module"
-6. Upload
+1. Install Arduino IDE 1.8.19+ or 2.x
+2. Install ESP32 board support (version 2.0.0+)
+3. Install required libraries (see docs/ARDUINO_SETUP.md)
+4. Clone repository
+5. Open `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+6. Edit `config.h` for WiFi credentials
+7. Select "ESP32 Dev Module" board
+8. Configure board settings (see docs/ARDUINO_SETUP.md)
+9. Upload to device
+
+See [docs/ARDUINO_SETUP.md](docs/ARDUINO_SETUP.md) for detailed instructions.
 
 ## Support Resources
 
