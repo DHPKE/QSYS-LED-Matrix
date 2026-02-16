@@ -1,66 +1,89 @@
--- PluginInfo section
-PLUGIN_INFO = {
-    Name = "Olimex~LED Matrix Controller",
-    Version = "1.1.0",
-    Id = "dhpke.olimex.led.matrix.1.1.0",
-    Description = "Professional UDP controller for Olimex ESP32 Gateway 64x32 LED Matrix with dark-themed UI"
+-- Q-SYS Plugin Code for Olimex LED Matrix Display
+
+-- Plugin Info
+local PluginInfo = {
+    Name="Olimex~LED Matrix Display",
+    Version="2.0.0",
+    Id="",
+    Description="",
+    ShowDebug=true,
+    Author="DHPKE"
 }
 
--- GetProperties function
+-- Function to Get Properties
 function GetProperties()
     return {
-        { Name = "IP Address", Type = "string", Default = "192.168.1.100" },
-        { Name = "Port", Type = "integer", Default = 8888 },
-        { Name = "Brightness", Type = "integer", Default = 100, Min = 0, Max = 100 }
+        IP_Address = {type="string", default="192.168.1.100"},
+        UDP_Port = {type="integer", min=1, max=65535, default=21324},
+        Number_of_Segments = {type="integer", min=1, max=4, default=4}
     }
 end
 
--- GetControls function
-function GetControls()
-    return {
-        { Name = "Segment 1", Type = "group" },
-        { Name = "Segment 2", Type = "group" },
-        { Name = "Segment 3", Type = "group" },
-        { Name = "Segment 4", Type = "group" },
-        { Name = "Global Controls", Type = "group" }
-    }
-end
-
--- GetControlLayout function
-function GetControlLayout()
-    return {
-        Header = { Title = "Olimex LED Matrix Controller", ConnectionStatus = "Disconnected" },
-        ConnectionSection = { { Name = "IP Address", Placeholder = "Enter IP" }, { Name = "Port", Placeholder = "Enter Port" } },
-        SegmentControls = {
-            { Segment = 1, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font1", EffectDropdown = "Effect1", SendButton = "Send", ClearButton = "Clear" },
-            { Segment = 2, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font2", EffectDropdown = "Effect2", SendButton = "Send", ClearButton = "Clear" },
-            { Segment = 3, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font3", EffectDropdown = "Effect3", SendButton = "Send", ClearButton = "Clear" },
-            { Segment = 4, TextInput = "Text", ColorPicker = "#00D4AA", FontSelector = "Font4", EffectDropdown = "Effect4", SendButton = "Send", ClearButton = "Clear" }
-        },
-        GlobalControls = { BrightnessSlider = "Brightness", ClearAllButton = "Clear All" }
-    }
-end
-
--- Runtime script for UDP handling
-local socket = require("socket")
-local udp = socket.udp()
-
-function Initialize()
-    udp:settimeout(0)
-end
-
-function SendData(ip, port, data)
-    udp:send(ip, port, data)
-end
-
-function ReceiveData()
-    local data, msg = udp:receive()
-    if data then
-        -- Process incoming data
+-- Function to Get Controls
+function GetControls(props)
+    local controls = {}
+    
+    -- Connection Controls
+    controls.ip_address = Text("IP Address")
+    controls.udp_port = Text("UDP Port")
+    controls.connection_status = Indicator("Status")
+    
+    for i = 1, props.Number_of_Segments.default do
+        controls["segment_" .. i] = {
+            text_input = Text("Text Input"),
+            color_hex_input = Text("Color Hex"),
+            font_dropdown = Dropdown("Font", {"roboto6", "roboto8", "roboto12", "roboto16", "roboto24", "digital12", "digital24", "mono9", "mono12"}),
+            effect_dropdown = Dropdown("Effect", {"none", "scroll", "blink", "fade", "rainbow"}),
+            alignment_buttons = { 
+                left = Button("Align Left"),
+                center = Button("Align Center"),
+                right = Button("Align Right")
+            },
+            send_trigger = Button("Send"),
+            clear_trigger = Button("Clear")
+        }
     end
+    
+    -- Global Controls
+    controls.global_brightness = Knob("Global Brightness", {min=0, max=255})
+    controls.clear_all = Button("Clear All")
+    
+    return controls
 end
 
-function Update()
-    -- Update the UI elements based on the incoming data
-    ReceiveData()
+-- Function to Get Control Layout
+function GetControlLayout(props)
+    local layout = --[[Name your layout views using relevant Q-SYS Lua methods]]
+    {
+        BackgroundColor = "#2D2D30",
+        TitleColor = "#00D4AA",
+        Sections = {
+            Header = {},
+            Connection = {},
+            Segments = {},
+            Global = {}
+        }
+    }
+
+    for i = 1, props.Number_of_Segments.default do
+        layout.Sections.Segments[i] = {
+            PositionY = 150 + (i * 140),
+            Controls = GetControls(props)["segment_" .. i]
+        }
+    end
+
+    return layout
+end
+
+-- Function to Get Pins
+function GetPins(props)
+    return GetControls(props)
+end
+
+-- Runtime code - initialize on Controls
+if Controls then
+    -- UDP Socket Initialization
+    -- Implement SendCommand() function 
+    -- Event Handlers for Controls
+    -- Initialize() function setting defaults
 end
