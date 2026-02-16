@@ -286,7 +286,7 @@ Test each color channel:
 ```
 TEXT|0|RED|FF0000|roboto24|auto|C|none
 TEXT|0|GREEN|00FF00|roboto24|auto|C|none
-TEXT|0|BLUE|0000FF|FF0000|roboto24|auto|C|none
+TEXT|0|BLUE|0000FF|roboto24|auto|C|none
 ```
 
 ## Troubleshooting Hardware Issues
