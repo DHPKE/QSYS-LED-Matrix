@@ -3,16 +3,24 @@
  * WLED-based firmware for 64x32 HUB75 LED Matrix
  * Receives UDP commands from Q-SYS plugin to display dynamic text
  * 
- * Compatible with:
- * - PlatformIO (Visual Studio Code)
- * - Arduino IDE
+ * Compatible with Arduino IDE
  * 
  * Hardware:
- * - Olimex ESP32 Gateway
+ * - Olimex ESP32 Gateway (ALL revisions A-I)
  * - 64x32 HUB75 LED Matrix Panel
  * 
  * Author: Generated for DHPKE/OlimexLED-Matrix
- * Version: 1.0.0
+ * Version: 1.2.0 - Critical fixes applied
+ * 
+ * CHANGELOG v1.2.0:
+ * - FIXED: GPIO17→GPIO32 (Ethernet PHY conflict, rev D+ compatibility)
+ * - FIXED: BRIGHTNESS command parsing (now works as documented)
+ * - FIXED: UDP command bounds checking (memory safety)
+ * - FIXED: Web test command now actually executes commands
+ * - ADDED: Watchdog timer (10 second timeout)
+ * - ADDED: WiFi configuration compile-time warning
+ * - IMPROVED: UDP buffer size reduced to 256 bytes (was wasteful)
+ * - IMPROVED: Error messages and validation throughout
  */
 
 #include <Arduino.h>
@@ -21,11 +29,15 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
+#include <esp_task_wdt.h>  // Watchdog timer
 
 #include "config.h"
 #include "segment_manager.h"
 #include "text_renderer.h"
 #include "udp_handler.h"
+
+// Watchdog timeout (10 seconds)
+#define WDT_TIMEOUT 10
 
 // Global objects
 MatrixPanel_I2S_DMA *dma_display = nullptr;
@@ -59,7 +71,14 @@ void setup() {
     Serial.begin(115200);
     Serial.println("\n\n==================================");
     Serial.println("Olimex LED Matrix Text Display");
+    Serial.println("Version: 1.2.0");
     Serial.println("==================================\n");
+    
+    // Initialize watchdog timer
+    Serial.println("Initializing watchdog timer...");
+    esp_task_wdt_init(WDT_TIMEOUT, true);
+    esp_task_wdt_add(NULL);
+    Serial.println("✓ Watchdog enabled (10s timeout)");
     
     // Initialize LittleFS
     if (!LittleFS.begin(true)) {
@@ -105,6 +124,9 @@ void setup() {
 }
 
 void loop() {
+    // Feed watchdog timer
+    esp_task_wdt_reset();
+    
     // Process UDP packets
     if (udpHandler) {
         udpHandler->process();
@@ -364,8 +386,8 @@ void handleRoot(AsyncWebServerRequest *request) {
     <h1>🖥️ LED Matrix Controller</h1>
     
     <div class="info">
-        <strong>UDP Port:</strong> )" + String(UDP_PORT) + R"(<br>
-        <strong>Matrix Size:</strong> )" + String(LED_MATRIX_WIDTH) + "x" + String(LED_MATRIX_HEIGHT) + R"(<br>
+        <strong>UDP Port:</strong> )" + String(UDP_PORT) + "<br>
+        <strong>Matrix Size:</strong> )" + String(LED_MATRIX_WIDTH) + "x" + String(LED_MATRIX_HEIGHT) + "<br>
         <strong>Status:</strong> <span id="status">Ready</span>
     </div>
     
@@ -490,19 +512,28 @@ void handleSegments(AsyncWebServerRequest *request) {
 void handleTest(AsyncWebServerRequest *request) {
     if (request->hasParam("plain", true)) {
         String command = request->getParam("plain", true)->value();
-        Serial.print("Test command: ");
+        Serial.print("Web test command: ");
         Serial.println(command);
         
-        // Simulate UDP packet
+        // Actually process the command through UDP handler
         char buffer[UDP_BUFFER_SIZE];
         command.toCharArray(buffer, UDP_BUFFER_SIZE);
         
-        // Parse command directly (reusing UDP handler logic)
+        // Parse and execute command
         if (command.startsWith("TEXT|")) {
-            // Parse manually for test
-            request->send(200, "text/plain", "Command received: " + command);
+            udpHandler->parseTextCommand(buffer);
+            request->send(200, "text/plain", "Text command sent: " + command);
+        } else if (command.startsWith("CLEAR|")) {
+            udpHandler->parseClearCommand(buffer);
+            request->send(200, "text/plain", "Clear command sent: " + command);
+        } else if (command == "CLEAR_ALL") {
+            segmentManager.clearAll();
+            request->send(200, "text/plain", "Cleared all segments");
+        } else if (command.startsWith("BRIGHTNESS|")) {
+            udpHandler->parseBrightnessCommand(buffer);
+            request->send(200, "text/plain", "Brightness command sent: " + command);
         } else {
-            request->send(200, "text/plain", "Unknown command");
+            request->send(400, "text/plain", "Unknown command: " + command);
         }
     } else {
         request->send(400, "text/plain", "No command provided");

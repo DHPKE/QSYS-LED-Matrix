@@ -4,7 +4,7 @@
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <Adafruit_GFX.h>
 #include "segment_manager.h"
-#include "../lib/fonts/fonts.h"
+#include "fonts.h"
 
 class TextRenderer {
 private:
