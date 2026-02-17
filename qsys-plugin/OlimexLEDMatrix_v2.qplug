@@ -456,15 +456,15 @@ if Controls then
             Controls[string.format("active_%d", i)].Boolean = false
         end
         
-        -- Open UDP socket with error handling
+        -- Open UDP socket with error handling (connectionless — no IP/port at open time)
         local success, err = pcall(function()
             socket = UdpSocket.New()
-            socket:Open(ip_addr, udp_port)
+            socket:Open()
         end)
         
         if success then
             Controls.connection_status.Value = 0 -- OK
-            print("✓ UDP socket opened: " .. ip_addr .. ":" .. udp_port)
+            print("✓ UDP socket opened, targeting " .. ip_addr .. ":" .. udp_port)
         else
             Controls.connection_status.Value = 2 -- Fault
             print("✗ ERROR opening socket: " .. tostring(err))
@@ -483,7 +483,7 @@ if Controls then
         end
         
         local success, err = pcall(function()
-            socket:Send(command .. "\n")
+            socket:Send(ip_addr, udp_port, command .. "\n")
         end)
         
         if success then
@@ -578,7 +578,7 @@ if Controls then
             pcall(function() socket:Close() end)
             local success, err = pcall(function()
                 socket = UdpSocket.New()
-                socket:Open(ip_addr, udp_port)
+                socket:Open()
             end)
             
             if success then
@@ -602,7 +602,7 @@ if Controls then
                 pcall(function() socket:Close() end)
                 local success, err = pcall(function()
                     socket = UdpSocket.New()
-                    socket:Open(ip_addr, udp_port)
+                    socket:Open()
                 end)
                 
                 if success then
