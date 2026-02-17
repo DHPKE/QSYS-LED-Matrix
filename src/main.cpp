@@ -93,11 +93,8 @@ void setup() {
     // Setup LED Matrix
     setupMatrix();
     
-    // Setup Ethernet
+    // Setup Ethernet (UDP will be started from the ETH_GOT_IP event)
     setupEthernet();
-    
-    // Setup UDP handler
-    setupUDP();
     
     // Setup web server
     setupWebServer();
@@ -106,10 +103,10 @@ void setup() {
     Serial.println("System Ready!");
     Serial.println("==================================");
     Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
+    Serial.println(ETH.localIP());
     Serial.print("UDP Port: ");
     Serial.println(UDP_PORT);
-    Serial.println("Web Interface: http://" + WiFi.localIP().toString());
+    Serial.println("Web Interface: http://" + ETH.localIP().toString());
     Serial.println("==================================\n");
     
     // Display welcome message
@@ -127,6 +124,11 @@ void loop() {
     // Feed watchdog timer
     esp_task_wdt_reset();
     
+    // If Ethernet is up but UDP handler wasn't started yet, start it now
+    if (eth_connected && !udpHandler) {
+        setupUDP();
+    }
+
     // Process UDP packets
     if (udpHandler) {
         udpHandler->process();
@@ -232,6 +234,8 @@ void WiFiEvent(WiFiEvent_t event) {
             Serial.print(ETH.linkSpeed());
             Serial.println("Mbps");
             eth_connected = true;
+            // Start UDP listener now that the network interface is up
+            setupUDP();
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             Serial.println("ETH Disconnected");
