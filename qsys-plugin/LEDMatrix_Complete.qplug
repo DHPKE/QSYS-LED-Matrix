@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.1.0 - Optimized runtime helpers, fixed UDP Send signature
+-- Version 3.2.0 - Fixed dropdowns: ControlType = "ComboBox" (was "Text"+"List")
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP
 --
 -- FEATURES:
@@ -16,8 +16,8 @@
 
 PluginInfo = {
     Name = "Olimex~LED Matrix Complete",
-    Version = "3.1.0",
-    Id = "dhpke.olimex.led.matrix.3.1.0",
+    Version = "3.2.0",
+    Id = "dhpke.olimex.led.matrix.3.2.0",
     Description = "Complete UDP control for Olimex ESP32 Gateway 64x32 LED Matrix with all features",
     ShowDebug = true,
     Author = "DHPKE"
@@ -101,8 +101,7 @@ function GetControls(props)
     -- Layout controls
     table.insert(controls, {
         Name = "layout",
-        ControlType = "Text",
-        ControlUnit = "List",
+        ControlType = "ComboBox",
         Choices = {"Fullscreen", "Split Vertical", "Split Horizontal", "Quad"},
         Count = 1,
         UserPin = true,
@@ -142,8 +141,7 @@ function GetControls(props)
         -- Text color selector
         table.insert(controls, {
             Name = string.format("text_color_%d", seg),
-            ControlType = "Text",
-            ControlUnit = "List",
+            ControlType = "ComboBox",
             Choices = {"White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray", "Black"},
             Count = 1,
             UserPin = true,
@@ -153,8 +151,7 @@ function GetControls(props)
         -- Background color selector
         table.insert(controls, {
             Name = string.format("bg_color_%d", seg),
-            ControlType = "Text",
-            ControlUnit = "List",
+            ControlType = "ComboBox",
             Choices = {"Black", "White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray"},
             Count = 1,
             UserPin = true,
@@ -176,8 +173,7 @@ function GetControls(props)
         -- Font selector
         table.insert(controls, {
             Name = string.format("font_%d", seg),
-            ControlType = "Text",
-            ControlUnit = "List",
+            ControlType = "ComboBox",
             Choices = {"Arial", "Verdana", "Digital", "Mono"},
             Count = 1,
             UserPin = true,
@@ -187,8 +183,7 @@ function GetControls(props)
         -- Alignment selector
         table.insert(controls, {
             Name = string.format("align_%d", seg),
-            ControlType = "Text",
-            ControlUnit = "List",
+            ControlType = "ComboBox",
             Choices = {"Left", "Center", "Right"},
             Count = 1,
             UserPin = true,
@@ -257,7 +252,7 @@ function GetControlLayout(props)
     
     table.insert(graphics, {
         Type = "Text",
-        Text = "LED Matrix Complete Controller v3.1",
+        Text = "LED Matrix Complete Controller v3.2",
         Font = "Roboto",
         FontSize = 18,
         FontStyle = "Bold",
@@ -608,7 +603,7 @@ if Controls then
     -- ---------------------------------------------------------------
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.1.0 Initializing")
+        print("LED Matrix Complete v3.2.0 Initializing")
         print("===========================================")
 
         Controls.ip_address.String  = ip_addr
