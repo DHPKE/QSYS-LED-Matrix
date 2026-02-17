@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Restructured** project for Arduino IDE as primary development environment
-- **Moved** main firmware from `src/main.cpp` to `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+- **Moved** main firmware from `src/main.cpp` to `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino`
 - **Copied** all header files and fonts to Arduino sketch directory
 - **Updated** all documentation to focus exclusively on Arduino IDE
 - **Renamed** `docs/SETUP.md` to `docs/HARDWARE_SETUP.md` for clarity
@@ -44,8 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration Notes
 For existing PlatformIO users:
 - All source files remain available in `src/` and `lib/` directories for reference
-- Arduino sketch in `arduino/OlimexLED-Matrix/` contains complete working project
-- WiFi credentials: Edit `arduino/OlimexLED-Matrix/config.h`
+- Arduino sketch in `arduino/QSYS-LED-Matrix/` contains complete working project
+- WiFi credentials: Edit `arduino/QSYS-LED-Matrix/config.h`
 - Matrix size: Edit `LED_MATRIX_WIDTH` and `LED_MATRIX_HEIGHT` in `config.h`
 - UDP port: Edit `UDP_PORT` in `config.h`
 - See `docs/ARDUINO_SETUP.md` for complete setup instructions
@@ -281,9 +281,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for areas accepting contributions:
 
 ## Links
 
-- [GitHub Repository](https://github.com/DHPKE/OlimexLED-Matrix)
-- [Issue Tracker](https://github.com/DHPKE/OlimexLED-Matrix/issues)
-- [Releases](https://github.com/DHPKE/OlimexLED-Matrix/releases)
+- [GitHub Repository](https://github.com/DHPKE/QSYS-LED-Matrix)
+- [Issue Tracker](https://github.com/DHPKE/QSYS-LED-Matrix/issues)
+- [Releases](https://github.com/DHPKE/QSYS-LED-Matrix/releases)
 
 ## Contributing
 

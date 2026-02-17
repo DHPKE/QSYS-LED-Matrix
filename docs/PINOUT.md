@@ -336,7 +336,7 @@ May require different scan rates, but same pin connections.
 
 If default pins conflict with other peripherals:
 
-Edit `arduino/OlimexLED-Matrix/config.h`:
+Edit `arduino/QSYS-LED-Matrix/config.h`:
 
 ```cpp
 // Example alternative mapping

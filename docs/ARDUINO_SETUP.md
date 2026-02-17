@@ -177,28 +177,28 @@ After restarting Arduino IDE:
 ### Download/Clone Repository
 
 **Option A: Download ZIP**
-1. Go to [https://github.com/DHPKE/OlimexLED-Matrix](https://github.com/DHPKE/OlimexLED-Matrix)
+1. Go to [https://github.com/DHPKE/QSYS-LED-Matrix](https://github.com/DHPKE/QSYS-LED-Matrix)
 2. Click the green **Code** button
 3. Select **Download ZIP**
 4. Extract to a convenient location
 
 **Option B: Clone with Git**
 ```bash
-git clone https://github.com/DHPKE/OlimexLED-Matrix.git
+git clone https://github.com/DHPKE/QSYS-LED-Matrix.git
 ```
 
 ### Open the Sketch
 
 1. Open Arduino IDE
 2. Go to **File → Open**
-3. Navigate to: `OlimexLED-Matrix/arduino/OlimexLED-Matrix/`
-4. Select `OlimexLED-Matrix.ino`
+3. Navigate to: `QSYS-LED-Matrix/arduino/QSYS-LED-Matrix/`
+4. Select `QSYS-LED-Matrix.ino`
 5. Click **Open**
 
 ### Required Files
 
 The Arduino IDE will automatically detect all files in the same directory. You should see tabs for:
-- `OlimexLED-Matrix` (main sketch)
+- `QSYS-LED-Matrix` (main sketch)
 - `config.h`
 - `segment_manager.h`
 - `text_renderer.h`
@@ -520,7 +520,7 @@ The IP address is displayed in the Serial Monitor after "IP Address:". You'll ne
 2. Check WiFi is 2.4GHz (ESP32 doesn't support 5GHz)
 3. Move ESP32 closer to router
 4. Check for special characters in password (use escape sequences)
-5. Try AP mode if connection fails (SSID: "OlimexLED-Matrix", password: "12345678")
+5. Try AP mode if connection fails (SSID: "QSYS-LED-Matrix", password: "12345678")
 
 **Problem:** Matrix displays nothing
 
@@ -543,7 +543,7 @@ The IP address is displayed in the Serial Monitor after "IP Address:". You'll ne
 
 If you're still experiencing issues:
 
-1. Check existing GitHub issues: [https://github.com/DHPKE/OlimexLED-Matrix/issues](https://github.com/DHPKE/OlimexLED-Matrix/issues)
+1. Check existing GitHub issues: [https://github.com/DHPKE/QSYS-LED-Matrix/issues](https://github.com/DHPKE/QSYS-LED-Matrix/issues)
 2. Create a new issue with:
    - Arduino IDE version
    - ESP32 board package version

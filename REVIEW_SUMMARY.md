@@ -38,7 +38,7 @@
 ---
 
 ## Files Reviewed:
-✅ OlimexLED-Matrix.ino (510 lines)
+✅ QSYS-LED-Matrix.ino (510 lines)
 ✅ config.h (64 lines)
 ✅ segment_manager.h (175 lines)
 ✅ text_renderer.h (158 lines)

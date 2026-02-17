@@ -15,8 +15,8 @@ Complete WLED-inspired firmware for displaying dynamic text on 64x32 HUB75 LED m
 
 ### Core Components
 
-#### 1. Firmware (`arduino/OlimexLED-Matrix/`)
-- **OlimexLED-Matrix.ino** (510 lines) - Main Arduino sketch with embedded web interface
+#### 1. Firmware (`arduino/QSYS-LED-Matrix/`)
+- **QSYS-LED-Matrix.ino** (510 lines) - Main Arduino sketch with embedded web interface
 - **config.h** (64 lines) - Hardware pin configuration for Olimex Gateway
 - **segment_manager.h** (175 lines) - Multi-segment text layout system
 - **text_renderer.h** (158 lines) - Adafruit GFX-based rendering engine
@@ -157,10 +157,10 @@ Integrated in Arduino sketch directory with multiple font families:
 ## File Structure
 
 ```
-OlimexLED-Matrix/
+QSYS-LED-Matrix/
 ├── arduino/                 # Arduino IDE project
-│   └── OlimexLED-Matrix/
-│       ├── OlimexLED-Matrix.ino  # Main sketch (510 lines)
+│   └── QSYS-LED-Matrix/
+│       ├── QSYS-LED-Matrix.ino  # Main sketch (510 lines)
 │       ├── config.h         # Hardware config
 │       ├── segment_manager.h  # Segment system
 │       ├── text_renderer.h  # Rendering engine
@@ -193,14 +193,14 @@ OlimexLED-Matrix/
 ### 1. Build and Upload
 
 **Arduino IDE**:
-1. Open `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+1. Open `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino`
 2. Install required libraries (see docs/ARDUINO_SETUP.md)
 3. Select "ESP32 Dev Module" board
 4. Configure board settings (see docs/ARDUINO_SETUP.md)
 5. Upload to Olimex ESP32 Gateway
 
 ### 2. Configure WiFi
-Edit `arduino/OlimexLED-Matrix/config.h`:
+Edit `arduino/QSYS-LED-Matrix/config.h`:
 ```cpp
 #define WIFI_SSID "YourNetwork"
 #define WIFI_PASSWORD "YourPassword"
@@ -344,7 +344,7 @@ Navigate to `http://[ESP32_IP_ADDRESS]` in browser
 2. Install ESP32 board support (version 2.0.0+)
 3. Install required libraries (see docs/ARDUINO_SETUP.md)
 4. Clone repository
-5. Open `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+5. Open `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino`
 6. Edit `config.h` for WiFi credentials
 7. Select "ESP32 Dev Module" board
 8. Configure board settings (see docs/ARDUINO_SETUP.md)

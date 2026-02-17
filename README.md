@@ -55,12 +55,12 @@ A complete firmware solution for displaying dynamic text on a 64x32 pixel LED ma
 
 4. **Clone and Open Project**
    ```bash
-   git clone https://github.com/DHPKE/OlimexLED-Matrix.git
+   git clone https://github.com/DHPKE/QSYS-LED-Matrix.git
    ```
    - Open Arduino IDE
    - Go to **File → Open**
-   - Navigate to `OlimexLED-Matrix/arduino/OlimexLED-Matrix/`
-   - Open `OlimexLED-Matrix.ino`
+   - Navigate to `QSYS-LED-Matrix/arduino/QSYS-LED-Matrix/`
+   - Open `QSYS-LED-Matrix.ino`
    - All required header files are in the same directory
 
 5. **Configure WiFi**
@@ -213,10 +213,10 @@ See [docs/QSYS_INTEGRATION.md](docs/QSYS_INTEGRATION.md) for detailed setup inst
 ## 📁 Project Structure
 
 ```
-OlimexLED-Matrix/
+QSYS-LED-Matrix/
 ├── arduino/
-│   └── OlimexLED-Matrix/
-│       ├── OlimexLED-Matrix.ino  # Main Arduino sketch
+│   └── QSYS-LED-Matrix/
+│       ├── QSYS-LED-Matrix.ino  # Main Arduino sketch
 │       ├── config.h              # Hardware pin configuration
 │       ├── segment_manager.h     # Segment layout management
 │       ├── text_renderer.h       # Text rendering engine
@@ -240,7 +240,7 @@ OlimexLED-Matrix/
 
 ### WiFi Configuration
 
-Edit `arduino/OlimexLED-Matrix/config.h`:
+Edit `arduino/QSYS-LED-Matrix/config.h`:
 ```cpp
 #define WIFI_SSID "YourNetwork"
 #define WIFI_PASSWORD "YourPassword"
@@ -248,7 +248,7 @@ Edit `arduino/OlimexLED-Matrix/config.h`:
 
 ### Matrix Size
 
-Default is 64x32. To change, edit `arduino/OlimexLED-Matrix/config.h`:
+Default is 64x32. To change, edit `arduino/QSYS-LED-Matrix/config.h`:
 ```cpp
 #define LED_MATRIX_WIDTH 64
 #define LED_MATRIX_HEIGHT 32
@@ -256,14 +256,14 @@ Default is 64x32. To change, edit `arduino/OlimexLED-Matrix/config.h`:
 
 ### UDP Port
 
-Default is 21324. To change, edit `arduino/OlimexLED-Matrix/config.h`:
+Default is 21324. To change, edit `arduino/QSYS-LED-Matrix/config.h`:
 ```cpp
 #define UDP_PORT 21324
 ```
 
 ### Pin Configuration
 
-If using different GPIO pins, edit the pin definitions in `arduino/OlimexLED-Matrix/config.h`.
+If using different GPIO pins, edit the pin definitions in `arduino/QSYS-LED-Matrix/config.h`.
 
 ## 📊 Segment Layouts
 
@@ -297,7 +297,7 @@ Segments can be reconfigured in `src/segment_manager.h` by modifying the `initDe
 
 ### WiFi connection fails
 - Verify SSID and password in config.h
-- Device will create AP "OlimexLED-Matrix" if connection fails
+- Device will create AP "QSYS-LED-Matrix" if connection fails
 - Connect to AP (password: 12345678) and access 192.168.4.1
 
 ### UDP commands not working
@@ -346,7 +346,7 @@ Contributions are welcome! Please:
 
 ## 📞 Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/DHPKE/OlimexLED-Matrix/issues)
+- GitHub Issues: [Report bugs or request features](https://github.com/DHPKE/QSYS-LED-Matrix/issues)
 - Documentation: See `docs/` folder for detailed guides
 
 ## 🙏 Acknowledgments

@@ -1,8 +1,8 @@
-# OlimexLED-Matrix Project Overview
+# QSYS-LED-Matrix Project Overview
 
-## Project: OlimexLED-Matrix
-**Location:** `/Users/user/.openclaw/workspace/OlimexLED-Matrix`  
-**GitHub:** https://github.com/DHPKE/OlimexLED-Matrix.git  
+## Project: QSYS-LED-Matrix
+**Location:** `/Users/user/.openclaw/workspace/QSYS-LED-Matrix`  
+**GitHub:** https://github.com/DHPKE/QSYS-LED-Matrix.git  
 **Status:** Cloned - Ready for Development
 
 ## What Is This?
@@ -30,10 +30,10 @@
 ## Project Structure
 
 ```
-OlimexLED-Matrix/
+QSYS-LED-Matrix/
 ├── arduino/
-│   └── OlimexLED-Matrix/      # Main Arduino firmware
-│       ├── OlimexLED-Matrix.ino
+│   └── QSYS-LED-Matrix/      # Main Arduino firmware
+│       ├── QSYS-LED-Matrix.ino
 │       ├── config.h           # WiFi & pin config
 │       ├── segment_manager.h  # Segment layouts
 │       ├── text_renderer.h    # Text rendering
@@ -60,7 +60,7 @@ OlimexLED-Matrix/
    - Install required libraries (ESP32 HUB75, Adafruit GFX, ArduinoJson, AsyncWebServer, AsyncTCP)
 
 2. **Configure WiFi**
-   - Edit `arduino/OlimexLED-Matrix/config.h`
+   - Edit `arduino/QSYS-LED-Matrix/config.h`
    - Set SSID and password
 
 3. **Upload Firmware**
@@ -97,11 +97,11 @@ TEXT|segment|content|color|font|size|align|effect
 ## Current Status
 
 ✅ **Cloned from GitHub**  
-📂 **Location:** `/Users/user/.openclaw/workspace/OlimexLED-Matrix`  
+📂 **Location:** `/Users/user/.openclaw/workspace/QSYS-LED-Matrix`  
 🔧 **Ready for:** Development, testing, customization  
 
 ---
 
 **Version:** v1.0.0 (initial release 2026-02-16)  
 **License:** Open Source  
-**Repository:** https://github.com/DHPKE/OlimexLED-Matrix.git
+**Repository:** https://github.com/DHPKE/QSYS-LED-Matrix.git

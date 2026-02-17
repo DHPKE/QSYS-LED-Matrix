@@ -9,7 +9,7 @@
 ## ✅ ALL CRITICAL FIXES APPLIED
 
 ### Fix #1: GPIO17 Hardware Conflict ✅
-**File:** `arduino/OlimexLED-Matrix/config.h`
+**File:** `arduino/QSYS-LED-Matrix/config.h`
 
 **Problem:**
 - GPIO17 used for B2_PIN (LED matrix)
@@ -35,7 +35,7 @@
 ---
 
 ### Fix #2: BRIGHTNESS Command Parsing ✅
-**File:** `arduino/OlimexLED-Matrix/udp_handler.h`
+**File:** `arduino/QSYS-LED-Matrix/udp_handler.h`
 
 **Problem:**
 - Documentation said to use `BRIGHTNESS|value`
@@ -56,7 +56,7 @@
 ---
 
 ### Fix #3: Memory Safety - Bounds Checking ✅
-**File:** `arduino/OlimexLED-Matrix/udp_handler.h`
+**File:** `arduino/QSYS-LED-Matrix/udp_handler.h`
 
 **Problem:**
 - `strtok()` used without bounds checking
@@ -104,7 +104,7 @@ if (segmentId >= MAX_SEGMENTS) {
 ---
 
 ### Fix #4: Web Test Command Not Working ✅
-**File:** `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+**File:** `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino`
 
 **Problem:**
 - Web interface parsed commands but never executed them
@@ -161,7 +161,7 @@ if (command.startsWith("TEXT|")) {
 ---
 
 ### Fix #6: Added Watchdog Timer ✅
-**File:** `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+**File:** `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino`
 
 **Problem:**
 - ESP32 could hang if matrix DMA or network stalled
@@ -197,7 +197,7 @@ void loop() {
 ---
 
 ### Fix #7: WiFi Configuration Warning ✅
-**File:** `arduino/OlimexLED-Matrix/config.h`
+**File:** `arduino/QSYS-LED-Matrix/config.h`
 
 **Problem:**
 - Users would upload with `"YOUR_SSID"` placeholder
@@ -223,7 +223,7 @@ void loop() {
 ---
 
 ### Fix #8: UDP Buffer Optimization ✅
-**File:** `arduino/OlimexLED-Matrix/config.h`
+**File:** `arduino/QSYS-LED-Matrix/config.h`
 
 **Problem:**
 - Buffer size was 512 bytes
@@ -273,19 +273,19 @@ void loop() {
 
 ## 📁 FILES MODIFIED
 
-1. ✅ `arduino/OlimexLED-Matrix/config.h` (67 → 85 lines)
+1. ✅ `arduino/QSYS-LED-Matrix/config.h` (67 → 85 lines)
    - GPIO17→GPIO32
    - WiFi warning
    - Buffer optimization
    - Detailed comments
 
-2. ✅ `arduino/OlimexLED-Matrix/udp_handler.h` (180 → 220 lines)
+2. ✅ `arduino/QSYS-LED-Matrix/udp_handler.h` (180 → 220 lines)
    - BRIGHTNESS command
    - Bounds checking
    - Validation throughout
    - Error messages
 
-3. ✅ `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino` (510 → 540 lines)
+3. ✅ `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino` (510 → 540 lines)
    - Watchdog timer
    - Web test fix
    - Version bump to 1.2.0

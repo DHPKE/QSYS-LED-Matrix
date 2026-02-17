@@ -203,4 +203,4 @@ TEXT|0|Hello|FF0000|roboto16|24|R|scroll
 ---
 
 **Status:** v2.0.0 Ready for Testing  
-**Recommended:** Use with OlimexLED-Matrix firmware v1.2.0+
+**Recommended:** Use with QSYS-LED-Matrix firmware v1.2.0+

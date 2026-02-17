@@ -1,12 +1,12 @@
-# OlimexLED-Matrix - Project Status
+# QSYS-LED-Matrix - Project Status
 
 ## ✅ COMPLETE - Ready for Hardware Testing
 
 **Firmware Version:** v1.2.0 (Critical Fixes Applied)  
 **Q-SYS Plugin Version:** v2.0.0 (Complete Overhaul)  
 **Date:** 2026-02-17  
-**Location:** `/Users/user/.openclaw/workspace/OlimexLED-Matrix`  
-**GitHub:** https://github.com/DHPKE/OlimexLED-Matrix.git
+**Location:** `/Users/user/.openclaw/workspace/QSYS-LED-Matrix`  
+**GitHub:** https://github.com/DHPKE/QSYS-LED-Matrix.git
 
 ---
 
@@ -26,7 +26,7 @@ ESP32 firmware for displaying dynamic text on 64x32 HUB75 LED matrix using Olime
 
 ## ✅ Critical Fixes Applied (v1.2.0)
 
-### Firmware (arduino/OlimexLED-Matrix/)
+### Firmware (arduino/QSYS-LED-Matrix/)
 
 ### 1. **GPIO17 Hardware Conflict** - FIXED
 - **Was:** GPIO17 (conflicts with Ethernet on rev D+)

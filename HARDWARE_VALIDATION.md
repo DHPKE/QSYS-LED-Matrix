@@ -1,7 +1,7 @@
 # Olimex ESP32-GATEWAY Hardware Validation Report
 
 **Date:** 2026-02-17  
-**Project:** OlimexLED-Matrix  
+**Project:** QSYS-LED-Matrix  
 **Hardware:** Olimex ESP32-GATEWAY (ESP32-GATEWAY)  
 **Official Repo:** https://github.com/OLIMEX/ESP32-GATEWAY
 
@@ -25,7 +25,7 @@ The Olimex ESP32-GATEWAY has **MULTIPLE hardware revisions** (A through I) with 
 **From Olimex Hardware Revision F changelog:**
 > "GPIO6-11, which are used by the ESP32's internal flash, were disconnected from CON1 and the 6 SD card signals are now routed instead"
 
-**Impact on OlimexLED-Matrix project:**
+**Impact on QSYS-LED-Matrix project:**
 - ❌ **No GPIOs 6-11 available on any revision F or newer**
 - ✅ Current pin mapping avoids GPIO 6-11 (good!)
 - ✅ Project is compatible with all hardware revisions
@@ -40,7 +40,7 @@ The Olimex ESP32-GATEWAY has **MULTIPLE hardware revisions** (A through I) with 
 **From Hardware Revision I changelog:**
 > "To reduce noise getting picked by Ethernet clock, **disconnected GPIO17 from the CON1 header**. Added jumper pads GPIO17_E1 (open by default) if somebody wants to lead it to the header..."
 
-**Impact on OlimexLED-Matrix project:**
+**Impact on QSYS-LED-Matrix project:**
 - ⚠️ **GPIO17 used for B2_PIN (Blue Data Lower)**
 - ⚠️ **GPIO17 also used by Ethernet PHY on rev D+**
 - ⚠️ **GPIO17 NOT available on header in rev I (newest)**
@@ -71,7 +71,7 @@ Olimex rev C used GPIO0 for Ethernet, but rev D+ moved to GPIO17.
 **From Olimex Hardware Revision D changelog:**
 > "**GPIO5 is now used for Ethernet 'power enable pin'**."
 
-**Impact on OlimexLED-Matrix project:**
+**Impact on QSYS-LED-Matrix project:**
 - ✅ GPIO5 used for A_PIN (Row Address A)
 - ⚠️ GPIO5 controls Ethernet power on rev D+
 - ⚠️ If Ethernet is used, GPIO5 behavior might conflict

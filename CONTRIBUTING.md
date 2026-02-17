@@ -255,8 +255,8 @@ Add screenshots showing UI changes or output
 
 1. **Clone repository**:
    ```bash
-   git clone https://github.com/DHPKE/OlimexLED-Matrix.git
-   cd OlimexLED-Matrix
+   git clone https://github.com/DHPKE/QSYS-LED-Matrix.git
+   cd QSYS-LED-Matrix
    ```
 
 2. **Install Arduino IDE**:
@@ -266,7 +266,7 @@ Add screenshots showing UI changes or output
 
 3. **Open project**:
    - Launch Arduino IDE
-   - Open `arduino/OlimexLED-Matrix/OlimexLED-Matrix.ino`
+   - Open `arduino/QSYS-LED-Matrix/QSYS-LED-Matrix.ino`
    - All header files should appear as tabs
 
 4. **Configure**:

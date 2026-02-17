@@ -1,8 +1,8 @@
-# OlimexLED-Matrix Code Review & Optimization Report
+# QSYS-LED-Matrix Code Review & Optimization Report
 
 **Date:** 2026-02-17  
 **Reviewer:** AI Assistant  
-**Project:** OlimexLED-Matrix firmware and Q-SYS plugin
+**Project:** QSYS-LED-Matrix firmware and Q-SYS plugin
 
 ---
 
@@ -16,7 +16,7 @@ Comprehensive review of all project files identified **multiple critical issues*
 
 ### 1. **BRIGHTNESS Command Parsing Bug** (udp_handler.h)
 **Severity:** HIGH  
-**File:** `arduino/OlimexLED-Matrix/udp_handler.h` line 144
+**File:** `arduino/QSYS-LED-Matrix/udp_handler.h` line 144
 
 **Problem:**
 ```cpp
@@ -53,7 +53,7 @@ Add null pointer check before using font.
 
 ### 4. **Web Interface Test Command Not Implemented**
 **Severity:** MEDIUM  
-**File:** `OlimexLED-Matrix.ino` line 454
+**File:** `QSYS-LED-Matrix.ino` line 454
 
 **Problem:**
 ```cpp
@@ -108,7 +108,7 @@ Create shared utility function in config.h or separate utils.h file.
 
 ### 7. **Missing EOF Handling in LittleFS**
 **Severity:** LOW  
-**File:** `OlimexLED-Matrix.ino` line 295
+**File:** `QSYS-LED-Matrix.ino` line 295
 
 **Problem:**
 No check if file read was successful before parsing JSON.
@@ -220,7 +220,7 @@ Serial.println(FPSTR(STR_MATRIX_INIT));
 ```
 
 ### 13. **Effect Update Rate Fixed**
-**File:** `OlimexLED-Matrix.ino` line 106
+**File:** `QSYS-LED-Matrix.ino` line 106
 
 **Problem:**
 ```cpp
@@ -258,7 +258,7 @@ Add fade state tracking and alpha blending logic.
 Add HSV to RGB conversion and color cycling logic.
 
 ### 16. **No Persistent Segment Configuration**
-**File:** `OlimexLED-Matrix.ino`
+**File:** `QSYS-LED-Matrix.ino`
 
 **Problem:**
 `SEGMENT_CONFIG_FILE` defined but never used. Segments reset on reboot.
@@ -307,7 +307,7 @@ Some functions return bool for success/failure, others just print Serial message
 Standardize error handling pattern across project.
 
 ### 20. **No Watchdog Timer**
-**File:** `OlimexLED-Matrix.ino`
+**File:** `QSYS-LED-Matrix.ino`
 
 **Problem:**
 ESP32 can hang if matrix DMA or network stalls. `delay(1)` is not sufficient.
