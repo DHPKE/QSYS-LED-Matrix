@@ -101,7 +101,8 @@ function GetControls(props)
     -- Layout controls
     table.insert(controls, {
         Name = "layout",
-        ControlType = "ComboBox",
+        ControlType = "Text",
+        ControlUnit = "List",
         Choices = {"Fullscreen", "Split Vertical", "Split Horizontal", "Quad"},
         Count = 1,
         UserPin = true,
@@ -141,7 +142,8 @@ function GetControls(props)
         -- Text color selector
         table.insert(controls, {
             Name = string.format("text_color_%d", seg),
-            ControlType = "ComboBox",
+            ControlType = "Text",
+            ControlUnit = "List",
             Choices = {"White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray", "Black"},
             Count = 1,
             UserPin = true,
@@ -151,7 +153,8 @@ function GetControls(props)
         -- Background color selector
         table.insert(controls, {
             Name = string.format("bg_color_%d", seg),
-            ControlType = "ComboBox",
+            ControlType = "Text",
+            ControlUnit = "List",
             Choices = {"Black", "White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray"},
             Count = 1,
             UserPin = true,
@@ -173,7 +176,8 @@ function GetControls(props)
         -- Font selector
         table.insert(controls, {
             Name = string.format("font_%d", seg),
-            ControlType = "ComboBox",
+            ControlType = "Text",
+            ControlUnit = "List",
             Choices = {"Arial", "Verdana", "Digital", "Mono"},
             Count = 1,
             UserPin = true,
@@ -183,7 +187,8 @@ function GetControls(props)
         -- Alignment selector
         table.insert(controls, {
             Name = string.format("align_%d", seg),
-            ControlType = "ComboBox",
+            ControlType = "Text",
+            ControlUnit = "List",
             Choices = {"Left", "Center", "Right"},
             Count = 1,
             UserPin = true,
@@ -239,218 +244,228 @@ end
 function GetControlLayout(props)
     local layout = {}
     local graphics = {}
-    
-    -- Title section
+    local W = 860  -- total plugin width
+
+    -- Helper: add a small label above a control
+    local function Label(text, x, y, w)
+        table.insert(graphics, {
+            Type = "Text",
+            Text = text,
+            Font = "Roboto",
+            FontSize = 9,
+            HTextAlign = "Left",
+            Color = {220, 220, 220},
+            Position = {x, y},
+            Size = {w, 12}
+        })
+    end
+
+    -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {
         Type = "GroupBox",
-        Fill = {160, 160, 160},
-        StrokeWidth = 2,
-        CornerRadius = 8,
+        Fill = {50, 50, 50},
+        StrokeWidth = 0,
+        CornerRadius = 6,
         Position = {0, 0},
-        Size = {900, 50}
+        Size = {W, 40}
     })
-    
     table.insert(graphics, {
         Type = "Text",
-        Text = "LED Matrix Complete Controller v3.2",
+        Text = "LED Matrix Complete Controller  v3.2",
         Font = "Roboto",
-        FontSize = 18,
+        FontSize = 16,
         FontStyle = "Bold",
         HTextAlign = "Center",
-        Color = {0, 0, 0},
-        Position = {0, 15},
-        Size = {900, 30}
+        Color = {255, 255, 255},
+        Position = {0, 10},
+        Size = {W, 24}
     })
-    
-    -- Connection section
-    local yPos = 60
+
+    -- ── Connection ─────────────────────────────────────────────────
+    local yPos = 48
     table.insert(graphics, {
         Type = "GroupBox",
         Text = "Connection",
-        Fill = {140, 140, 140},
+        Fill = {70, 70, 70},
         StrokeWidth = 1,
         CornerRadius = 4,
-        Position = {10, yPos},
-        Size = {880, 90}
+        Position = {0, yPos},
+        Size = {W, 68}
     })
-    
+    Label("IP Address",  10, yPos+14, 120)
+    Label("Port",       140, yPos+14,  60)
+    Label("Status",     210, yPos+14,  60)
+
     layout["ip_address"] = {
         PrettyName = "IP Address",
         Style = "Text",
-        Position = {20, yPos + 25},
-        Size = {150, 20}
+        Position = {10, yPos+26},
+        Size = {120, 22}
     }
-    
     layout["udp_port"] = {
         PrettyName = "Port",
         Style = "Text",
-        Position = {180, yPos + 25},
-        Size = {70, 20}
+        Position = {140, yPos+26},
+        Size = {60, 22}
     }
-    
     layout["connection_status"] = {
         PrettyName = "Status",
         Style = "Indicator",
-        Position = {260, yPos + 25},
-        Size = {40, 20}
+        Position = {210, yPos+26},
+        Size = {50, 22}
     }
-    
     layout["last_command"] = {
         PrettyName = "Last Command",
         Style = "Text",
-        Position = {20, yPos + 55},
-        Size = {850, 20},
-        Color = {80, 80, 80}
+        Position = {270, yPos+26},
+        Size = {W-280, 22},
+        Color = {180, 180, 180}
     }
-    
-    -- Layout section
-    yPos = 160
+
+    -- ── Display Layout ─────────────────────────────────────────────
+    yPos = yPos + 76
     table.insert(graphics, {
         Type = "GroupBox",
         Text = "Display Layout",
-        Fill = {140, 140, 140},
+        Fill = {70, 70, 70},
         StrokeWidth = 1,
         CornerRadius = 4,
-        Position = {10, yPos},
-        Size = {880, 70}
+        Position = {0, yPos},
+        Size = {W, 56}
     })
-    
+    Label("Layout Preset", 10, yPos+14, 160)
     layout["layout"] = {
         PrettyName = "Layout Preset",
         Style = "ComboBox",
-        Position = {20, yPos + 25},
-        Size = {200, 30}
+        Position = {10, yPos+26},
+        Size = {180, 22}
     }
-    
     layout["apply_layout"] = {
         PrettyName = "Apply",
         Style = "Button",
         ButtonStyle = "Trigger",
         Legend = "Apply Layout",
-        Color = {80, 150, 220},
-        Position = {230, yPos + 25},
-        Size = {120, 30}
+        Color = {60, 130, 210},
+        Position = {200, yPos+26},
+        Size = {120, 22}
     }
-    
-    -- Segments section
-    yPos = 240
+
+    -- ── Segments ───────────────────────────────────────────────────
+    yPos = yPos + 64
     for seg = 0, 3 do
-        local segmentY = yPos + (seg * 180)
-        
+        local sY = yPos + seg * 148
+
         table.insert(graphics, {
             Type = "GroupBox",
             Text = string.format("Segment %d", seg + 1),
-            Fill = {140, 140, 140},
+            Fill = {70, 70, 70},
             StrokeWidth = 1,
             CornerRadius = 4,
-            Position = {10, segmentY},
-            Size = {880, 170}
+            Position = {0, sY},
+            Size = {W, 140}
         })
-        
-        -- Active indicator
+
+        -- Row 1: LED + Text + Send + Clear  (y+18..y+42)
         layout[string.format("active_%d", seg)] = {
-            PrettyName = "Active",
+            PrettyName = string.format("Seg%d Active", seg+1),
             Style = "Led",
-            Position = {20, segmentY + 30},
-            Size = {16, 16}
+            Position = {10, sY+20},
+            Size = {14, 14}
         }
-        
-        -- Text input
+        Label("Text", 30, sY+14, W-220)
         layout[string.format("text_%d", seg)] = {
-            PrettyName = "Text",
+            PrettyName = string.format("Seg%d Text", seg+1),
             Style = "Text",
-            Position = {45, segmentY + 30},
-            Size = {400, 20}
+            Position = {30, sY+26},
+            Size = {W-250, 22}
         }
-        
-        -- Send and Clear buttons
         layout[string.format("send_%d", seg)] = {
-            PrettyName = "Send",
+            PrettyName = "Display",
             Style = "Button",
             ButtonStyle = "Trigger",
             Legend = "Display",
-            Color = {0, 180, 80},
-            Position = {455, segmentY + 25},
-            Size = {100, 30}
+            Color = {0, 160, 70},
+            Position = {W-210, sY+26},
+            Size = {100, 22}
         }
-        
         layout[string.format("clear_%d", seg)] = {
             PrettyName = "Clear",
             Style = "Button",
             ButtonStyle = "Trigger",
             Legend = "Clear",
-            Color = {200, 60, 60},
-            Position = {565, segmentY + 25},
-            Size = {100, 30}
+            Color = {180, 50, 50},
+            Position = {W-104, sY+26},
+            Size = {100, 22}
         }
-        
-        -- Row 2: Text Color, Background Color
+
+        -- Row 2: Text Color | BG Color | Font | Align | Intensity  (y+56..y+90)
+        local r2y = sY + 58
+        Label("Text Color",  10,  r2y-12, 120)
+        Label("BG Color",   140,  r2y-12, 120)
+        Label("Font",       270,  r2y-12,  90)
+        Label("Align",      368,  r2y-12,  70)
+        Label("Intensity",  446,  r2y-12, 160)
+
         layout[string.format("text_color_%d", seg)] = {
-            PrettyName = "Text Color",
+            PrettyName = string.format("Seg%d Text Color", seg+1),
             Style = "ComboBox",
-            Position = {20, segmentY + 65},
-            Size = {120, 25}
+            Position = {10, r2y},
+            Size = {120, 22}
         }
-        
         layout[string.format("bg_color_%d", seg)] = {
-            PrettyName = "Background",
+            PrettyName = string.format("Seg%d BG Color", seg+1),
             Style = "ComboBox",
-            Position = {150, segmentY + 65},
-            Size = {120, 25}
+            Position = {140, r2y},
+            Size = {120, 22}
         }
-        
-        layout[string.format("intensity_%d", seg)] = {
-            PrettyName = "Intensity",
-            Style = "Fader",
-            Position = {280, segmentY + 65},
-            Size = {150, 25}
-        }
-        
-        -- Row 3: Font and Alignment
         layout[string.format("font_%d", seg)] = {
-            PrettyName = "Font",
+            PrettyName = string.format("Seg%d Font", seg+1),
             Style = "ComboBox",
-            Position = {20, segmentY + 100},
-            Size = {120, 25}
+            Position = {270, r2y},
+            Size = {90, 22}
         }
-        
         layout[string.format("align_%d", seg)] = {
-            PrettyName = "Alignment",
+            PrettyName = string.format("Seg%d Align", seg+1),
             Style = "ComboBox",
-            Position = {150, segmentY + 100},
-            Size = {120, 25}
+            Position = {368, r2y},
+            Size = {70, 22}
+        }
+        layout[string.format("intensity_%d", seg)] = {
+            PrettyName = string.format("Seg%d Intensity", seg+1),
+            Style = "Fader",
+            Position = {446, r2y},
+            Size = {W-456, 22}
         }
     end
-    
-    -- Global controls section
-    yPos = 240 + (4 * 180) + 10
+
+    -- ── Global Controls ────────────────────────────────────────────
+    yPos = yPos + (4 * 148) + 4
     table.insert(graphics, {
         Type = "GroupBox",
         Text = "Global Controls",
-        Fill = {140, 140, 140},
+        Fill = {70, 70, 70},
         StrokeWidth = 1,
         CornerRadius = 4,
-        Position = {10, yPos},
-        Size = {880, 90}
+        Position = {0, yPos},
+        Size = {W, 72}
     })
-    
+    Label("Global Brightness", 10, yPos+14, 200)
     layout["brightness"] = {
-        PrettyName = "Global Brightness (0-255)",
+        PrettyName = "Global Brightness",
         Style = "Fader",
-        Position = {20, yPos + 25},
-        Size = {300, 50}
+        Position = {10, yPos+26},
+        Size = {280, 36}
     }
-    
     layout["clear_all"] = {
         PrettyName = "Clear All",
         Style = "Button",
         ButtonStyle = "Trigger",
         Legend = "Clear All Segments",
-        Color = {200, 60, 60},
-        Position = {340, yPos + 25},
-        Size = {180, 50}
+        Color = {180, 50, 50},
+        Position = {300, yPos+26},
+        Size = {180, 36}
     }
-    
+
     return layout, graphics
 end
 
