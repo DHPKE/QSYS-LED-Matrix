@@ -525,18 +525,21 @@ if Controls then
     -- Helpers
     -- ---------------------------------------------------------------
 
-    -- Generic debounce: cancel any pending timer with the given key,
-    -- then fire fn after `delay` seconds.
+    -- Generic debounce: stop any pending timer with the given key,
+    -- then fire fn once after `delay` seconds.
+    -- Q-SYS Timer.New() repeats; we stop it inside the handler to make it one-shot.
     local function Debounce(key, delay, fn)
         if debounceTimers[key] then
-            debounceTimers[key]:Cancel()
+            debounceTimers[key]:Stop()
         end
-        local t = Timer.New()
+        if not debounceTimers[key] then
+            debounceTimers[key] = Timer.New()
+        end
+        local t = debounceTimers[key]
         t.EventHandler = function()
-            debounceTimers[key] = nil
+            t:Stop()
             fn()
         end
-        debounceTimers[key] = t
         t:Start(delay)
     end
 
@@ -746,7 +749,7 @@ if Controls then
     function Cleanup()
         print("Cleaning up LED Matrix Controller...")
         for _, t in pairs(debounceTimers) do
-            if t then pcall(function() t:Cancel() end) end
+            if t then pcall(function() t:Stop() end) end
         end
         if socket then pcall(function() socket:Close() end) end
     end

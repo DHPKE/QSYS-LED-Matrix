@@ -551,14 +551,16 @@ if Controls then
     Controls.brightness.EventHandler = function(ctl)
         pendingBrightness = math.floor(ctl.Value)
         
-        -- Cancel existing timer
+        -- Stop existing timer (reuse object to avoid runaway timers)
         if brightnessTimer then
-            brightnessTimer:Cancel()
+            brightnessTimer:Stop()
+        else
+            brightnessTimer = Timer.New()
         end
         
-        -- Create new timer (500ms debounce)
-        brightnessTimer = Timer.New()
+        -- One-shot: stop inside handler before executing
         brightnessTimer.EventHandler = function()
+            brightnessTimer:Stop()
             if pendingBrightness then
                 local command = string.format("BRIGHTNESS|%d", pendingBrightness)
                 SendCommand(command)
@@ -626,7 +628,7 @@ if Controls then
             pcall(function() socket:Close() end)
         end
         if brightnessTimer then
-            brightnessTimer:Cancel()
+            brightnessTimer:Stop()
         end
     end
     
