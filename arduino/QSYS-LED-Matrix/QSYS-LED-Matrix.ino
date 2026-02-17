@@ -319,7 +319,7 @@ void saveConfiguration() {
 }
 
 void handleRoot(AsyncWebServerRequest *request) {
-    String html = R"(
+    String html = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
@@ -451,12 +451,12 @@ void handleRoot(AsyncWebServerRequest *request) {
             const fontSelect = document.getElementById('font' + segment);
             const font = fontSelect ? fontSelect.value : 'roboto12';
             
-            const command = `TEXT|${segment}|${text}|${color}|${font}|auto|C|none`;
+            const command = 'TEXT|' + segment + '|' + text + '|' + color + '|' + font + '|auto|C|none';
             sendUDP(command);
         }
         
         function clearSegment(segment) {
-            sendUDP(`CLEAR|${segment}`);
+            sendUDP('CLEAR|' + segment);
         }
         
         function clearAll() {
@@ -465,12 +465,12 @@ void handleRoot(AsyncWebServerRequest *request) {
         
         function setBrightness(value) {
             document.getElementById('brightness-value').textContent = value;
-            sendUDP(`BRIGHTNESS|${value}`);
+            sendUDP('BRIGHTNESS|' + value);
         }
     </script>
 </body>
 </html>
-    )";
+    )rawliteral";
     
     request->send(200, "text/html", html);
 }

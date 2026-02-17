@@ -18,11 +18,8 @@ struct FontInfo {
 
 // Available fonts
 const FontInfo FONTS[] = {
-    {"roboto6", &FreeSans9pt7b, 9},
-    {"roboto8", &FreeSans9pt7b, 9},
-    {"roboto12", &FreeSans12pt7b, 12},
-    {"roboto16", &FreeSans18pt7b, 18},
-    {"roboto24", &FreeSans24pt7b, 24},
+    {"arial", &FreeSans12pt7b, 12},        // Arial sans-serif (auto-sized)
+    {"verdana", &FreeSans12pt7b, 12},      // Verdana sans-serif (auto-sized)
     {"digital12", &FreeMonoBold12pt7b, 12},
     {"digital24", &FreeSans24pt7b, 24},
     {"mono9", &FreeMonoBold9pt7b, 9},

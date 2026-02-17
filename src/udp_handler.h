@@ -34,14 +34,14 @@ public:
     }
     
     // Parse TEXT command with bounds checking
-    // Format: TEXT|segment|content|color|font|size|align|effect
+    // Format: TEXT|segment|content|color|font|size|align|effect|bgcolor|intensity
     void parseTextCommand(char* cmd) {
-        char* tokens[8] = {nullptr};
+        char* tokens[10] = {nullptr};
         int tokenCount = 0;
         
         // Safely tokenize with bounds checking
         char* token = strtok(cmd, "|");
-        while (token != nullptr && tokenCount < 8) {
+        while (token != nullptr && tokenCount < 10) {
             tokens[tokenCount++] = token;
             token = strtok(nullptr, "|");
         }
@@ -60,6 +60,8 @@ public:
         char* size = (tokenCount > 5) ? tokens[5] : nullptr;
         char* align = (tokenCount > 6) ? tokens[6] : nullptr;
         char* effect = (tokenCount > 7) ? tokens[7] : nullptr;
+        char* bgcolor = (tokenCount > 8) ? tokens[8] : nullptr;
+        char* intensity = (tokenCount > 9) ? tokens[9] : nullptr;
         
         // Validate segment ID
         if (segmentId >= MAX_SEGMENTS) {
@@ -108,6 +110,16 @@ public:
                 else seg->effect = EFFECT_NONE;
             }
             
+            if (bgcolor) {
+                seg->bgColor = parseColor(bgcolor);
+            }
+            
+            if (intensity) {
+                // Intensity affects text brightness (stored in segment for rendering)
+                // For now, we'll store it as a simple flag or process during rendering
+                // This can be extended based on your needs
+            }
+            
             seg->isDirty = true;
         }
     }
@@ -145,29 +157,52 @@ public:
         }
     }
     
-    // Parse CONFIG command (legacy support)
-    // Format: CONFIG|brightness|value
+    // Parse CONFIG command (extended support)
+    // Format: CONFIG|brightness|value OR CONFIG|segment|id|property|value
     void parseConfigCommand(char* cmd) {
-        char* token = strtok(cmd, "|");
-        if (!token) return;
+        char* tokens[5] = {nullptr};
+        int tokenCount = 0;
         
-        token = strtok(nullptr, "|"); // Get config type
-        if (token && strcmp(token, "brightness") == 0) {
-            token = strtok(nullptr, "|"); // Get value
-            if (token) {
-                int value = atoi(token);
-                if (value >= 0 && value <= 255) {
-                    brightness = (uint8_t)value;
-                }
+        // Tokenize
+        char* token = strtok(cmd, "|");
+        while (token != nullptr && tokenCount < 5) {
+            tokens[tokenCount++] = token;
+            token = strtok(nullptr, "|");
+        }
+        
+        if (tokenCount < 2) return;
+        
+        // Check config type
+        if (strcmp(tokens[1], "brightness") == 0 && tokenCount >= 3) {
+            int value = atoi(tokens[2]);
+            if (value >= 0 && value <= 255) {
+                brightness = (uint8_t)value;
+            }
+        } else if (strcmp(tokens[1], "segment") == 0 && tokenCount >= 5) {
+            // CONFIG|segment|id|property|value
+            uint8_t segmentId = atoi(tokens[2]);
+            if (segmentId >= MAX_SEGMENTS) return;
+            
+            Segment* seg = segmentManager->getSegment(segmentId);
+            if (!seg) return;
+            
+            char* property = tokens[3];
+            int value = atoi(tokens[4]);
+            
+            if (strcmp(property, "x") == 0) {
+                seg->x = value;
+                seg->isDirty = true;
+            } else if (strcmp(property, "y") == 0) {
+                seg->y = value;
+                seg->isDirty = true;
+            } else if (strcmp(property, "width") == 0) {
+                seg->width = value;
+                seg->isDirty = true;
+            } else if (strcmp(property, "height") == 0) {
+                seg->height = value;
+                seg->isDirty = true;
             }
         }
-    }
-    
-public:
-    UDPHandler(SegmentManager* manager) : segmentManager(manager), brightness(DEFAULT_BRIGHTNESS) {}
-    
-    bool begin() {
-        return udp.begin(UDP_PORT);
     }
     
     void process() {

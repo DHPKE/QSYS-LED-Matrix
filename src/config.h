@@ -54,8 +54,11 @@
 #define WIFI_PASSWORD "YOUR_PASSWORD"
 
 // Compile-time warning for unconfigured WiFi
-#if defined(WIFI_SSID) && (strcmp(WIFI_SSID, "YOUR_SSID") == 0)
-#warning "WiFi SSID not configured! Update config.h with your network credentials"
+#if defined(WIFI_SSID)
+  #define WIFI_SSID_STR WIFI_SSID
+  #if __has_include(<cstring>)
+    #include <cstring>
+  #endif
 #endif
 
 // UDP Configuration

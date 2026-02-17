@@ -29,40 +29,53 @@ private:
     
     // Calculate optimal font size for text to fit in segment
     uint8_t calculateAutoSize(Segment* seg, const char* text) {
-        // Simple auto-sizing algorithm
         int textLen = strlen(text);
         if (textLen == 0) return 12;
         
-        // Estimate character width (rough approximation)
+        // Available space with padding
         int availWidth = seg->width - 4; // 2px padding each side
         int availHeight = seg->height - 4;
         
         // Try fonts from largest to smallest
         const uint8_t sizes[] = {24, 18, 12, 9, 6};
+        
         for (int i = 0; i < 5; i++) {
-            int charWidth = sizes[i] * 0.6; // Rough estimate
-            int totalWidth = textLen * charWidth;
+            // Get the actual font for this size
+            const GFXfont* testFont = selectFont(sizes[i], seg->fontName);
+            dma_display->setFont(testFont);
             
-            if (totalWidth <= availWidth && sizes[i] <= availHeight) {
+            // Get actual text bounds
+            int16_t x1, y1;
+            uint16_t w, h;
+            dma_display->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+            
+            // Check if text fits in available space
+            if (w <= availWidth && h <= availHeight) {
                 return sizes[i];
             }
         }
         
-        return 6; // Minimum size
+        return 6; // Minimum size if nothing fits
     }
     
     // Get appropriate font for size
     const GFXfont* selectFont(uint8_t size, const char* fontName) {
-        // Map size to closest available font
-        if (size <= 9) {
-            return getFontByName("roboto8");
-        } else if (size <= 12) {
-            return getFontByName("roboto12");
-        } else if (size <= 18) {
-            return getFontByName("roboto16");
-        } else {
-            return getFontByName("roboto24");
+        // Handle auto-sizing for Arial and Verdana fonts
+        if (fontName && (strcmp(fontName, "arial") == 0 || strcmp(fontName, "verdana") == 0)) {
+            // Select size based on segment height
+            if (size <= 9) {
+                return &FreeSans9pt7b;
+            } else if (size <= 12) {
+                return &FreeSans12pt7b;
+            } else if (size <= 18) {
+                return &FreeSans18pt7b;
+            } else {
+                return &FreeSans24pt7b;
+            }
         }
+        
+        // Otherwise use the font name directly
+        return getFontByName(fontName);
     }
     
 public:
@@ -98,20 +111,22 @@ public:
         int16_t textX, textY;
         int padding = 2;
         
+        // Calculate cursor position (not bounding box position)
+        // We need to subtract x1 offset from alignment calculations
         switch (seg->align) {
             case ALIGN_LEFT:
-                textX = seg->x + padding;
+                textX = seg->x + padding - x1;
                 break;
             case ALIGN_CENTER:
-                textX = seg->x + (seg->width - w) / 2;
+                textX = seg->x + (seg->width - w) / 2 - x1;
                 break;
             case ALIGN_RIGHT:
-                textX = seg->x + seg->width - w - padding;
+                textX = seg->x + seg->width - w - padding - x1;
                 break;
         }
         
-        // Vertical center
-        textY = seg->y + (seg->height + h) / 2 - y1;
+        // Vertical center - cursor Y position
+        textY = seg->y + (seg->height - y1 + h) / 2;
         
         // Apply scrolling offset
         if (seg->effect == EFFECT_SCROLL) {
