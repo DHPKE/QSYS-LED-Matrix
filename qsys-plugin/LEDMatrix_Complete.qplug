@@ -1,23 +1,15 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.2.0 - Fixed dropdowns: ControlType = "ComboBox" (was "Text"+"List")
+-- Version 3.3.0 - All firmware features: size, effect, auto-send on change
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP
 --
--- FEATURES:
--- - 4 independent segments with dynamic layouts
--- - Layout presets: Fullscreen, Split Vertical, Split Horizontal, Quad
--- - CSS color names for text and background
--- - Arial, Verdana, Digital and Mono font support with auto-sizing
--- - Text alignment (Left, Center, Right)
--- - Individual segment background colors and intensity
--- - Automatic segment repositioning on layout change
--- - Global brightness control
--- - Connection status monitoring
--- - UDP error handling and validation
+-- FIRMWARE PROTOCOL: TEXT|seg|content|color|font|size|align|effect|bgcolor|intensity
+--                    CLEAR|seg  |  CLEAR_ALL  |  BRIGHTNESS|val
+--                    CONFIG|segment|seg|x/y/width/height|val
 
 PluginInfo = {
     Name = "Olimex~LED Matrix Complete",
-    Version = "3.2.0",
-    Id = "dhpke.olimex.led.matrix.3.2.0",
+    Version = "3.3.0",
+    Id = "dhpke.olimex.led.matrix.3.3.0",
     Description = "Complete UDP control for Olimex ESP32 Gateway 64x32 LED Matrix with all features",
     ShowDebug = true,
     Author = "DHPKE"
@@ -194,7 +186,29 @@ function GetControls(props)
             UserPin = true,
             PinStyle = "Input"
         })
-        
+
+        -- Font size selector
+        table.insert(controls, {
+            Name = string.format("size_%d", seg),
+            ControlType = "Text",
+            ControlUnit = "List",
+            Choices = {"auto", "8", "12", "16", "24", "32"},
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Input"
+        })
+
+        -- Effect selector
+        table.insert(controls, {
+            Name = string.format("effect_%d", seg),
+            ControlType = "Text",
+            ControlUnit = "List",
+            Choices = {"none", "scroll", "blink", "fade", "rainbow"},
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Input"
+        })
+
         -- Send button
         table.insert(controls, {
             Name = string.format("send_%d", seg),
@@ -242,229 +256,123 @@ end
 
 -- Define UI layout
 function GetControlLayout(props)
-    local layout = {}
+    local layout   = {}
     local graphics = {}
-    local W = 860  -- total plugin width
+    local W  = 900   -- plugin width
+    local CH = 24    -- standard control height
+    local BH = 28    -- button height
 
-    -- Helper: add a small label above a control
-    local function Label(text, x, y, w)
-        table.insert(graphics, {
-            Type = "Text",
-            Text = text,
-            Font = "Roboto",
-            FontSize = 9,
-            HTextAlign = "Left",
-            Color = {220, 220, 220},
-            Position = {x, y},
-            Size = {w, 12}
-        })
+    local C_GRP   = {62,  62,  62 }
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55 }
+    local C_BTN_R = {165, 38,  38 }
+    local C_BTN_B = {45,  105, 195}
+
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, {Type="GroupBox", Text=title or "", Fill=C_GRP,
+            StrokeWidth=1, CornerRadius=4, Position={x,y}, Size={w,h}})
+    end
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, {Type="Text", Text=text, Font="Roboto", FontSize=9,
+            HTextAlign="Left", Color=C_LBL, Position={x,y}, Size={w,12}})
     end
 
     -- ── Title ──────────────────────────────────────────────────────
-    table.insert(graphics, {
-        Type = "GroupBox",
-        Fill = {50, 50, 50},
-        StrokeWidth = 0,
-        CornerRadius = 6,
-        Position = {0, 0},
-        Size = {W, 40}
-    })
-    table.insert(graphics, {
-        Type = "Text",
-        Text = "LED Matrix Complete Controller  v3.2",
-        Font = "Roboto",
-        FontSize = 16,
-        FontStyle = "Bold",
-        HTextAlign = "Center",
-        Color = {255, 255, 255},
-        Position = {0, 10},
-        Size = {W, 24}
-    })
+    table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.3",
+        Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
+        Color={255,255,255}, Position={0,9}, Size={W,20}})
 
     -- ── Connection ─────────────────────────────────────────────────
-    local yPos = 48
-    table.insert(graphics, {
-        Type = "GroupBox",
-        Text = "Connection",
-        Fill = {70, 70, 70},
-        StrokeWidth = 1,
-        CornerRadius = 4,
-        Position = {0, yPos},
-        Size = {W, 68}
-    })
-    Label("IP Address",  10, yPos+14, 120)
-    Label("Port",       140, yPos+14,  60)
-    Label("Status",     210, yPos+14,  60)
-
-    layout["ip_address"] = {
-        PrettyName = "IP Address",
-        Style = "Text",
-        Position = {10, yPos+26},
-        Size = {120, 22}
-    }
-    layout["udp_port"] = {
-        PrettyName = "Port",
-        Style = "Text",
-        Position = {140, yPos+26},
-        Size = {60, 22}
-    }
-    layout["connection_status"] = {
-        PrettyName = "Status",
-        Style = "Indicator",
-        Position = {210, yPos+26},
-        Size = {50, 22}
-    }
-    layout["last_command"] = {
-        PrettyName = "Last Command",
-        Style = "Text",
-        Position = {270, yPos+26},
-        Size = {W-280, 22},
-        Color = {180, 180, 180}
-    }
+    local y = 42
+    GBox(0, y, W, 54, "Connection")
+    Lbl("IP Address",   6, y+5, 124)
+    Lbl("Port",       138, y+5,  62)
+    Lbl("Status",     208, y+5,  62)
+    Lbl("Last Command", 278, y+5, W-284)
+    layout["ip_address"]        = {PrettyName="IP Address",   Style="Text",
+        Position={6,   y+18}, Size={124, CH}}
+    layout["udp_port"]          = {PrettyName="Port",         Style="Text",
+        Position={138, y+18}, Size={62,  CH}}
+    layout["connection_status"] = {PrettyName="Status",       Style="Indicator",
+        Position={208, y+18}, Size={62,  CH}}
+    layout["last_command"]      = {PrettyName="Last Command", Style="Text",
+        Position={278, y+18}, Size={W-284, CH}}
 
     -- ── Display Layout ─────────────────────────────────────────────
-    yPos = yPos + 76
-    table.insert(graphics, {
-        Type = "GroupBox",
-        Text = "Display Layout",
-        Fill = {70, 70, 70},
-        StrokeWidth = 1,
-        CornerRadius = 4,
-        Position = {0, yPos},
-        Size = {W, 56}
-    })
-    Label("Layout Preset", 10, yPos+14, 160)
-    layout["layout"] = {
-        PrettyName = "Layout Preset",
-        Style = "ComboBox",
-        Position = {10, yPos+26},
-        Size = {180, 22}
-    }
-    layout["apply_layout"] = {
-        PrettyName = "Apply",
-        Style = "Button",
-        ButtonStyle = "Trigger",
-        Legend = "Apply Layout",
-        Color = {60, 130, 210},
-        Position = {200, yPos+26},
-        Size = {120, 22}
-    }
+    y = y + 60
+    GBox(0, y, W, 50, "Display Layout")
+    Lbl("Layout Preset", 6, y+5, 190)
+    layout["layout"] = {PrettyName="Layout Preset", Style="ComboBox",
+        Position={6, y+18}, Size={190, CH}}
+    layout["apply_layout"] = {PrettyName="Apply", Style="Button",
+        ButtonStyle="Trigger", Legend="Apply Layout", Color=C_BTN_B,
+        Position={204, y+18}, Size={130, CH}}
 
     -- ── Segments ───────────────────────────────────────────────────
-    yPos = yPos + 64
+    y = y + 56
+    -- Each segment box has 3 rows:
+    --   Row1 (y+16):  LED | text input | Display | Clear
+    --   Row2 (y+52):  Text Color | BG Color | Font | Size | Align | Effect
+    --   Row3 (y+88):  Intensity fader
+    local SEG_H = 122
+
     for seg = 0, 3 do
-        local sY = yPos + seg * 148
+        local s  = tostring(seg)
+        local sy = y + seg * (SEG_H + 4)
 
-        table.insert(graphics, {
-            Type = "GroupBox",
-            Text = string.format("Segment %d", seg + 1),
-            Fill = {70, 70, 70},
-            StrokeWidth = 1,
-            CornerRadius = 4,
-            Position = {0, sY},
-            Size = {W, 140}
-        })
+        GBox(0, sy, W, SEG_H, "Segment " .. (seg+1))
 
-        -- Row 1: LED + Text + Send + Clear  (y+18..y+42)
-        layout[string.format("active_%d", seg)] = {
-            PrettyName = string.format("Seg%d Active", seg+1),
-            Style = "Led",
-            Position = {10, sY+20},
-            Size = {14, 14}
-        }
-        Label("Text", 30, sY+14, W-220)
-        layout[string.format("text_%d", seg)] = {
-            PrettyName = string.format("Seg%d Text", seg+1),
-            Style = "Text",
-            Position = {30, sY+26},
-            Size = {W-250, 22}
-        }
-        layout[string.format("send_%d", seg)] = {
-            PrettyName = "Display",
-            Style = "Button",
-            ButtonStyle = "Trigger",
-            Legend = "Display",
-            Color = {0, 160, 70},
-            Position = {W-210, sY+26},
-            Size = {100, 22}
-        }
-        layout[string.format("clear_%d", seg)] = {
-            PrettyName = "Clear",
-            Style = "Button",
-            ButtonStyle = "Trigger",
-            Legend = "Clear",
-            Color = {180, 50, 50},
-            Position = {W-104, sY+26},
-            Size = {100, 22}
-        }
+        -- Row 1
+        local r1 = sy + 16
+        layout["active_"..s] = {PrettyName="Active", Style="Led",
+            Position={6, r1+5}, Size={14, 14}}
+        Lbl("Text", 26, r1-12, W-230)
+        layout["text_"..s]  = {PrettyName="Text", Style="Text",
+            Position={26, r1}, Size={W-232, CH}}
+        layout["send_"..s]  = {PrettyName="Display", Style="Button",
+            ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
+            Position={W-200, r1}, Size={95, BH}}
+        layout["clear_"..s] = {PrettyName="Clear", Style="Button",
+            ButtonStyle="Trigger", Legend="Clear", Color=C_BTN_R,
+            Position={W-99,  r1}, Size={93, BH}}
 
-        -- Row 2: Text Color | BG Color | Font | Align | Intensity  (y+56..y+90)
-        local r2y = sY + 58
-        Label("Text Color",  10,  r2y-12, 120)
-        Label("BG Color",   140,  r2y-12, 120)
-        Label("Font",       270,  r2y-12,  90)
-        Label("Align",      368,  r2y-12,  70)
-        Label("Intensity",  446,  r2y-12, 160)
+        -- Row 2: 6 ComboBoxes
+        local r2 = sy + 52
+        -- {label, control_name_prefix, width}
+        local cols = {
+            {"Text Color", "text_color_", 114},
+            {"BG Color",   "bg_color_",   114},
+            {"Font",       "font_",        84},
+            {"Size",       "size_",        68},
+            {"Align",      "align_",       78},
+            {"Effect",     "effect_",      96},
+        }
+        local cx = 6
+        for _, col in ipairs(cols) do
+            Lbl(col[1], cx, r2-13, col[3])
+            layout[col[2]..s] = {PrettyName=col[1], Style="ComboBox",
+                Position={cx, r2}, Size={col[3], CH}}
+            cx = cx + col[3] + 6
+        end
 
-        layout[string.format("text_color_%d", seg)] = {
-            PrettyName = string.format("Seg%d Text Color", seg+1),
-            Style = "ComboBox",
-            Position = {10, r2y},
-            Size = {120, 22}
-        }
-        layout[string.format("bg_color_%d", seg)] = {
-            PrettyName = string.format("Seg%d BG Color", seg+1),
-            Style = "ComboBox",
-            Position = {140, r2y},
-            Size = {120, 22}
-        }
-        layout[string.format("font_%d", seg)] = {
-            PrettyName = string.format("Seg%d Font", seg+1),
-            Style = "ComboBox",
-            Position = {270, r2y},
-            Size = {90, 22}
-        }
-        layout[string.format("align_%d", seg)] = {
-            PrettyName = string.format("Seg%d Align", seg+1),
-            Style = "ComboBox",
-            Position = {368, r2y},
-            Size = {70, 22}
-        }
-        layout[string.format("intensity_%d", seg)] = {
-            PrettyName = string.format("Seg%d Intensity", seg+1),
-            Style = "Fader",
-            Position = {446, r2y},
-            Size = {W-456, 22}
-        }
+        -- Row 3: Intensity fader
+        local r3 = sy + 88
+        Lbl("Intensity  (0 = off, 255 = full)", 6, r3-13, 260)
+        layout["intensity_"..s] = {PrettyName="Intensity", Style="Fader",
+            Position={6, r3}, Size={W-14, 22}}
     end
 
     -- ── Global Controls ────────────────────────────────────────────
-    yPos = yPos + (4 * 148) + 4
-    table.insert(graphics, {
-        Type = "GroupBox",
-        Text = "Global Controls",
-        Fill = {70, 70, 70},
-        StrokeWidth = 1,
-        CornerRadius = 4,
-        Position = {0, yPos},
-        Size = {W, 72}
-    })
-    Label("Global Brightness", 10, yPos+14, 200)
-    layout["brightness"] = {
-        PrettyName = "Global Brightness",
-        Style = "Fader",
-        Position = {10, yPos+26},
-        Size = {280, 36}
-    }
-    layout["clear_all"] = {
-        PrettyName = "Clear All",
-        Style = "Button",
-        ButtonStyle = "Trigger",
-        Legend = "Clear All Segments",
-        Color = {180, 50, 50},
-        Position = {300, yPos+26},
-        Size = {180, 36}
-    }
+    y = y + 4 * (SEG_H + 4) + 4
+    GBox(0, y, W, 64, "Global Controls")
+    Lbl("Global Brightness", 6, y+5, 220)
+    layout["brightness"] = {PrettyName="Global Brightness", Style="Fader",
+        Position={6, y+18}, Size={340, 36}}
+    layout["clear_all"] = {PrettyName="Clear All", Style="Button",
+        ButtonStyle="Trigger", Legend="Clear All Segments", Color=C_BTN_R,
+        Position={354, y+18}, Size={200, 36}}
 
     return layout, graphics
 end
@@ -602,15 +510,18 @@ if Controls then
     end
 
     -- Build the TEXT command string for a segment using its current control values.
+    -- Protocol: TEXT|seg|content|color|font|size|align|effect|bgcolor|intensity
     local function BuildTextCommand(seg)
         local text      = Controls[string.format("text_%d",       seg)].String
         local textColor = ColorNames[Controls[string.format("text_color_%d", seg)].String] or "FFFFFF"
         local bgColor   = ColorNames[Controls[string.format("bg_color_%d",   seg)].String] or "000000"
         local intensity = math.floor(Controls[string.format("intensity_%d",  seg)].Value)
         local font      = FontMap[Controls[string.format("font_%d",  seg)].String] or "arial"
+        local size      = Controls[string.format("size_%d",   seg)].String or "auto"
         local align     = AlignMap[Controls[string.format("align_%d", seg)].String] or "C"
-        return text, string.format("TEXT|%d|%s|%s|%s|auto|%s|none|%s|%d",
-            seg, text, textColor, font, align, bgColor, intensity)
+        local effect    = Controls[string.format("effect_%d", seg)].String or "none"
+        return text, string.format("TEXT|%d|%s|%s|%s|%s|%s|%s|%s|%d",
+            seg, text, textColor, font, size, align, effect, bgColor, intensity)
     end
 
     -- ---------------------------------------------------------------
@@ -618,7 +529,7 @@ if Controls then
     -- ---------------------------------------------------------------
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.2.0 Initializing")
+        print("LED Matrix Complete v3.3.0 Initializing")
         print("===========================================")
 
         Controls.ip_address.String  = ip_addr
@@ -634,7 +545,9 @@ if Controls then
             Controls[string.format("bg_color_%d",   seg)].String  = "Black"
             Controls[string.format("intensity_%d",  seg)].Value   = 255
             Controls[string.format("font_%d",       seg)].String  = "Arial"
+            Controls[string.format("size_%d",       seg)].String  = "auto"
             Controls[string.format("align_%d",      seg)].String  = "Center"
+            Controls[string.format("effect_%d",     seg)].String  = "none"
             Controls[string.format("active_%d",     seg)].Boolean = false
         end
 
@@ -730,6 +643,14 @@ if Controls then
                 if text ~= "" then SendCommand(cmd) end
             end)
         end
+
+        -- Auto-send when size or effect changes
+        local function AutoSend()
+            local text, cmd = BuildTextCommand(seg)
+            if text ~= "" then SendCommand(cmd) end
+        end
+        Controls[string.format("size_%d",   seg)].EventHandler = AutoSend
+        Controls[string.format("effect_%d", seg)].EventHandler = AutoSend
     end
 
     -- ---------------------------------------------------------------
