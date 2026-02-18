@@ -107,21 +107,29 @@ def main():
         # drop_privileges=False prevents the Pi detection code from running.
         options.drop_privileges = False
         
-        # Explicitly set GPIO pins for Rock Pi S (RK3308 Linux GPIO numbers)
-        # This overrides the library's hardcoded Raspberry Pi BCM mappings.
-        options.gpio_r1  = GPIO_R1
-        options.gpio_g1  = GPIO_G1
-        options.gpio_b1  = GPIO_B1
-        options.gpio_r2  = GPIO_R2
-        options.gpio_g2  = GPIO_G2
-        options.gpio_b2  = GPIO_B2
-        options.gpio_a   = GPIO_A
-        options.gpio_b   = GPIO_B
-        options.gpio_c   = GPIO_C
-        options.gpio_d   = GPIO_D
-        options.gpio_clk = GPIO_CLK
-        options.gpio_lat = GPIO_LAT
-        options.gpio_oe  = GPIO_OE
+        # Try to set explicit GPIO pins if the library version supports it
+        # (Some builds don't expose gpio_* attributes in Python bindings)
+        try:
+            options.gpio_r1  = GPIO_R1
+            options.gpio_g1  = GPIO_G1
+            options.gpio_b1  = GPIO_B1
+            options.gpio_r2  = GPIO_R2
+            options.gpio_g2  = GPIO_G2
+            options.gpio_b2  = GPIO_B2
+            options.gpio_a   = GPIO_A
+            options.gpio_b   = GPIO_B
+            options.gpio_c   = GPIO_C
+            options.gpio_d   = GPIO_D
+            options.gpio_clk = GPIO_CLK
+            options.gpio_lat = GPIO_LAT
+            options.gpio_oe  = GPIO_OE
+            logger.info("  ↳ Explicit GPIO pins set via options")
+        except AttributeError:
+            # GPIO attributes not available in this build - library will use
+            # hardware_mapping defaults or custom hardware mapping file
+            logger.info("  ↳ GPIO pin attributes not available in this library build")
+            logger.info("  ↳ Using hardware_mapping='%s' (library defaults)", 
+                       MATRIX_HARDWARE_MAPPING)
         
         options.show_refresh_rate   = False
 
@@ -131,7 +139,6 @@ def main():
         logger.info("✓ LED matrix initialised")
         logger.info("  ↳ Hardware pulsing disabled (bit-bang OE- mode for RK3308)")
         logger.info("  ↳ Privilege drop disabled (non-Pi hardware mode)")
-        logger.info(f"  ↳ GPIO pins: R1={GPIO_R1} G1={GPIO_G1} B1={GPIO_B1} CLK={GPIO_CLK}")
 
     except ImportError:
         logger.warning(
