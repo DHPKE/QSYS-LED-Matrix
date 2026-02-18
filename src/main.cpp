@@ -138,7 +138,7 @@ void loop() {
     uint8_t newBrightness = udpHandler ? udpHandler->getBrightness() : DEFAULT_BRIGHTNESS;
     if (newBrightness != currentBrightness) {
         currentBrightness = newBrightness;
-        dma_display->setBrightness8(currentBrightness);
+        if (dma_display) dma_display->setBrightness8(currentBrightness);
     }
     
     // Update text effects periodically
@@ -158,6 +158,14 @@ void loop() {
 }
 
 void setupMatrix() {
+#ifdef NO_DISPLAY
+    // NO_DISPLAY mode: skip HUB75 init entirely.
+    // The web UI and UDP handler still work — segments are updated in RAM
+    // and the web preview reflects all changes sent from Q-SYS.
+    Serial.println("⚠ NO_DISPLAY mode: HUB75 matrix init skipped (virtual preview only)");
+    dma_display = nullptr;
+    textRenderer = nullptr;
+#else
     Serial.println("Initializing LED Matrix...");
     
     // HUB75 configuration
@@ -191,6 +199,9 @@ void setupMatrix() {
     // Initialize display
     if (!dma_display->begin()) {
         Serial.println("ERROR: Matrix initialization failed!");
+        delete dma_display;
+        dma_display = nullptr;
+        textRenderer = nullptr;
         return;
     }
     
@@ -209,6 +220,7 @@ void setupMatrix() {
     Serial.print(LED_MATRIX_WIDTH);
     Serial.print("x");
     Serial.println(LED_MATRIX_HEIGHT);
+#endif
 }
 
 void WiFiEvent(WiFiEvent_t event) {
@@ -1234,22 +1246,60 @@ void handleRoot(AsyncWebServerRequest *request) {
         // Store alignment for each segment
         const segmentAlign = ['C', 'C', 'C', 'C'];
         
-        // Store segment bounds (x, y, width, height)
+        // Store segment bounds (x, y, width, height) — updated by layout commands and /api/segments polling
         const segmentBounds = [
-            { x: 0, y: 0, width: 32, height: 32 },  // Segment 1 (left half default)
-            { x: 32, y: 0, width: 32, height: 32 }, // Segment 2 (right half default)
-            { x: 0, y: 16, width: 32, height: 16 }, // Segment 3 (bottom-left default)
-            { x: 32, y: 16, width: 32, height: 16 } // Segment 4 (bottom-right default)
+            { x: 0, y: 0, width: 32, height: 32 },
+            { x: 32, y: 0, width: 32, height: 32 },
+            { x: 0, y: 16, width: 32, height: 16 },
+            { x: 32, y: 16, width: 32, height: 16 }
         ];
         
         // Initialize black canvas
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 64, 32);
         
-        // Initialize with split-vertical layout (default)
+        // Poll /api/segments every second to reflect Q-SYS changes
         window.addEventListener('load', function() {
-            updateSegmentStates([0, 1]); // Only segments 1 and 2 active by default
+            updateSegmentStates([0, 1]);
+            pollSegments();
+            setInterval(pollSegments, 1000);
         });
+        
+        function pollSegments() {
+            fetch('/api/segments')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.segments) return;
+                    // Determine which segments are active
+                    const active = data.segments
+                        .filter(s => s.active && s.w > 0 && s.h > 0)
+                        .map(s => s.id);
+                    updateSegmentStates(active);
+                    
+                    // Update bounds from server state
+                    data.segments.forEach(s => {
+                        segmentBounds[s.id] = { x: s.x, y: s.y, width: s.w, height: s.h };
+                        // Update text fields with current server values
+                        const textEl = document.getElementById('text' + s.id);
+                        if (textEl && document.activeElement !== textEl) {
+                            textEl.value = s.text || '';
+                        }
+                    });
+                    
+                    // Redraw all active segments on the canvas
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, 64, 32);
+                    data.segments.forEach(s => {
+                        if (s.active && s.w > 0 && s.h > 0 && s.text) {
+                            drawSegmentOnCanvas(s.id, s.text,
+                                s.color   || '#FFFFFF',
+                                s.bgcolor || '#000000',
+                                s.align   || 'C');
+                        }
+                    });
+                })
+                .catch(() => {}); // Silently ignore network errors
+        }
         
         function updateStatus(message, type = 'ready') {
             const statusEl = document.getElementById('status');
@@ -1259,17 +1309,13 @@ void handleRoot(AsyncWebServerRequest *request) {
         
         function setAlign(segment, align, btn) {
             segmentAlign[segment] = align;
-            
-            // Update active state for buttons in this segment's group
             const parent = btn.parentElement;
             parent.querySelectorAll('.align-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            
             updateStatus('Alignment set to ' + (align === 'L' ? 'Left' : align === 'C' ? 'Center' : 'Right'), 'ready');
         }
         
         function updateSegmentStates(activeSegments) {
-            // activeSegments is an array of segment indices (0-3) that should be active
             for (let i = 0; i < 4; i++) {
                 const card = document.getElementById('segment-card-' + i);
                 if (card) {
@@ -1282,208 +1328,154 @@ void handleRoot(AsyncWebServerRequest *request) {
             }
         }
         
+        // ── JSON command senders ──────────────────────────────────────────────
+        
+        function sendJSON(obj) {
+            updateStatus('Sending...', 'sending');
+            fetch('/api/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(obj)
+            })
+            .then(r => r.text())
+            .then(() => updateStatus('OK', 'ready'))
+            .catch(e => updateStatus('Error: ' + e, 'error'));
+        }
+        
+        function sendText(segment) {
+            const text      = document.getElementById('text'      + segment).value;
+            const color     = document.getElementById('color'     + segment).value.replace('#','');
+            const bgcolor   = document.getElementById('bgcolor'   + segment).value.replace('#','');
+            const intensity = parseInt(document.getElementById('intensity' + segment).value);
+            const font      = document.getElementById('font'      + segment).value;
+            const align     = segmentAlign[segment];
+            
+            sendJSON({
+                cmd: 'text', seg: segment,
+                text: text, color: color, bgcolor: bgcolor,
+                font: font, size: 'auto', align: align,
+                effect: 'none', intensity: intensity
+            });
+            drawSegmentOnCanvas(segment, text,
+                '#' + color, '#' + bgcolor, align);
+        }
+        
+        function clearSegment(segment) {
+            sendJSON({ cmd: 'clear', seg: segment });
+            ctx.fillStyle = '#000000';
+            const b = segmentBounds[segment];
+            ctx.fillRect(b.x, b.y, b.width, b.height);
+            updateStatus('Segment ' + (segment + 1) + ' cleared', 'ready');
+        }
+        
+        function clearAll() {
+            sendJSON({ cmd: 'clear_all' });
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 64, 32);
+            updateStatus('All segments cleared', 'ready');
+        }
+        
+        function updateBrightness(value) {
+            document.getElementById('brightness-value').textContent = value;
+            sendJSON({ cmd: 'brightness', value: parseInt(value) });
+        }
+        
         function applyLayout(layoutType) {
             updateStatus('Applying ' + layoutType + ' layout...', 'sending');
             
-            let commands = [];
-            
-            // Save current segment 1 settings before layout change
-            const seg0Text = document.getElementById('text0').value;
-            const seg0Color = document.getElementById('color0').value;
-            const seg0BgColor = document.getElementById('bgcolor0').value;
-            const seg0Intensity = document.getElementById('intensity0').value;
-            const seg0Font = document.getElementById('font0').value;
-            const seg0Align = segmentAlign[0];
+            let configCmds = [];
+            let clearSegs  = [];
             
             if (layoutType === 'split-vertical') {
-                // 1 | 2: Left half (0->32px) | Right half (32->64px), full height
-                // Only segments 1 and 2 are active
                 updateSegmentStates([0, 1]);
-                segmentBounds[0] = { x: 0, y: 0, width: 32, height: 32 };
+                segmentBounds[0] = { x: 0,  y: 0, width: 32, height: 32 };
                 segmentBounds[1] = { x: 32, y: 0, width: 32, height: 32 };
-                segmentBounds[2] = { x: 0, y: 0, width: 0, height: 0 };
-                segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
-                commands = [
-                    'CONFIG|segment|0|x|0',
-                    'CONFIG|segment|0|y|0',
-                    'CONFIG|segment|0|width|32',
-                    'CONFIG|segment|0|height|32',
-                    'CONFIG|segment|1|x|32',
-                    'CONFIG|segment|1|y|0',
-                    'CONFIG|segment|1|width|32',
-                    'CONFIG|segment|1|height|32',
-                    'CLEAR|2',
-                    'CLEAR|3'
+                segmentBounds[2] = segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
+                configCmds = [
+                    { cmd:'config', seg:0, x:0,  y:0, w:32, h:32 },
+                    { cmd:'config', seg:1, x:32, y:0, w:32, h:32 }
                 ];
+                clearSegs = [2, 3];
             } else if (layoutType === 'split-horizontal') {
-                // 1 / 2: Top half (0->16px) / Bottom half (16->32px), full width
-                // Only segments 1 and 2 are active
                 updateSegmentStates([0, 1]);
-                segmentBounds[0] = { x: 0, y: 0, width: 64, height: 16 };
+                segmentBounds[0] = { x: 0, y: 0,  width: 64, height: 16 };
                 segmentBounds[1] = { x: 0, y: 16, width: 64, height: 16 };
-                segmentBounds[2] = { x: 0, y: 0, width: 0, height: 0 };
-                segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
-                commands = [
-                    'CONFIG|segment|0|x|0',
-                    'CONFIG|segment|0|y|0',
-                    'CONFIG|segment|0|width|64',
-                    'CONFIG|segment|0|height|16',
-                    'CONFIG|segment|1|x|0',
-                    'CONFIG|segment|1|y|16',
-                    'CONFIG|segment|1|width|64',
-                    'CONFIG|segment|1|height|16',
-                    'CLEAR|2',
-                    'CLEAR|3'
+                segmentBounds[2] = segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
+                configCmds = [
+                    { cmd:'config', seg:0, x:0, y:0,  w:64, h:16 },
+                    { cmd:'config', seg:1, x:0, y:16, w:64, h:16 }
                 ];
+                clearSegs = [2, 3];
             } else if (layoutType === 'quad') {
-                // 2x2 Grid: 1(top-left) 2(top-right) 3(bottom-left) 4(bottom-right)
-                // All 4 segments are active
                 updateSegmentStates([0, 1, 2, 3]);
-                segmentBounds[0] = { x: 0, y: 0, width: 32, height: 16 };
-                segmentBounds[1] = { x: 32, y: 0, width: 32, height: 16 };
-                segmentBounds[2] = { x: 0, y: 16, width: 32, height: 16 };
+                segmentBounds[0] = { x: 0,  y: 0,  width: 32, height: 16 };
+                segmentBounds[1] = { x: 32, y: 0,  width: 32, height: 16 };
+                segmentBounds[2] = { x: 0,  y: 16, width: 32, height: 16 };
                 segmentBounds[3] = { x: 32, y: 16, width: 32, height: 16 };
-                commands = [
-                    'CONFIG|segment|0|x|0',
-                    'CONFIG|segment|0|y|0',
-                    'CONFIG|segment|0|width|32',
-                    'CONFIG|segment|0|height|16',
-                    'CONFIG|segment|1|x|32',
-                    'CONFIG|segment|1|y|0',
-                    'CONFIG|segment|1|width|32',
-                    'CONFIG|segment|1|height|16',
-                    'CONFIG|segment|2|x|0',
-                    'CONFIG|segment|2|y|16',
-                    'CONFIG|segment|2|width|32',
-                    'CONFIG|segment|2|height|16',
-                    'CONFIG|segment|3|x|32',
-                    'CONFIG|segment|3|y|16',
-                    'CONFIG|segment|3|width|32',
-                    'CONFIG|segment|3|height|16'
+                configCmds = [
+                    { cmd:'config', seg:0, x:0,  y:0,  w:32, h:16 },
+                    { cmd:'config', seg:1, x:32, y:0,  w:32, h:16 },
+                    { cmd:'config', seg:2, x:0,  y:16, w:32, h:16 },
+                    { cmd:'config', seg:3, x:32, y:16, w:32, h:16 }
                 ];
             } else if (layoutType === 'fullscreen') {
-                // Fullscreen: Only segment 1 is active, displays on full screen
                 updateSegmentStates([0]);
                 segmentBounds[0] = { x: 0, y: 0, width: 64, height: 32 };
-                segmentBounds[1] = { x: 0, y: 0, width: 0, height: 0 };
-                segmentBounds[2] = { x: 0, y: 0, width: 0, height: 0 };
-                segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
-                commands = [
-                    'CONFIG|segment|0|x|0',
-                    'CONFIG|segment|0|y|0',
-                    'CONFIG|segment|0|width|64',
-                    'CONFIG|segment|0|height|32',
-                    'CLEAR|1',
-                    'CLEAR|2',
-                    'CLEAR|3'
+                segmentBounds[1] = segmentBounds[2] = segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
+                configCmds = [
+                    { cmd:'config', seg:0, x:0, y:0, w:64, h:32 }
                 ];
+                clearSegs = [1, 2, 3];
             }
             
-            // Send all CONFIG commands
-            for (let i = 0; i < commands.length; i++) {
-                sendUDP(commands[i]);
-            }
+            // Send config commands sequentially then clear unused segments
+            configCmds.forEach(c => sendJSON(c));
+            clearSegs.forEach(s => sendJSON({ cmd: 'clear', seg: s }));
             
-            // Re-send all active segments' content to apply them with new layout dimensions
-            const segmentsToResend = layoutType === 'fullscreen' ? [0] : 
-                                     (layoutType === 'split-vertical' || layoutType === 'split-horizontal') ? [0, 1] : 
-                                     [0, 1, 2, 3];
-            
-            setTimeout(function() {
-                for (let seg of segmentsToResend) {
-                    const text = document.getElementById('text' + seg).value;
-                    if (text) {
-                        sendText(seg);
-                    }
-                }
-            }, 200);
-            
-            // Clear and redraw canvas with new layout
+            // Redraw canvas with new bounds
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, 64, 32);
-            
-            // Preview all active segments with new layout
-            setTimeout(function() {
-                for (let seg of segmentsToResend) {
-                    const text = document.getElementById('text' + seg).value;
-                    if (text) {
-                        previewText(seg);
-                    }
+            for (let seg = 0; seg < 4; seg++) {
+                const text = document.getElementById('text' + seg).value;
+                if (text && segmentBounds[seg].width > 0) {
+                    const color   = document.getElementById('color'   + seg).value;
+                    const bgcolor = document.getElementById('bgcolor' + seg).value;
+                    drawSegmentOnCanvas(seg, text, color, bgcolor, segmentAlign[seg]);
                 }
-            }, 100);
+            }
             
-            setTimeout(() => updateStatus('Layout applied: ' + layoutType, 'ready'), 500);
+            setTimeout(() => updateStatus('Layout applied: ' + layoutType, 'ready'), 300);
         }
         
-        function previewText(segment) {
-            const text = document.getElementById('text' + segment).value;
-            const colorInput = document.getElementById('color' + segment);
-            const color = colorInput ? colorInput.value : '#FFFFFF';
-            const bgColorInput = document.getElementById('bgcolor' + segment);
-            const bgColor = bgColorInput ? bgColorInput.value : '#000000';
-            const intensityInput = document.getElementById('intensity' + segment);
-            const intensity = intensityInput ? parseInt(intensityInput.value) / 255 : 1.0;
-            const align = segmentAlign[segment];
-            
-            // Get segment bounds
+        // ── Canvas preview renderer ───────────────────────────────────────────
+        
+        function drawSegmentOnCanvas(segment, text, color, bgcolor, align) {
             const bounds = segmentBounds[segment];
+            if (!bounds || bounds.width === 0 || bounds.height === 0) return;
             
-            // Skip if segment has no area (disabled in current layout)
-            if (bounds.width === 0 || bounds.height === 0) {
-                updateStatus('Segment ' + (segment + 1) + ' not active in current layout', 'ready');
-                return;
-            }
-            
-            // Fill segment area with background color
-            ctx.fillStyle = bgColor;
-            ctx.globalAlpha = intensity;
+            // Background fill
+            ctx.fillStyle = bgcolor;
             ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
-            ctx.globalAlpha = 1.0;
             
-            // Set text properties
-            ctx.fillStyle = color;
+            if (!text) return;
             
-            // Get font selection
-            const fontSelect = document.getElementById('font' + segment);
-            const fontValue = fontSelect ? fontSelect.value : 'arial';
-            let fontFamily;
-            if (fontValue === 'arial') {
-                fontFamily = 'Arial, sans-serif';
-            } else if (fontValue === 'verdana') {
-                fontFamily = 'Verdana, sans-serif';
-            } else {
-                fontFamily = 'monospace';
-            }
+            const availW = bounds.width  - 4;
+            const availH = bounds.height - 2;
             
-            // Calculate optimal font size to fit in segment
-            const availWidth = bounds.width - 4; // 2px padding each side
-            const availHeight = bounds.height - 4;
-            
-            // Try different font sizes from largest to smallest
-            const fontSizes = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
+            // Find the largest font that fits
+            const sizes = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
             let fontSize = 6;
-            
-            for (let size of fontSizes) {
-                ctx.font = size + 'px ' + fontFamily;
-                const metrics = ctx.measureText(text);
-                const textWidth = metrics.width;
-                const textHeight = size * 1.2; // Approximate height with line spacing
-                
-                if (textWidth <= availWidth && textHeight <= availHeight) {
+            for (let size of sizes) {
+                ctx.font = size + 'px Arial, sans-serif';
+                if (ctx.measureText(text).width <= availW && size * 1.2 <= availH) {
                     fontSize = size;
                     break;
                 }
             }
+            ctx.font = fontSize + 'px Arial, sans-serif';
+            ctx.fillStyle = color;
+            ctx.textBaseline = 'middle';
             
-            // Set final font
-            ctx.font = fontSize + 'px ' + fontFamily;
-            
-            // Measure text for proper centering
-            const metrics = ctx.measureText(text);
-            const textWidth = metrics.width;
-            const textHeight = fontSize; // Approximate height
-            
-            // Set alignment and calculate X position
             let x;
             if (align === 'L') {
                 ctx.textAlign = 'left';
@@ -1495,74 +1487,16 @@ void handleRoot(AsyncWebServerRequest *request) {
                 ctx.textAlign = 'center';
                 x = bounds.x + bounds.width / 2;
             }
-            
-            // Calculate Y position for vertical centering
-            // Calculate Y position for vertical centering
-            ctx.textBaseline = 'middle';
-            const y = bounds.y + bounds.height / 2;
-            
-            // Draw text (simple single line for now)
-            ctx.fillText(text, x, y);
-            
+            ctx.fillText(text, x, bounds.y + bounds.height / 2);
+        }
+        
+        function previewText(segment) {
+            const text    = document.getElementById('text'    + segment).value;
+            const color   = document.getElementById('color'   + segment).value;
+            const bgcolor = document.getElementById('bgcolor' + segment).value;
+            const align   = segmentAlign[segment];
+            drawSegmentOnCanvas(segment, text, color, bgcolor, align);
             updateStatus('Preview updated for Segment ' + (segment + 1), 'ready');
-        }
-        
-        function sendUDP(command) {
-            updateStatus('Sending command...', 'sending');
-            fetch('/api/test', {
-                method: 'POST',
-                headers: {'Content-Type': 'text/plain'},
-                body: command
-            })
-            .then(response => response.text())
-            .then(data => {
-                updateStatus('Command sent successfully', 'ready');
-            })
-            .catch(error => {
-                updateStatus('Error: ' + error, 'error');
-            });
-        }
-        
-        function sendText(segment) {
-            const text = document.getElementById('text' + segment).value;
-            const colorInput = document.getElementById('color' + segment);
-            const color = colorInput ? colorInput.value.substring(1).toUpperCase() : 'FFFFFF';
-            const bgColorInput = document.getElementById('bgcolor' + segment);
-            const bgColor = bgColorInput ? bgColorInput.value.substring(1).toUpperCase() : '000000';
-            const intensityInput = document.getElementById('intensity' + segment);
-            const intensity = intensityInput ? intensityInput.value : '255';
-            const fontSelect = document.getElementById('font' + segment);
-            const font = fontSelect ? fontSelect.value : 'roboto12';
-            const align = segmentAlign[segment];
-            
-            const command = 'TEXT|' + segment + '|' + text + '|' + color + '|' + font + '|auto|' + align + '|none|' + bgColor + '|' + intensity;
-            sendUDP(command);
-            
-            // Update preview
-            previewText(segment);
-        }
-        
-        function clearSegment(segment) {
-            sendUDP('CLEAR|' + segment);
-            
-            // Clear preview
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 64, 32);
-            updateStatus('Segment ' + segment + ' cleared', 'ready');
-        }
-        
-        function clearAll() {
-            sendUDP('CLEAR_ALL');
-            
-            // Clear preview
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 64, 32);
-            updateStatus('All segments cleared', 'ready');
-        }
-        
-        function updateBrightness(value) {
-            document.getElementById('brightness-value').textContent = value;
-            sendUDP('BRIGHTNESS|' + value);
         }
     </script>
 </body>
@@ -1599,9 +1533,35 @@ void handleSegments(AsyncWebServerRequest *request) {
         Segment* seg = segmentManager.getSegment(i);
         if (seg) {
             JsonObject segObj = segments.createNestedObject();
-            segObj["id"] = seg->id;
-            segObj["text"] = seg->text;
+            segObj["id"]     = seg->id;
+            segObj["text"]   = seg->text;
             segObj["active"] = seg->isActive;
+            segObj["x"]      = seg->x;
+            segObj["y"]      = seg->y;
+            segObj["w"]      = seg->width;
+            segObj["h"]      = seg->height;
+            segObj["align"]  = (seg->align == ALIGN_LEFT) ? "L" :
+                               (seg->align == ALIGN_RIGHT) ? "R" : "C";
+            segObj["effect"] = (seg->effect == EFFECT_SCROLL)  ? "scroll" :
+                               (seg->effect == EFFECT_BLINK)   ? "blink"  :
+                               (seg->effect == EFFECT_FADE)    ? "fade"   :
+                               (seg->effect == EFFECT_RAINBOW) ? "rainbow": "none";
+
+            // Convert RGB565 colors back to hex strings for the web UI
+            uint16_t c  = seg->color;
+            uint16_t bg = seg->bgColor;
+            char colorHex[8], bgHex[8];
+            // RGB565 → RGB888 approximate
+            snprintf(colorHex, sizeof(colorHex), "#%02X%02X%02X",
+                     ((c >> 8) & 0xF8),
+                     ((c >> 3) & 0xFC),
+                     ((c << 3) & 0xF8));
+            snprintf(bgHex, sizeof(bgHex), "#%02X%02X%02X",
+                     ((bg >> 8) & 0xF8),
+                     ((bg >> 3) & 0xFC),
+                     ((bg << 3) & 0xF8));
+            segObj["color"]   = colorHex;
+            segObj["bgcolor"] = bgHex;
         }
     }
     

@@ -6,36 +6,62 @@
 // Compatible with ALL hardware revisions (A through I)
 
 // Pin assignments for Olimex ESP32 Gateway to HUB75 matrix
-// TESTED AND VERIFIED against Olimex official schematics
+//
+// ══════════════════════════════════════════════════════════════════
+// ⚠ HARDWARE CONFLICT WARNING ⚠
+//
+// The Olimex ESP32-GATEWAY uses Ethernet via ESP32 RMII interface.
+// These GPIO pins are PERMANENTLY RESERVED for Ethernet and CANNOT
+// be used for any other purpose:
+//
+//   GPIO 0  — RMII REF_CLK      (fixed by silicon)
+//   GPIO 19 — RMII TXD0         (fixed by silicon)
+//   GPIO 21 — RMII TX_EN        (fixed by silicon)
+//   GPIO 22 — RMII TXD1         (fixed by silicon)
+//   GPIO 25 — RMII RXD0         (fixed by silicon)
+//   GPIO 26 — RMII RXD1         (fixed by silicon)
+//   GPIO 27 — RMII CRS_DV       (fixed by silicon)
+//   GPIO 5  — ETH PHY power     (wired on board)
+//   GPIO 17 — ETH clock output  (wired on board, Rev D+)
+//   GPIO 18 — ETH MDIO          (wired on board)
+//   GPIO 23 — ETH MDC           (wired on board)
+//
+// Available output GPIOs: 2, 4, 12, 13, 14, 15, 16, 32, 33  (9 pins)
+// HUB75 requires: R1,G1,B1,R2,G2,B2,A,B,C,D,LAT,OE,CLK     (13 signals)
+//
+// ⚠ CONCLUSION: This board CANNOT drive HUB75 directly while
+//   Ethernet is active. You need an external shift-register
+//   buffer (e.g. 74HC595) to expand the available GPIO count,
+//   OR use a different ESP32 board that has more free GPIOs
+//   (e.g. ESP32-DevKitC, ESP32-S3).
+//
+// The pin assignments below use the 9 available free GPIOs for
+// the 6 colour data lines + 3 most critical address/control lines.
+// This is a PARTIAL assignment — the matrix will NOT work correctly
+// until the hardware conflict is resolved.
+// ══════════════════════════════════════════════════════════════════
 
-// Color Data (Upper half)
+// Color Data (Upper half) — 3 free GPIOs
 #define R1_PIN 2   // Red Data Upper
 #define G1_PIN 15  // Green Data Upper
 #define B1_PIN 4   // Blue Data Upper
 
-// Color Data (Lower half)
+// Color Data (Lower half) — 3 free GPIOs
 #define R2_PIN 16  // Red Data Lower
-#define G2_PIN 27  // Green Data Lower
-#define B2_PIN 32  // Blue Data Lower - FIXED: Changed from GPIO17 (Ethernet conflict)
-                   // GPIO17 used by Ethernet PHY on rev D+ and not on header in rev I
+#define G2_PIN 12  // Green Data Lower  (was 27 — RMII CRS_DV conflict)
+#define B2_PIN 14  // Blue Data Lower   (was 32)
 
-// Row Address Lines
-#define A_PIN 5    // Row Address A (Note: Also controls Ethernet power on rev D+)
-#define B_PIN 18   // Row Address B
-#define C_PIN 19   // Row Address C
-#define D_PIN 21   // Row Address D
+// Row Address Lines — only 1 free GPIO left after colour data
+#define A_PIN 33   // Row Address A  (was 5  — ETH power pin conflict)
+#define B_PIN 13   // Row Address B  (was 18 — ETH MDIO conflict)
+#define C_PIN -1   // Row Address C  *** NO FREE GPIO — ETH conflict ***
+#define D_PIN -1   // Row Address D  *** NO FREE GPIO — ETH conflict ***
 #define E_PIN -1   // Row Address E (Not used for 1/16 scan on 32px height panels)
 
-// Control Signals
-#define LAT_PIN 26 // Latch
-#define OE_PIN 25  // Output Enable (active low)
-#define CLK_PIN 22 // Clock
-
-// ⚠️ IMPORTANT COMPATIBILITY NOTES:
-// - GPIO17 cannot be used: Ethernet PHY clock on rev D+, not on header in rev I
-// - GPIO5 (A_PIN) also controls Ethernet power on rev D+
-// - Do NOT enable Ethernet while using LED matrix
-// - Tested compatible with ESP32-GATEWAY hardware revisions A through I
+// Control Signals — 2 free GPIOs left
+#define LAT_PIN 32 // Latch
+#define OE_PIN  -1 // Output Enable  *** NO FREE GPIO — ETH conflict ***
+#define CLK_PIN -1 // Clock          *** NO FREE GPIO — ETH conflict ***
 
 // Matrix Configuration
 #ifndef LED_MATRIX_WIDTH
