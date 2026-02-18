@@ -90,14 +90,14 @@ if grep -q "rockpis_mapping" "$HWMAP_C"; then
 fi
 
 # Find insertion point
-LINE_NUM=$(grep -n "static HardwareMapping \*hardware_mappings" "$HWMAP_C" | head -1 | cut -d: -f1)
+LINE_NUM=$(grep -n "struct HardwareMapping matrix_hardware_mappings\[\]" "$HWMAP_C" | head -1 | cut -d: -f1)
 
 if [ -z "$LINE_NUM" ]; then
-    echo "ERROR: Could not find hardware_mappings array"
+    echo "ERROR: Could not find matrix_hardware_mappings array"
     exit 1
 fi
 
-# Insert the mapping
+# Insert the mapping before the array
 echo "Patching hardware-mapping.c..."
 {
     head -n $((LINE_NUM - 1)) "$HWMAP_C"
@@ -106,30 +106,30 @@ echo "Patching hardware-mapping.c..."
 // ========== Rock Pi S Hardware Mapping (RK3308) ==========
 // All pins on Header 1 (26-pin GPIO)
 // See: https://docs.radxa.com/en/rock-pi-s/hardware/rock-pi-s
-static struct HardwareMapping rockpis_mapping = {
+static const struct HardwareMapping rockpis_mapping = {
   .name          = "rockpis",
   
   // Control signals
-  .output_enable = 54,  // OE  - GPIO1_C6 - Header 1 Pin 21
-  .clock         = 71,  // CLK - GPIO2_A7 - Header 1 Pin 22
-  .strobe        = 55,  // LAT - GPIO1_C7 - Header 1 Pin 19
+  .output_enable = GPIO_BIT(54),  // OE  - GPIO1_C6 - Header 1 Pin 21
+  .clock         = GPIO_BIT(71),  // CLK - GPIO2_A7 - Header 1 Pin 22
+  .strobe        = GPIO_BIT(55),  // LAT - GPIO1_C7 - Header 1 Pin 19
   
   // Row address pins
-  .a             = 11,  // GPIO0_B3 - Header 1 Pin 3
-  .b             = 12,  // GPIO0_B4 - Header 1 Pin 5
-  .c             = 65,  // GPIO2_A1 - Header 1 Pin 8  (UART0_TX - disable console!)
-  .d             = 64,  // GPIO2_A0 - Header 1 Pin 10 (UART0_RX - disable console!)
-  .e             = -1,  // Not used for 32px height (1/16 scan)
+  .a             = GPIO_BIT(11),  // GPIO0_B3 - Header 1 Pin 3
+  .b             = GPIO_BIT(12),  // GPIO0_B4 - Header 1 Pin 5
+  .c             = GPIO_BIT(65),  // GPIO2_A1 - Header 1 Pin 8  (UART0_TX - disable console!)
+  .d             = GPIO_BIT(64),  // GPIO2_A0 - Header 1 Pin 10 (UART0_RX - disable console!)
+  .e             = 0,             // Not used for 32px height (1/16 scan)
   
   // Upper half RGB
-  .p0_r1         = 16,  // GPIO0_C0 - Header 1 Pin 13
-  .p0_g1         = 17,  // GPIO0_C1 - Header 1 Pin 15
-  .p0_b1         = 15,  // GPIO0_B7 - Header 1 Pin 11
+  .p0_r1         = GPIO_BIT(16),  // GPIO0_C0 - Header 1 Pin 13
+  .p0_g1         = GPIO_BIT(17),  // GPIO0_C1 - Header 1 Pin 15
+  .p0_b1         = GPIO_BIT(15),  // GPIO0_B7 - Header 1 Pin 11
   
   // Lower half RGB
-  .p0_r2         = 68,  // GPIO2_A4 - Header 1 Pin 7
-  .p0_g2         = 69,  // GPIO2_A5 - Header 1 Pin 12
-  .p0_b2         = 74,  // GPIO2_B2 - Header 1 Pin 16
+  .p0_r2         = GPIO_BIT(68),  // GPIO2_A4 - Header 1 Pin 7
+  .p0_g2         = GPIO_BIT(69),  // GPIO2_A5 - Header 1 Pin 12
+  .p0_b2         = GPIO_BIT(74),  // GPIO2_B2 - Header 1 Pin 16
 };
 // ==========================================================
 
@@ -138,10 +138,15 @@ MAPPING_END
 } > "$HWMAP_C.tmp"
 mv "$HWMAP_C.tmp" "$HWMAP_C"
 
-# Register in array
-if ! grep -q "&rockpis_mapping," "$HWMAP_C"; then
-    sed -i "/static HardwareMapping \*hardware_mappings/,/NULL/s/  NULL/  \&rockpis_mapping,\n  NULL/" "$HWMAP_C"
-    echo "✓ Mapping registered"
+# Add to the end of the array (before the last closing brace and semicolon)
+if ! grep -q "rockpis_mapping" "$HWMAP_C"; then
+    # Find the line with "};" that ends the array
+    LAST_BRACE=$(grep -n "^};" "$HWMAP_C" | tail -1 | cut -d: -f1)
+    if [ -n "$LAST_BRACE" ]; then
+        # Insert before the closing brace
+        sed -i "${LAST_BRACE}i\\  rockpis_mapping," "$HWMAP_C"
+        echo "✓ Mapping registered"
+    fi
 else
     echo "ℹ Mapping already registered"
 fi
