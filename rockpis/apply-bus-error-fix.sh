@@ -21,16 +21,16 @@ echo ""
 
 # Update from git
 REPO_DIR=""
-if [ -d ~/QSYS-LED-Matrix ]; then
+if [ -f ./main.py ] && [ -f ./config.py ]; then
+    # Already in rockpis/ subdirectory
+    REPO_DIR=..
+elif [ -f rockpis/main.py ]; then
+    # Already in repository root
+    REPO_DIR=.
+elif [ -d ~/QSYS-LED-Matrix ]; then
     REPO_DIR=~/QSYS-LED-Matrix
 elif [ -d ./QSYS-LED-Matrix ]; then
     REPO_DIR=./QSYS-LED-Matrix
-elif [ -f ../main.py ]; then
-    # Already in rockpis/ subdirectory
-    REPO_DIR=..
-elif [ -f ./main.py ]; then
-    # Already in repository root
-    REPO_DIR=.
 fi
 
 if [ -z "$REPO_DIR" ]; then
@@ -44,9 +44,11 @@ cd "$REPO_DIR"
 git pull origin main || echo "⚠ Git pull failed (continue anyway)"
 echo "✓ Repository updated"
 
-# Make sure we're in the right place
+# Verify we found the right location
 if [ ! -f rockpis/main.py ]; then
-    echo "ERROR: rockpis/main.py not found in $REPO_DIR"
+    echo "ERROR: rockpis/main.py not found"
+    echo "Current directory: $(pwd)"
+    ls -la rockpis/ 2>/dev/null || echo "rockpis/ directory not found"
     exit 1
 fi
 
