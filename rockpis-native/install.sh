@@ -8,9 +8,10 @@ echo "Rock Pi S LED Matrix Installation"
 echo "=================================="
 echo ""
 
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-   echo "Please run as normal user (will use sudo when needed)"
+# Check if running as root (allow root for automated installation)
+if [ "$EUID" -ne 0 ]; then
+   echo "This script requires root privileges"
+   echo "Please run: sudo bash install.sh"
    exit 1
 fi
 
@@ -31,12 +32,12 @@ fi
 # Update package list
 echo ""
 echo "Step 1: Updating package list..."
-sudo apt update
+apt update
 
 # Install dependencies
 echo ""
 echo "Step 2: Installing dependencies..."
-sudo apt install -y \
+apt install -y \
     python3 \
     python3-pip \
     python3-dev \
@@ -70,18 +71,27 @@ echo "✓ GPIO chip found"
 echo ""
 echo "Step 4: Disabling UART0 console..."
 if systemctl is-enabled serial-getty@ttyS0.service &> /dev/null; then
-    sudo systemctl disable --now serial-getty@ttyS0.service
+    systemctl disable --now serial-getty@ttyS0.service
     echo "✓ UART0 console disabled"
 else
     echo "✓ UART0 console already disabled"
 fi
 
-# Remove console from kernel command line
+# Remove console from kernel command line (check common locations)
+BOOT_CONFIG=""
 if [ -f /boot/armbianEnv.txt ]; then
-    if grep -q "console=ttyS0" /boot/armbianEnv.txt; then
-        echo "Removing ttyS0 from kernel console..."
-        sudo sed -i 's/console=ttyS0[^ ]* //g' /boot/armbianEnv.txt
-        echo "✓ Updated /boot/armbianEnv.txt"
+    BOOT_CONFIG="/boot/armbianEnv.txt"
+elif [ -f /boot/dietpiEnv.txt ]; then
+    BOOT_CONFIG="/boot/dietpiEnv.txt"
+elif [ -f /boot/cmdline.txt ]; then
+    BOOT_CONFIG="/boot/cmdline.txt"
+fi
+
+if [ -n "$BOOT_CONFIG" ] && [ -f "$BOOT_CONFIG" ]; then
+    if grep -q "console=ttyS0" "$BOOT_CONFIG"; then
+        echo "Removing ttyS0 from kernel console in $BOOT_CONFIG..."
+        sed -i 's/console=ttyS0[^ ]* //g' "$BOOT_CONFIG"
+        echo "✓ Updated $BOOT_CONFIG"
         REBOOT_NEEDED=1
     fi
 fi
@@ -90,12 +100,12 @@ fi
 echo ""
 echo "Step 5: Installing application..."
 INSTALL_DIR="/opt/led-matrix-native"
-sudo mkdir -p "$INSTALL_DIR"
-
-# Copy files
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sudo cp "$SCRIPT_DIR"/*.py "$INSTALL_DIR/"
-sudo chmod +x "$INSTALL_DIR"/*.py
+# Create systemd service
+echo ""
+echo "Step 6: Installing systemd service..."
+tee /etc/systemd/system/led-matrix.service > /dev/null <<'EOF'
+cp "$SCRIPT_DIR"/*.py "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR"/*.py
 
 echo "✓ Files copied to $INSTALL_DIR"
 
@@ -106,14 +116,14 @@ sudo tee /etc/systemd/system/led-matrix.service > /dev/null <<'EOF'
 [Unit]
 Description=LED Matrix Display Controller
 After=network.target
+[Install]
+WantedBy=multi-user.target
+EOF
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/led-matrix-native
-ExecStart=/usr/bin/python3 /opt/led-matrix-native/main.py
-Restart=on-failure
-RestartSec=5s
+systemctl daemon-reload
+systemctl enable led-matrix.service
+
+echo "✓ Service installed"
 
 [Install]
 WantedBy=multi-user.target
