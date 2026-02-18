@@ -1,0 +1,135 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           Rock Pi S → 64×32 HUB75 LED Matrix Connection Diagram             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Rock Pi S GPIO Header (26-pin)                       │
+│                        Top View - Pins Facing You                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+         LEFT SIDE                                    RIGHT SIDE
+    ┌─────────────────┐                          ┌─────────────────┐
+    │  1  3V3         │                          │  5V          2  │
+    │  3  SDA (A) ●───┼──────────────────────────┼─→ A            │
+    │  5  SCL (B) ●───┼──────────────────────────┼─→ B            │
+    │  7  GPIO (D)●───┼──────────────────────────┼─→ D            │
+    │  9  GND ○───────┼──────────────────────────┼─→ GND          │
+    │ 11  GPIO16 ●────┼──────────────────────────┼─→ R1           │
+    │ 13  GPIO18 ●────┼──────────────────────────┼─→ B1           │
+    │ 15  GPIO19 ●────┼──────────────────────────┼─→ R2           │
+    │ 17  3V3         │                          │  GPIO21     18 ●┼─→ B2
+    │ 19  MOSI(LAT)●──┼──────────────────────────┼─→ LAT          │
+    │ 21  MISO(OE) ●──┼──────────────────────────┼─→ OE           │
+    │ 23  CLK         │                          │  GPIO22     22 ●┼─→ CLK
+    │ 25  GND ○       │                          │  CS0        24  │
+    └─────────────────┘                          │  GPIO17     12 ●┼─→ G1
+                                                 │  GND        14 ○┼─→ GND
+                                                 │  GPIO20     16 ●┼─→ G2
+                                                 │  TXD(C)⚠    8 ●┼─→ C
+                                                 │  RXD        10  │
+                                                 └─────────────────┘
+
+Legend: ● Active connection   ○ Ground connection   ⚠ UART conflict
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           HUB75 Connector (Panel Side)                      │
+│                    16-pin IDC Female Connector (2×8 pins)                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    Pin 1 (Red Triangle Marker)
+                            ▼
+       ┌────────────────────────────────────────┐
+       │  R1   G1   B1  GND  |  R2   G2   B2  GND  │  ← Row 1 & 2 RGB Data
+       │   A    B    C    D  | CLK  LAT   OE  GND  │  ← Address & Control
+       └────────────────────────────────────────┘
+        1    3    5    7    9   11   13   15
+          2    4    6    8   10   12   14   16
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Complete Connection Table                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔═══════════╦══════════════╦════════╦══════╦═══════════════════════════════╗
+║  HUB75    ║  Rock Pi S   ║ Linux  ║ Pin  ║  Function                     ║
+║  Pin      ║  GPIO Name   ║ GPIO # ║  #   ║                               ║
+╠═══════════╬══════════════╬════════╬══════╬═══════════════════════════════╣
+║ R1  (1)   ║ GPIO0_C0     ║   16   ║  11  ║ Upper half RED data           ║
+║ G1  (3)   ║ GPIO0_C1     ║   17   ║  12  ║ Upper half GREEN data         ║
+║ B1  (5)   ║ GPIO0_C2     ║   18   ║  13  ║ Upper half BLUE data          ║
+╠═══════════╬══════════════╬════════╬══════╬═══════════════════════════════╣
+║ R2  (9)   ║ GPIO0_C3     ║   19   ║  15  ║ Lower half RED data           ║
+║ G2 (11)   ║ GPIO0_C4     ║   20   ║  16  ║ Lower half GREEN data         ║
+║ B2 (13)   ║ GPIO0_C5     ║   21   ║  18  ║ Lower half BLUE data          ║
+╠═══════════╬══════════════╬════════╬══════╬═══════════════════════════════╣
+║ A   (2)   ║ GPIO0_B3     ║   11   ║   3  ║ Row address line A (LSB)      ║
+║ B   (4)   ║ GPIO0_B4     ║   12   ║   5  ║ Row address line B            ║
+║ C   (6)   ║ GPIO0_B5     ║   13   ║   8  ║ Row address line C  ⚠ UART TX║
+║ D   (8)   ║ GPIO0_B6     ║   14   ║   7  ║ Row address line D  ⚠ UART RX║
+╠═══════════╬══════════════╬════════╬══════╬═══════════════════════════════╣
+║ CLK (10)  ║ GPIO0_C6     ║   22   ║  22  ║ Shift register clock          ║
+║ LAT (12)  ║ GPIO0_C7     ║   23   ║  19  ║ Latch / Strobe signal         ║
+║ OE  (14)  ║ GPIO0_D0     ║   24   ║  21  ║ Output Enable (active LOW)    ║
+╠═══════════╬══════════════╬════════╬══════╬═══════════════════════════════╣
+║ GND (all) ║ GND          ║   —    ║6,9,  ║ Common ground (connect at     ║
+║           ║              ║        ║14,20 ║ least one, preferably two)    ║
+╚═══════════╩══════════════╩════════╩══════╩═══════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    ⚠⚠⚠  CRITICAL WARNINGS  ⚠⚠⚠                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+1. UART0 SERIAL CONSOLE CONFLICT
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Pin 8 (GPIO0_B5, Linux GPIO 13) = HUB75 'C' line = UART0 TX
+   Pin 7 (GPIO0_B6, Linux GPIO 14) = HUB75 'D' line = UART0 RX
+   
+   You MUST disable the serial console before connecting:
+   
+   sudo systemctl disable --now serial-getty@ttyS0
+   
+   Edit /boot/armbianEnv.txt and remove: console=ttyS0,1500000
+   
+   Then reboot!
+
+2. VOLTAGE LEVEL (3.3V vs 5V)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Rock Pi S outputs 3.3V logic, HUB75 expects 5V logic.
+   Most panels tolerate 3.3V, but if you see issues:
+   - Random flickering / ghosting
+   - Colors incorrect or missing
+   - Panel not responding
+   
+   Add a 74HCT245 octal bus transceiver for level shifting.
+
+3. POWER SUPPLY
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   64×32 LED matrix can draw 3-4A at full brightness (all white).
+   - Power the panel separately with a 5V/4A+ power supply
+   - Power Rock Pi S via USB-C or PoE splitter separately
+   - DO NOT power the panel from Rock Pi S GPIO 5V pins!
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Quick Wiring Checklist                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+[ ] Disable UART0 serial console (see commands above)
+[ ] Reboot Rock Pi S after UART disable
+[ ] Connect all 13 signal wires (R1,G1,B1,R2,G2,B2,A,B,C,D,CLK,LAT,OE)
+[ ] Connect at least one GND wire (two or more recommended)
+[ ] Verify 3.3V tolerance or add level shifter
+[ ] Separate 5V power supply for LED panel (3A+ rated)
+[ ] Separate power for Rock Pi S (USB-C or PoE)
+[ ] Check all connections match pinout table above
+[ ] Run: sudo systemctl start led-matrix
+[ ] Check logs: sudo journalctl -u led-matrix -f
+[ ] Verify "READY" appears on display in green
+
+
+═══════════════════════════════════════════════════════════════════════════════
+For more information: See README.md and GPIO_PIN_MAPPING_ISSUE.md
+═══════════════════════════════════════════════════════════════════════════════

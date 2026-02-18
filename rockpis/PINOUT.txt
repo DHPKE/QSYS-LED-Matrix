@@ -1,0 +1,132 @@
+Rock Pi S → HUB75 LED Matrix Pinout Diagram
+═══════════════════════════════════════════════════════════════════════════════
+
+RADXA Rock Pi S 26-pin GPIO Header (top view, pins facing you)
+───────────────────────────────────────────────────────────────────────────────
+
+    3V3  [ 1] [ 2]  5V
+    SDA  [ 3] [ 4]  5V          ┌─────────────────────────────────────────┐
+    SCL  [ 5] [ 6]  GND         │  Connect to HUB75 LED Matrix Panel      │
+  GPIO14 [ 7] [ 8]  TXD         │                                         │
+    GND  [ 9] [10]  RXD         │  HUB75 Connector (16-pin IDC):          │
+ GPIO16  [11] [12]  GPIO17      │                                         │
+ GPIO18  [13] [14]  GND         │   R1  G1  B1  GND                       │
+ GPIO19  [15] [16]  GPIO20      │   R2  G2  B2  GND                       │
+    3V3  [17] [18]  GPIO21      │    A   B   C   D                        │
+  MOSI   [19] [20]  GND         │  CLK LAT  OE  GND                       │
+  MISO   [21] [22]  GPIO22      │                                         │
+   CLK   [23] [24]  CS0         └─────────────────────────────────────────┘
+    GND  [25] [26]  CS1
+
+
+Complete Wiring Table
+═══════════════════════════════════════════════════════════════════════════════
+
+┌────────────┬──────────────┬────────┬──────────────┬─────────────────────────┐
+│ HUB75      │ Rock Pi S    │ Linux  │ Physical Pin │ Notes                   │
+│ Signal     │ GPIO Name    │ GPIO#  │              │                         │
+├────────────┼──────────────┼────────┼──────────────┼─────────────────────────┤
+│ R1 (red 1) │ GPIO0_C0     │   16   │     11       │ Upper half - Red        │
+│ G1 (grn 1) │ GPIO0_C1     │   17   │     12       │ Upper half - Green      │
+│ B1 (blu 1) │ GPIO0_C2     │   18   │     13       │ Upper half - Blue       │
+├────────────┼──────────────┼────────┼──────────────┼─────────────────────────┤
+│ R2 (red 2) │ GPIO0_C3     │   19   │     15       │ Lower half - Red        │
+│ G2 (grn 2) │ GPIO0_C4     │   20   │     16       │ Lower half - Green      │
+│ B2 (blu 2) │ GPIO0_C5     │   21   │     18       │ Lower half - Blue       │
+├────────────┼──────────────┼────────┼──────────────┼─────────────────────────┤
+│ A (addr)   │ GPIO0_B3     │   11   │      3       │ Row address bit 0       │
+│ B (addr)   │ GPIO0_B4     │   12   │      5       │ Row address bit 1       │
+│ C (addr)   │ GPIO0_B5     │   13   │      8       │ Row address bit 2 ⚠ TX │
+│ D (addr)   │ GPIO0_B6     │   14   │      7       │ Row address bit 3 ⚠ RX │
+├────────────┼──────────────┼────────┼──────────────┼─────────────────────────┤
+│ CLK (clk)  │ GPIO0_C6     │   22   │     22       │ Shift clock             │
+│ LAT (lat)  │ GPIO0_C7     │   23   │     19       │ Latch / Strobe          │
+│ OE  (oe)   │ GPIO0_D0     │   24   │     21       │ Output Enable (active-L)│
+├────────────┼──────────────┼────────┼──────────────┼─────────────────────────┤
+│ GND        │ GND          │   —    │ 6,9,14,20,25 │ Common ground (any pin) │
+└────────────┴──────────────┴────────┴──────────────┴─────────────────────────┘
+
+⚠ CRITICAL: GPIO0_B5 (pin 8) and GPIO0_B6 (pin 7/10) are UART0 TX/RX
+   You MUST disable the serial console before using these pins!
+   See UART0 disable instructions in README.md
+
+
+Visual Wiring Guide
+═══════════════════════════════════════════════════════════════════════════════
+
+                    Rock Pi S                        HUB75 Connector
+                   GPIO Header                     (Female on panel)
+                                                    
+    Pin 3  (GPIO11) ────────────────────────────────→ A
+    Pin 5  (GPIO12) ────────────────────────────────→ B
+    Pin 8  (GPIO13) ────────────────────────────────→ C  ⚠ Disable UART!
+    Pin 7  (GPIO14) ────────────────────────────────→ D
+                                                    
+    Pin 11 (GPIO16) ────────────────────────────────→ R1
+    Pin 12 (GPIO17) ────────────────────────────────→ G1
+    Pin 13 (GPIO18) ────────────────────────────────→ B1
+                                                    
+    Pin 15 (GPIO19) ────────────────────────────────→ R2
+    Pin 16 (GPIO20) ────────────────────────────────→ G2
+    Pin 18 (GPIO21) ────────────────────────────────→ B2
+                                                    
+    Pin 22 (GPIO22) ────────────────────────────────→ CLK
+    Pin 19 (GPIO23) ────────────────────────────────→ LAT
+    Pin 21 (GPIO24) ────────────────────────────────→ OE
+                                                    
+    Pin 6,9,14,20,25 ───────────────────────────────→ GND (any GND)
+
+
+Quick Reference - Pin Numbers Only
+═══════════════════════════════════════════════════════════════════════════════
+
+HUB75 → Rock Pi S Physical Pins:
+
+  R1  →  11     R2  →  15     A  →   3     CLK → 22
+  G1  →  12     G2  →  16     B  →   5     LAT → 19
+  B1  →  13     B2  →  18     C  →   8     OE  → 21
+                              D  →   7     GND → 6,9,14,20,25
+
+
+Level Shifting Note
+═══════════════════════════════════════════════════════════════════════════════
+
+Rock Pi S GPIOs are 3.3V logic. Most HUB75 panels are designed for 5V logic
+but typically tolerate 3.3V inputs without issues.
+
+If you experience:
+- Random pixels / ghosting
+- Colors not displaying correctly
+- Panel not responding
+
+Consider adding a 74HCT245 level shifter board between the Rock Pi S GPIO
+and the HUB75 panel. Connect:
+  - Rock Pi S 3.3V → 74HCT245 inputs (A side)
+  - 74HCT245 outputs (B side) → HUB75 panel
+  - 5V power to 74HCT245 VCC
+  - Common GND
+
+
+Verification Commands
+═══════════════════════════════════════════════════════════════════════════════
+
+After wiring and running the software:
+
+# Check GPIO ownership (should show python3 or led-matrix)
+sudo ls -la /sys/class/gpio/gpio*/
+
+# Check service status
+sudo systemctl status led-matrix
+
+# View live output
+sudo journalctl -u led-matrix -f
+
+# Expected output on success:
+#   ✓ LED matrix initialised
+#   ↳ Hardware pulsing disabled (bit-bang OE- mode for RK3308)
+#   ↳ Privilege drop disabled (non-Pi hardware mode)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+Generated: 2026-02-18 | QSYS-LED-Matrix Project | github.com/DHPKE
+═══════════════════════════════════════════════════════════════════════════════
