@@ -94,8 +94,6 @@ function GetControls(props)
     table.insert(controls, {
         Name = "layout",
         ControlType = "Text",
-        ControlUnit = "List",
-        Choices = {"Fullscreen", "Split Vertical", "Split Horizontal", "Quad"},
         Count = 1,
         UserPin = true,
         PinStyle = "Both"
@@ -135,8 +133,6 @@ function GetControls(props)
         table.insert(controls, {
             Name = string.format("text_color_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray", "Black"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -146,8 +142,6 @@ function GetControls(props)
         table.insert(controls, {
             Name = string.format("bg_color_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"Black", "White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -169,8 +163,6 @@ function GetControls(props)
         table.insert(controls, {
             Name = string.format("font_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"Arial", "Verdana", "Digital", "Mono"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -180,8 +172,6 @@ function GetControls(props)
         table.insert(controls, {
             Name = string.format("align_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"Left", "Center", "Right"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -191,8 +181,6 @@ function GetControls(props)
         table.insert(controls, {
             Name = string.format("size_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"auto", "8", "12", "16", "24", "32"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -202,8 +190,6 @@ function GetControls(props)
         table.insert(controls, {
             Name = string.format("effect_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"none", "scroll", "blink", "fade", "rainbow"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -305,6 +291,7 @@ function GetControlLayout(props)
     GBox(0, y, W, 50, "Display Layout")
     Lbl("Layout Preset", 6, y+5, 190)
     layout["layout"] = {PrettyName="Layout Preset", Style="ComboBox",
+        IsReadOnly=false,
         Position={6, y+18}, Size={190, CH}}
     layout["apply_layout"] = {PrettyName="Apply", Style="Button",
         ButtonStyle="Trigger", Legend="Apply Layout", Color=C_BTN_B,
@@ -353,6 +340,7 @@ function GetControlLayout(props)
         for _, col in ipairs(cols) do
             Lbl(col[1], cx, r2-13, col[3])
             layout[col[2]..s] = {PrettyName=col[1], Style="ComboBox",
+                IsReadOnly=false,
                 Position={cx, r2}, Size={col[3], CH}}
             cx = cx + col[3] + 6
         end
@@ -536,19 +524,39 @@ if Controls then
         Controls.udp_port.String    = tostring(udp_port)
         Controls.brightness.Value   = 128
         Controls.last_command.String = "Ready"
-        Controls.layout.String      = "Fullscreen"
+
+        -- Set dropdown Choices at runtime (required by Q-SYS for ComboBox to work)
+        Controls.layout.Choices = {"Fullscreen", "Split Vertical", "Split Horizontal", "Quad"}
+        Controls.layout.String  = "Fullscreen"
+
+        local colorChoices  = {"White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan",
+                               "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray", "Black"}
+        local bgChoices     = {"Black", "White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan",
+                               "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray"}
+        local fontChoices   = {"Arial", "Verdana", "Digital", "Mono"}
+        local sizeChoices   = {"auto", "8", "12", "16", "24", "32"}
+        local alignChoices  = {"Left", "Center", "Right"}
+        local effectChoices = {"none", "scroll", "blink", "fade", "rainbow"}
 
         local defaultColors = {"White", "Lime", "Red", "Yellow"}
         for seg = 0, 3 do
-            Controls[string.format("text_%d",       seg)].String  = ""
-            Controls[string.format("text_color_%d", seg)].String  = defaultColors[seg + 1]
-            Controls[string.format("bg_color_%d",   seg)].String  = "Black"
-            Controls[string.format("intensity_%d",  seg)].Value   = 255
-            Controls[string.format("font_%d",       seg)].String  = "Arial"
-            Controls[string.format("size_%d",       seg)].String  = "auto"
-            Controls[string.format("align_%d",      seg)].String  = "Center"
-            Controls[string.format("effect_%d",     seg)].String  = "none"
-            Controls[string.format("active_%d",     seg)].Boolean = false
+            local s = tostring(seg)
+            Controls["text_color_"..s].Choices  = colorChoices
+            Controls["bg_color_"..s].Choices    = bgChoices
+            Controls["font_"..s].Choices        = fontChoices
+            Controls["size_"..s].Choices        = sizeChoices
+            Controls["align_"..s].Choices       = alignChoices
+            Controls["effect_"..s].Choices      = effectChoices
+
+            Controls["text_"..s].String         = ""
+            Controls["text_color_"..s].String   = defaultColors[seg + 1]
+            Controls["bg_color_"..s].String     = "Black"
+            Controls["intensity_"..s].Value     = 255
+            Controls["font_"..s].String         = "Arial"
+            Controls["size_"..s].String         = "auto"
+            Controls["align_"..s].String        = "Center"
+            Controls["effect_"..s].String       = "none"
+            Controls["active_"..s].Boolean      = false
         end
 
         ReopenSocket()
