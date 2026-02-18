@@ -42,11 +42,13 @@ apt install -y \
     python3-pip \
     python3-dev \
     python3-pil \
-    gpiod \
-    libgpiod-dev \
-    libgpiod2 \
     fonts-dejavu-core \
-    git
+    git \
+    build-essential
+
+# Try to install gpiod tools and library (version may vary)
+apt install -y gpiod libgpiod-dev 2>/dev/null || true
+apt install -y libgpiod2 2>/dev/null || apt install -y libgpiod3 2>/dev/null || true
 
 # Install Python gpiod via pip (not available in all repos)
 echo ""
