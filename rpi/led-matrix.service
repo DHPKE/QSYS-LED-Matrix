@@ -1,0 +1,21 @@
+[Unit]
+Description=LED Matrix Controller (Q-SYS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/led-matrix
+ExecStart=/usr/bin/python3 /opt/led-matrix/main.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Allow the process to access /dev/mem and GPIO
+PrivateDevices=no
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
