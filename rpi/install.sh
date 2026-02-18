@@ -12,6 +12,9 @@
 
 set -e
 
+# Capture script directory FIRST — before any cd commands change $PWD.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "=== LED Matrix Controller — Install Script ==="
 echo ""
 
@@ -50,7 +53,6 @@ echo "  ✓ rpi-rgb-led-matrix installed"
 
 # ── 3. Copy app files ──────────────────────────────────────────────────────
 echo "[3/5] Copying application files to /opt/led-matrix..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p /opt/led-matrix
 cp "$SCRIPT_DIR"/*.py    /opt/led-matrix/
 echo "  ✓ Files copied"
