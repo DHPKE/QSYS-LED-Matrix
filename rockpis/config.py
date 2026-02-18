@@ -47,23 +47,23 @@ RK3308 GPIO numbering:
   │ 26 │ SPI0_CS1      │ GPIO0_D3 / SPI0_CS1  │   27 │
   └────┴───────────────┴──────────────────────┴──────┘
 
-  Linux GPIO numbers used for HUB75 (using rpi-rgb-led-matrix 'regular' mapping):
+  Linux GPIO numbers used for HUB75 (Header 1 ONLY - all pins available):
   ┌──────────┬──────────────┬──────────────┬──────────────────────────────────┐
   │ HUB75    │ RK3308 GPIO  │ Linux number │ Physical header pin               │
   ├──────────┼──────────────┼──────────────┼──────────────────────────────────┤
-  │ R1       │ GPIO0_C0     │  16          │ 11                                │
-  │ G1       │ GPIO0_C1     │  17          │ 12                                │
-  │ B1       │ GPIO0_C2     │  18          │ 13                                │
-  │ R2       │ GPIO0_C3     │  19          │ 15                                │
-  │ G2       │ GPIO0_C4     │  20          │ 16                                │
-  │ B2       │ GPIO0_C5     │  21          │ 18                                │
+  │ R1       │ GPIO0_C0     │  16          │ 13                                │
+  │ G1       │ GPIO0_C1     │  17          │ 15                                │
+  │ B1       │ GPIO0_B7     │  15          │ 11                                │
+  │ R2       │ GPIO2_A4     │  68          │  7                                │
+  │ G2       │ GPIO2_A5     │  69          │ 12                                │
+  │ B2       │ GPIO2_B2     │  74          │ 16                                │
   │ A (addr) │ GPIO0_B3     │  11          │  3                                │
   │ B (addr) │ GPIO0_B4     │  12          │  5                                │
-  │ C (addr) │ GPIO0_B5     │  13          │  8  (shared UART0_TX — disable)   │
-  │ D (addr) │ GPIO0_B6     │  14          │  7  (also UART0_RX on some pinouts)│
-  │ CLK      │ GPIO0_C6     │  22          │ 22                                │
-  │ LAT/STR  │ GPIO0_C7     │  23          │ 19                                │
-  │ OE       │ GPIO0_D0     │  24          │ 21                                │
+  │ C (addr) │ GPIO2_A1     │  65          │  8  (UART0_TX — disable console!) │
+  │ D (addr) │ GPIO2_A0     │  64          │ 10  (UART0_RX — disable console!) │
+  │ CLK      │ GPIO2_A7     │  71          │ 22                                │
+  │ LAT/STR  │ GPIO1_C7     │  55          │ 19                                │
+  │ OE       │ GPIO1_C6     │  54          │ 21                                │
   └──────────┴──────────────┴──────────────┴──────────────────────────────────┘
 
   ⚠  NOTE ON UART0 CONFLICT (pins 8/10):
@@ -125,22 +125,22 @@ MATRIX_DISABLE_HW_PULSING = True
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HUB75 GPIO assignments (Linux sysfs / libgpiod numbers)
-# These are fed to RGBMatrixOptions so the library uses them instead of the
-# hard-coded RPi BCM offsets.  Values match the wiring table above.
+# Updated to use ONLY Header 1 pins - all 13 signals available on Header 1!
+# Linux GPIO# = bank×32 + offset (A=0-7, B=8-15, C=16-23, D=24-31)
 # ──────────────────────────────────────────────────────────────────────────────
-GPIO_R1  = 16   # GPIO0_C0   physical pin 11
-GPIO_G1  = 17   # GPIO0_C1   physical pin 12
-GPIO_B1  = 18   # GPIO0_C2   physical pin 13
-GPIO_R2  = 19   # GPIO0_C3   physical pin 15
-GPIO_G2  = 20   # GPIO0_C4   physical pin 16
-GPIO_B2  = 21   # GPIO0_C5   physical pin 18
-GPIO_A   = 11   # GPIO0_B3   physical pin  3
-GPIO_B   = 12   # GPIO0_B4   physical pin  5
-GPIO_C   = 13   # GPIO0_B5   physical pin  8  (disable UART0 console first!)
-GPIO_D   = 14   # GPIO0_B6   physical pin  7
-GPIO_CLK = 22   # GPIO0_C6   physical pin 22
-GPIO_LAT = 23   # GPIO0_C7   physical pin 19
-GPIO_OE  = 24   # GPIO0_D0   physical pin 21
+GPIO_R1  = 16   # GPIO0_C0   physical pin 13   (upper half red)
+GPIO_G1  = 17   # GPIO0_C1   physical pin 15   (upper half green)
+GPIO_B1  = 15   # GPIO0_B7   physical pin 11   (upper half blue)
+GPIO_R2  = 68   # GPIO2_A4   physical pin  7   (lower half red)
+GPIO_G2  = 69   # GPIO2_A5   physical pin 12   (lower half green)
+GPIO_B2  = 74   # GPIO2_B2   physical pin 16   (lower half blue)
+GPIO_A   = 11   # GPIO0_B3   physical pin  3   (row address A)
+GPIO_B   = 12   # GPIO0_B4   physical pin  5   (row address B)
+GPIO_C   = 65   # GPIO2_A1   physical pin  8   (row address C) ⚠ UART0_TX!
+GPIO_D   = 64   # GPIO2_A0   physical pin 10   (row address D) ⚠ UART0_RX!
+GPIO_CLK = 71   # GPIO2_A7   physical pin 22   (shift clock)
+GPIO_LAT = 55   # GPIO1_C7   physical pin 19   (latch/strobe)
+GPIO_OE  = 54   # GPIO1_C6   physical pin 21   (output enable)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Segments
