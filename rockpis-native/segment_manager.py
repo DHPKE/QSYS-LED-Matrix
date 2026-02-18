@@ -122,6 +122,15 @@ class SegmentManager:
         with self._lock:
             return [copy.deepcopy(s.to_dict()) for s in self._segments]
 
+    def get_active_segments(self) -> dict:
+        """Return a dict of active segments: {seg_id: seg_dict}"""
+        with self._lock:
+            result = {}
+            for i, seg in enumerate(self._segments):
+                if seg.is_active:
+                    result[i] = seg.to_dict()
+            return result
+
     # ─── Write access (all take the lock) ─────────────────────────────────
 
     def update_text(self, seg_id: int, text: str, color: str = None,
