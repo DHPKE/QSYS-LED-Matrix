@@ -9,13 +9,14 @@ sudo curl -o hub75_driver.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LE
 
 # Check if download succeeded
 if [ -f hub75_driver.py.new ]; then
-    # Verify the file is valid Python
-    if python3 -m py_compile hub75_driver.py.new 2>/dev/null; then
+    # Verify the file is valid Python (use sudo to write to __pycache__)
+    if sudo python3 -m py_compile hub75_driver.py.new 2>/dev/null; then
         echo "✓ File is valid Python"
         sudo mv hub75_driver.py.new hub75_driver.py
         echo "✓ Driver updated"
     else
         echo "✗ Downloaded file is invalid"
+        sudo rm -f hub75_driver.py.new
         exit 1
     fi
 else
