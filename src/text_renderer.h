@@ -83,44 +83,51 @@ public:
         : dma_display(display), segmentManager(manager) {}
     
     void renderSegment(Segment* seg) {
+        // Always clear dirty flag first — no matter what path we take
+        seg->isDirty = false;
+
         if (!seg->isActive || strlen(seg->text) == 0) {
-            // Clear segment area
             dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
-            seg->isDirty = false;
             return;
         }
 
-        Serial.printf("RENDER seg%d: '%s' x=%d y=%d w=%d h=%d active=%d\n",
-                      seg->id, seg->text, seg->x, seg->y, seg->width, seg->height, seg->isActive);
+        // Apply blink effect — skip drawing but don't re-dirty
+        if (seg->effect == EFFECT_BLINK && !seg->blinkState) {
+            return;
+        }
+
+        // Only log on first render or non-scroll effects (suppress scroll noise)
+        if (seg->effect != EFFECT_SCROLL || seg->scrollOffset == 0) {
+            Serial.printf("RENDER seg%d: '%s' x=%d y=%d w=%d h=%d fx=%d\n",
+                          seg->id, seg->text, seg->x, seg->y, seg->width, seg->height, seg->effect);
+        }
 
         // Clear segment background
         dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
-        
+
         // Draw border if enabled
         if (seg->hasBorder) {
             dma_display->drawRect(seg->x, seg->y, seg->width, seg->height, seg->borderColor);
         }
-        
+
         // Select and set font
         uint8_t fontSize = seg->autoSize ? calculateAutoSize(seg, seg->text) : seg->fontSize;
         const GFXfont* font = selectFont(fontSize, seg->fontName);
         dma_display->setFont(font);
-        
-        // Calculate text bounds relative to cursor at (0,0).
-        // For GFX bitmap fonts y1 is negative (ascent above baseline).
-        // w/h are the bounding box dimensions.
+
+        // Calculate text bounds relative to cursor at (0,0)
         int16_t x1, y1;
         uint16_t w, h;
         dma_display->getTextBounds(seg->text, 0, 0, &x1, &y1, &w, &h);
 
-        Serial.printf("  bounds: x1=%d y1=%d w=%u h=%u fontSize=%d\n", x1, y1, w, h, fontSize);
+        if (seg->effect != EFFECT_SCROLL || seg->scrollOffset == 0) {
+            Serial.printf("  bounds: x1=%d y1=%d w=%u h=%u fontSize=%d\n", x1, y1, w, h, fontSize);
+        }
 
         // Calculate position based on alignment
         int16_t textX, textY;
         int padding = 2;
-        
-        // textX: place bounding box left edge at target X, then convert to cursor X
-        // cursor_x = target_x - x1
+
         switch (seg->align) {
             case ALIGN_LEFT:
                 textX = seg->x + padding - x1;
@@ -135,35 +142,23 @@ public:
                 textX = seg->x + padding - x1;
                 break;
         }
-        
-        // Vertical centering for GFX fonts:
-        // The bounding box top is at (cursor_y + y1), bottom at (cursor_y + y1 + h).
-        // We want the box centred in the segment:
-        //   box_top = seg->y + (seg->height - h) / 2
-        //   cursor_y = box_top - y1
+
+        // Vertical centering
         int16_t boxTop = seg->y + ((int16_t)seg->height - (int16_t)h) / 2;
         textY = boxTop - y1;
-        
+
         // Apply scrolling offset
         if (seg->effect == EFFECT_SCROLL) {
             textX -= seg->scrollOffset;
-            // Reset scroll when text completely off screen
-            if (textX + w < seg->x) {
+            if (textX + (int16_t)w < seg->x) {
                 seg->scrollOffset = 0;
             }
         }
-        
-        // Apply blink effect
-        if (seg->effect == EFFECT_BLINK && !seg->blinkState) {
-            return; // Don't draw when blinked off
-        }
-        
+
         // Draw text
         dma_display->setTextColor(seg->color);
         dma_display->setCursor(textX, textY);
         dma_display->print(seg->text);
-        
-        seg->isDirty = false;
     }
     
     void renderAll() {
