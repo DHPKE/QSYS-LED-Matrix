@@ -7,7 +7,6 @@ import time
 import threading
 from typing import Tuple, Optional
 import gpiod
-from gpiod.line import Direction, Value
 from gpio_config import *
 
 class HUB75Driver:
@@ -32,8 +31,8 @@ class HUB75Driver:
         self.buffer_lock = threading.Lock()
         
         # GPIO setup
-        self.chip = None
-        self.lines = {}
+        self.request = None
+        self.gpio_pins = {}
         self.chip_path = chip_path
         
         # Display state
@@ -45,35 +44,63 @@ class HUB75Driver:
         print(f"Initializing HUB75 driver for {width}×{height} matrix")
         
     def initialize_gpio(self):
-        """Initialize GPIO lines using gpiod"""
+        """Initialize GPIO lines using gpiod 2.x API"""
         try:
-            # Open GPIO chip
-            self.chip = gpiod.Chip(self.chip_path)
-            print(f"Opened GPIO chip: {self.chip.get_info().name}")
-            
-            # Request all GPIO lines as outputs
-            line_config = {
+            # Pin mapping
+            self.gpio_pins = {
                 'R1': GPIO_R1, 'G1': GPIO_G1, 'B1': GPIO_B1,
                 'R2': GPIO_R2, 'G2': GPIO_G2, 'B2': GPIO_B2,
                 'A': GPIO_A, 'B': GPIO_B, 'C': GPIO_C, 'D': GPIO_D,
                 'CLK': GPIO_CLK, 'LAT': GPIO_LAT, 'OE': GPIO_OE
             }
             
-            for name, gpio_num in line_config.items():
-                line = self.chip.get_line(gpio_num)
-                line.request(consumer="hub75_driver", type=gpiod.LINE_REQ_DIR_OUT)
-                self.lines[name] = line
-                line.set_value(0)  # Initialize to low
-                
-            # Set OE high (disable output initially)
-            self.lines['OE'].set_value(1)
+            # Create line settings for all pins (outputs, initially low)
+            line_config = {}
+            for name, pin_num in self.gpio_pins.items():
+                # For gpiod 2.x, we need LineSettings objects
+                try:
+                    from gpiod.line import Direction, Value
+                    line_config[pin_num] = gpiod.LineSettings(
+                        direction=Direction.OUTPUT,
+                        output_value=Value.INACTIVE
+                    )
+                except (ImportError, AttributeError):
+                    # Fallback: try simple dict config for older versions
+                    line_config[pin_num] = gpiod.LineSettings(
+                        direction=gpiod.line.Direction.OUTPUT,
+                        output_value=gpiod.line.Value.INACTIVE
+                    )
             
-            print(f"✓ Initialized {len(self.lines)} GPIO lines")
+            # Request all lines at once
+            self.request = gpiod.request_lines(
+                self.chip_path,
+                consumer="hub75_driver",
+                config=line_config
+            )
+            
+            print(f"Opened GPIO chip: {self.chip_path}")
+            print(f"✓ Initialized {len(self.gpio_pins)} GPIO lines")
+            
+            # Set OE high (disable output initially)
+            self._set_pin('OE', 1)
+            
             return True
             
         except Exception as e:
             print(f"✗ GPIO initialization failed: {e}")
+            import traceback
+            traceback.print_exc()
             return False
+    
+    def _set_pin(self, name: str, value: int):
+        """Set a pin value (0 or 1)"""
+        pin_num = self.gpio_pins[name]
+        try:
+            from gpiod.line import Value
+            self.request.set_value(pin_num, Value.ACTIVE if value else Value.INACTIVE)
+        except (ImportError, AttributeError):
+            # Fallback for different API versions
+            self.request.set_value(pin_num, gpiod.line.Value.ACTIVE if value else gpiod.line.Value.INACTIVE)
     
     def set_pixel(self, x: int, y: int, r: int, g: int, b: int):
         """
@@ -100,10 +127,10 @@ class HUB75Driver:
     
     def set_address(self, row: int):
         """Set row address lines (A, B, C, D) for scanning"""
-        self.lines['A'].set_value(row & 0x01)
-        self.lines['B'].set_value((row >> 1) & 0x01)
-        self.lines['C'].set_value((row >> 2) & 0x01)
-        self.lines['D'].set_value((row >> 3) & 0x01)
+        self._set_pin('A', row & 0x01)
+        self._set_pin('B', (row >> 1) & 0x01)
+        self._set_pin('C', (row >> 2) & 0x01)
+        self._set_pin('D', (row >> 3) & 0x01)
     
     def shift_out_row(self, row: int):
         """
@@ -130,21 +157,21 @@ class HUB75Driver:
             b2 = (b2 * self.brightness) >> 8
             
             # Set data lines (1-bit for now, can add PWM later)
-            self.lines['R1'].set_value(1 if r1 > 127 else 0)
-            self.lines['G1'].set_value(1 if g1 > 127 else 0)
-            self.lines['B1'].set_value(1 if b1 > 127 else 0)
-            self.lines['R2'].set_value(1 if r2 > 127 else 0)
-            self.lines['G2'].set_value(1 if g2 > 127 else 0)
-            self.lines['B2'].set_value(1 if b2 > 127 else 0)
+            self._set_pin('R1', 1 if r1 > 127 else 0)
+            self._set_pin('G1', 1 if g1 > 127 else 0)
+            self._set_pin('B1', 1 if b1 > 127 else 0)
+            self._set_pin('R2', 1 if r2 > 127 else 0)
+            self._set_pin('G2', 1 if g2 > 127 else 0)
+            self._set_pin('B2', 1 if b2 > 127 else 0)
             
             # Clock pulse
-            self.lines['CLK'].set_value(1)
-            self.lines['CLK'].set_value(0)
+            self._set_pin('CLK', 1)
+            self._set_pin('CLK', 0)
     
     def display_row(self, row: int):
         """Display one row on the matrix"""
         # Disable output while updating
-        self.lines['OE'].set_value(1)
+        self._set_pin('OE', 1)
         
         # Set row address
         self.set_address(row)
@@ -153,11 +180,11 @@ class HUB75Driver:
         self.shift_out_row(row)
         
         # Latch data
-        self.lines['LAT'].set_value(1)
-        self.lines['LAT'].set_value(0)
+        self._set_pin('LAT', 1)
+        self._set_pin('LAT', 0)
         
         # Enable output
-        self.lines['OE'].set_value(0)
+        self._set_pin('OE', 0)
     
     def refresh_loop(self):
         """Main refresh loop - scans all rows continuously"""
@@ -205,14 +232,17 @@ class HUB75Driver:
             self.refresh_thread.join(timeout=1.0)
         
         # Turn off display
-        if self.lines:
-            self.lines['OE'].set_value(1)
+        if self.request:
+            try:
+                self._set_pin('OE', 1)
+            except:
+                pass
         
         # Release GPIO
-        if self.chip:
-            self.chip.close()
-            self.chip = None
-            self.lines = {}
+        if self.request:
+            self.request.release()
+            self.request = None
+            self.gpio_pins = {}
         
         print("✓ Display stopped")
     
