@@ -31,8 +31,8 @@ class HUB75Driver:
         self.buffer_lock = threading.Lock()
         
         # GPIO setup
-        self.request = None
-        self.gpio_pins = {}
+        self.requests = {}  # Dict of chip_num -> LineRequest
+        self.gpio_pins = {}  # Dict of pin_name -> (chip_num, line_offset)
         self.chip_path = chip_path
         
         # Display state
@@ -44,42 +44,55 @@ class HUB75Driver:
         print(f"Initializing HUB75 driver for {width}×{height} matrix")
         
     def initialize_gpio(self):
-        """Initialize GPIO lines using gpiod 2.x API"""
+        """Initialize GPIO lines using gpiod 2.x API across multiple chips"""
         try:
-            # Pin mapping
-            self.gpio_pins = {
+            from gpiod.line import Direction, Value
+            
+            # Map of signal names to GPIO numbers
+            gpio_map = {
                 'R1': GPIO_R1, 'G1': GPIO_G1, 'B1': GPIO_B1,
                 'R2': GPIO_R2, 'G2': GPIO_G2, 'B2': GPIO_B2,
                 'A': GPIO_A, 'B': GPIO_B, 'C': GPIO_C, 'D': GPIO_D,
                 'CLK': GPIO_CLK, 'LAT': GPIO_LAT, 'OE': GPIO_OE
             }
             
-            # Create line settings for all pins (outputs, initially low)
-            line_config = {}
-            for name, pin_num in self.gpio_pins.items():
-                # For gpiod 2.x, we need LineSettings objects
-                try:
-                    from gpiod.line import Direction, Value
-                    line_config[pin_num] = gpiod.LineSettings(
+            # Group GPIOs by chip (RK3308: chip 0 = GPIO 0-31, chip 1 = GPIO 32-63, chip 2 = GPIO 64-95, etc.)
+            # Calculate chip number and line offset for each GPIO
+            chips_config = {}  # chip_num -> {line_offset: pin_name}
+            
+            for name, gpio_num in gpio_map.items():
+                chip_num = gpio_num // 32
+                line_offset = gpio_num % 32
+                
+                if chip_num not in chips_config:
+                    chips_config[chip_num] = {}
+                chips_config[chip_num][line_offset] = name
+                
+                # Store mapping for _set_pin
+                self.gpio_pins[name] = (chip_num, line_offset)
+            
+            print(f"GPIO mapping: {len(gpio_map)} pins across {len(chips_config)} chips")
+            
+            # Request lines from each chip
+            for chip_num, lines in chips_config.items():
+                chip_path = f"/dev/gpiochip{chip_num}"
+                
+                # Create line settings for this chip
+                line_config = {}
+                for line_offset in lines.keys():
+                    line_config[line_offset] = gpiod.LineSettings(
                         direction=Direction.OUTPUT,
                         output_value=Value.INACTIVE
                     )
-                except (ImportError, AttributeError):
-                    # Fallback: try simple dict config for older versions
-                    line_config[pin_num] = gpiod.LineSettings(
-                        direction=gpiod.line.Direction.OUTPUT,
-                        output_value=gpiod.line.Value.INACTIVE
-                    )
-            
-            # Request all lines at once
-            self.request = gpiod.request_lines(
-                self.chip_path,
-                consumer="hub75_driver",
-                config=line_config
-            )
-            
-            print(f"Opened GPIO chip: {self.chip_path}")
-            print(f"✓ Initialized {len(self.gpio_pins)} GPIO lines")
+                
+                # Request lines from this chip
+                self.requests[chip_num] = gpiod.request_lines(
+                    chip_path,
+                    consumer="hub75_driver",
+                    config=line_config
+                )
+                
+                print(f"✓ Initialized gpiochip{chip_num}: {len(lines)} lines {list(lines.keys())}")
             
             # Set OE high (disable output initially)
             self._set_pin('OE', 1)
@@ -94,13 +107,10 @@ class HUB75Driver:
     
     def _set_pin(self, name: str, value: int):
         """Set a pin value (0 or 1)"""
-        pin_num = self.gpio_pins[name]
-        try:
-            from gpiod.line import Value
-            self.request.set_value(pin_num, Value.ACTIVE if value else Value.INACTIVE)
-        except (ImportError, AttributeError):
-            # Fallback for different API versions
-            self.request.set_value(pin_num, gpiod.line.Value.ACTIVE if value else gpiod.line.Value.INACTIVE)
+        from gpiod.line import Value
+        chip_num, line_offset = self.gpio_pins[name]
+        request = self.requests[chip_num]
+        request.set_value(line_offset, Value.ACTIVE if value else Value.INACTIVE)
     
     def set_pixel(self, x: int, y: int, r: int, g: int, b: int):
         """
@@ -232,17 +242,20 @@ class HUB75Driver:
             self.refresh_thread.join(timeout=1.0)
         
         # Turn off display
-        if self.request:
+        if self.requests:
             try:
                 self._set_pin('OE', 1)
             except:
                 pass
         
         # Release GPIO
-        if self.request:
-            self.request.release()
-            self.request = None
-            self.gpio_pins = {}
+        for request in self.requests.values():
+            try:
+                request.release()
+            except:
+                pass
+        self.requests = {}
+        self.gpio_pins = {}
         
         print("✓ Display stopped")
     
