@@ -1,16 +1,19 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.3.0 - All firmware features: size, effect, auto-send on change
--- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP
+-- Version 3.4.0 - JSON UDP protocol, ComboBox runtime Choices, all bug fixes
+-- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
 --
--- FIRMWARE PROTOCOL: TEXT|seg|content|color|font|size|align|effect|bgcolor|intensity
---                    CLEAR|seg  |  CLEAR_ALL  |  BRIGHTNESS|val
---                    CONFIG|segment|seg|x/y/width/height|val
+-- FIRMWARE PROTOCOL (JSON over UDP):
+--   {"cmd":"text","seg":0,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
+--    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
+--   {"cmd":"clear","seg":0}  |  {"cmd":"clear_all"}
+--   {"cmd":"brightness","value":200}
+--   {"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":32}
 
 PluginInfo = {
     Name = "Olimex~LED Matrix Complete",
-    Version = "3.3.0",
-    Id = "dhpke.olimex.led.matrix.3.3.0",
-    Description = "Complete UDP control for Olimex ESP32 Gateway 64x32 LED Matrix with all features",
+    Version = "3.4.0",
+    Id = "dhpke.olimex.led.matrix.3.4.0",
+    Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix",
     ShowDebug = true,
     Author = "DHPKE"
 }
