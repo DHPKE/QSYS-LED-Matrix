@@ -595,8 +595,8 @@ if Controls then
 
         Timer.CallAfter(function()
             for _, seg in ipairs(config.activeSegments) do
-                local text, cmd = BuildTextCommand(seg)
-                if text ~= "" then SendCommand(cmd) end
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
             end
         end, 0.3)
     end
@@ -618,10 +618,10 @@ if Controls then
             end
         end
 
-        -- Auto-send when any display property changes
+        -- Auto-send when any display property changes (always send, even empty text)
         local function AutoSend()
-            local text, cmd = BuildTextCommand(seg)
-            if text ~= "" then SendCommand(cmd) end
+            local _, cmd = BuildTextCommand(seg)
+            SendCommand(cmd)
         end
         Controls["text_color_"..s].EventHandler = AutoSend
         Controls["bg_color_"..s].EventHandler   = AutoSend
@@ -632,8 +632,8 @@ if Controls then
 
         Controls["intensity_"..s].EventHandler = function(ctl)
             Debounce("intensity_"..s, 0.5, function()
-                local text, cmd = BuildTextCommand(seg)
-                if text ~= "" then SendCommand(cmd) end
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
             end)
         end
     end

@@ -66,7 +66,7 @@
 #define UDP_PORT 21324
 #endif
 
-#define UDP_BUFFER_SIZE 256  // Reduced from 512 (was wasteful, max command ~200 bytes)
+#define UDP_BUFFER_SIZE 512  // JSON commands can be up to ~300 bytes
 
 // Segment Configuration
 #define MAX_SEGMENTS 4
