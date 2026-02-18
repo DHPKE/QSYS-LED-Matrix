@@ -19,6 +19,17 @@ WEB_PORT = 80     # HTTP web interface
 # ─── Logging ──────────────────────────────────────────────────────────────
 LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR
 
+# ─── Segment Configuration ────────────────────────────────────────────────
+MAX_SEGMENTS = 4
+MAX_TEXT_LENGTH = 256
+DEFAULT_SCROLL_SPEED = 30  # pixels per second
+DEFAULT_SEGMENTS = {
+    1: {"x": 0, "y": 0, "w": 64, "h": 8},
+    2: {"x": 0, "y": 8, "w": 64, "h": 8},
+    3: {"x": 0, "y": 16, "w": 64, "h": 8},
+    4: {"x": 0, "y": 24, "w": 64, "h": 8},
+}
+
 # ─── GPIO Pin Assignments ─────────────────────────────────────────────────
 # These are defined in gpio_config.py and used by hub75_driver.py
 # All pins on Rock Pi S Header 1 for clean wiring
