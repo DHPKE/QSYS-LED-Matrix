@@ -169,7 +169,7 @@ echo "Step 5: Installing Python Bindings"
 echo "========================================="
 echo ""
 cd ~/rpi-rgb-led-matrix/bindings/python
-sudo make install
+sudo python3 setup.py install
 echo "✓ Python bindings installed"
 echo ""
 
