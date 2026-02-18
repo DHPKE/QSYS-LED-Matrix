@@ -8,7 +8,7 @@ echo "Rock Pi S LED Matrix Installation"
 echo "=================================="
 echo ""
 
-# Check if running as root (allow root for automated installation)
+# Check if running as root
 if [ "$EUID" -ne 0 ]; then
    echo "This script requires root privileges"
    echo "Please run: sudo bash install.sh"
@@ -50,7 +50,7 @@ apt install -y \
 apt install -y gpiod libgpiod-dev 2>/dev/null || true
 apt install -y libgpiod2 2>/dev/null || apt install -y libgpiod3 2>/dev/null || true
 
-# Install Python gpiod via pip (not available in all repos)
+# Install Python gpiod via pip
 echo ""
 echo "Step 3: Installing Python gpiod library..."
 pip3 install --break-system-packages gpiod 2>/dev/null || pip3 install gpiod
@@ -107,10 +107,10 @@ fi
 echo ""
 echo "Step 6: Installing application..."
 INSTALL_DIR="/opt/led-matrix-native"
-# Create systemd service
-echo ""
-echo "Step 6: Installing systemd service..."
-tee /etc/systemd/system/led-matrix.service > /dev/null <<'EOF'
+mkdir -p "$INSTALL_DIR"
+
+# Copy files
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cp "$SCRIPT_DIR"/*.py "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR"/*.py
 
@@ -130,13 +130,14 @@ echo "✓ Service installed"
 # Test GPIO access
 echo ""
 echo "Step 8: Testing GPIO access..."
-python3 <<'PYEOF'
+python3 << 'PYEOF'
 import sys
 try:
     import gpiod
     chip = gpiod.Chip('/dev/gpiochip0')
-    print(f"✓ GPIO chip: {chip.get_info().name}")
-    print(f"✓ GPIO lines: {chip.get_info().num_lines}")
+    info = chip.get_info()
+    print(f"✓ GPIO chip: {info.name}")
+    print(f"✓ GPIO lines: {info.num_lines}")
     chip.close()
 except Exception as e:
     print(f"✗ GPIO test failed: {e}")
@@ -156,15 +157,15 @@ echo "=================================="
 echo ""
 echo "Next steps:"
 echo "1. Connect your 64×32 HUB75 LED panel to Rock Pi S Header 1"
-echo "2. Verify wiring matches the pinout in NATIVE_DRIVER_PLAN.md"
-echo "3. Start the service: sudo systemctl start led-matrix"
-echo "4. Check status: sudo systemctl status led-matrix"
-echo "5. View logs: sudo journalctl -u led-matrix -f"
+echo "2. Verify wiring matches the pinout in README.md"
+echo "3. Start the service: systemctl start led-matrix"
+echo "4. Check status: systemctl status led-matrix"
+echo "5. View logs: journalctl -u led-matrix -f"
 echo ""
 
 if [ -n "$REBOOT_NEEDED" ]; then
     echo "⚠️  REBOOT REQUIRED to disable UART0 console"
-    echo "Run: sudo reboot"
+    echo "Run: reboot"
     echo ""
 fi
 
@@ -173,5 +174,5 @@ echo "Web UI: http://$(hostname -I | awk '{print $1}')"
 echo ""
 echo "To test display manually:"
 echo "  cd $INSTALL_DIR"
-echo "  sudo python3 hub75_driver.py"
+echo "  python3 hub75_driver.py"
 echo ""
