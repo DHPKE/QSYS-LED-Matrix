@@ -4,59 +4,71 @@
  * Custom hardware mapping for RADXA Rock Pi S (RK3308) to use with
  * rpi-rgb-led-matrix library.
  * 
- * GPIO Pin Mapping (Linux sysfs numbers for RK3308):
- *   R1  = GPIO 16 (GPIO0_C0, physical pin 11)
- *   G1  = GPIO 17 (GPIO0_C1, physical pin 12)
- *   B1  = GPIO 18 (GPIO0_C2, physical pin 13)
- *   R2  = GPIO 19 (GPIO0_C3, physical pin 15)
- *   G2  = GPIO 20 (GPIO0_C4, physical pin 16)
- *   B2  = GPIO 21 (GPIO0_C5, physical pin 18)
- *   A   = GPIO 11 (GPIO0_B3, physical pin  3)
- *   B   = GPIO 12 (GPIO0_B4, physical pin  5)
- *   C   = GPIO 13 (GPIO0_B5, physical pin  8)  ⚠ Disable UART0 console!
- *   D   = GPIO 14 (GPIO0_B6, physical pin  7)
- *   CLK = GPIO 22 (GPIO0_C6, physical pin 22)
- *   LAT = GPIO 23 (GPIO0_C7, physical pin 19)
- *   OE  = GPIO 24 (GPIO0_D0, physical pin 21)
+ * GPIO Pin Mapping (Linux GPIO numbers for RK3308, Header 1 only):
+ *   R1  = GPIO 16 (GPIO0_C0, Header 1 pin 13)
+ *   G1  = GPIO 17 (GPIO0_C1, Header 1 pin 15)
+ *   B1  = GPIO 15 (GPIO0_B7, Header 1 pin 11)
+ *   R2  = GPIO 68 (GPIO2_A4, Header 1 pin  7)
+ *   G2  = GPIO 69 (GPIO2_A5, Header 1 pin 12)
+ *   B2  = GPIO 74 (GPIO2_B2, Header 1 pin 16)
+ *   A   = GPIO 11 (GPIO0_B3, Header 1 pin  3)
+ *   B   = GPIO 12 (GPIO0_B4, Header 1 pin  5)
+ *   C   = GPIO 65 (GPIO2_A1, Header 1 pin  8)  ⚠ UART0_TX - Disable console!
+ *   D   = GPIO 64 (GPIO2_A0, Header 1 pin 10)  ⚠ UART0_RX - Disable console!
+ *   CLK = GPIO 71 (GPIO2_A7, Header 1 pin 22)
+ *   LAT = GPIO 55 (GPIO1_C7, Header 1 pin 19)
+ *   OE  = GPIO 54 (GPIO1_C6, Header 1 pin 21)
+ * 
+ * IMPORTANT: Disable UART0 console on pins 8 & 10:
+ *   sudo systemctl disable --now serial-getty@ttyS0
+ *   Edit /boot/armbianEnv.txt - remove console=ttyS0,1500000
+ *   sudo reboot
  * 
  * To use this mapping:
- * 1. Copy this file to: rpi-rgb-led-matrix/lib/hardware-mapping.c
- *    (append the content to the existing file)
- * 2. Recompile the library: make clean && make -j$(nproc)
- * 3. Set MATRIX_HARDWARE_MAPPING = "rockpi-s" in config.py
- * 
- * Or use the simpler approach below (see SIMPLE_APPROACH.txt)
+ * 1. Copy this file to: ~/rpi-rgb-led-matrix/include/
+ * 2. Edit lib/hardware-mapping.c and add the registration
+ * 3. Recompile: cd ~/rpi-rgb-led-matrix && make clean && make -j$(nproc)
+ * 4. Reinstall Python bindings: cd bindings/python && sudo make install
+ * 5. Set MATRIX_HARDWARE_MAPPING = "rockpis" in config.py
+ * 6. Remove NO_DISPLAY override and restart service
  */
 
 #ifdef RGBMATRIX_HARDWARE_MAPPING_C
 
-static struct HardwareMapping rockpi_s_mapping = {
-  .name          = "rockpi-s",
+static struct HardwareMapping rockpis_mapping = {
+  .name          = "rockpis",
   
-  // RGB data pins
-  .output_enable = 24,  // OE
-  .clock         = 22,  // CLK
-  .strobe        = 23,  // LAT/STR
+  // Control signals
+  .output_enable = 54,  // OE  - GPIO1_C6
+  .clock         = 71,  // CLK - GPIO2_A7
+  .strobe        = 55,  // LAT - GPIO1_C7
   
   // Row address pins
-  .a             = 11,
-  .b             = 12,
-  .c             = 13,
-  .d             = 14,
+  .a             = 11,  // GPIO0_B3
+  .b             = 12,  // GPIO0_B4
+  .c             = 65,  // GPIO2_A1 (UART0_TX)
+  .d             = 64,  // GPIO2_A0 (UART0_RX)
   .e             = -1,  // Not used for 1/16 scan (32px height)
   
   // Upper half RGB
-  .p0_r1         = 16,
-  .p0_g1         = 17,
-  .p0_b1         = 18,
+  .p0_r1         = 16,  // GPIO0_C0
+  .p0_g1         = 17,  // GPIO0_C1
+  .p0_b1         = 15,  // GPIO0_B7
   
   // Lower half RGB
-  .p0_r2         = 19,
-  .p0_g2         = 20,
-  .p0_b2         = 21,
+  .p0_r2         = 68,  // GPIO2_A4
+  .p0_g2         = 69,  // GPIO2_A5
+  .p0_b2         = 74,  // GPIO2_B2
 };
 
 // Register the mapping (add this to the hardware_mappings array in hardware-mapping.c)
-// &rockpi_s_mapping,
+// Example in hardware-mapping.c:
+//   static HardwareMapping *hardware_mappings[] = {
+//     &adafruit_hat_mapping,
+//     &adafruit_hat_pwm_mapping,
+//     &regular_pi_mapping,
+//     &rockpis_mapping,  // <-- Add this line
+//     NULL
+//   };
 
 #endif /* RGBMATRIX_HARDWARE_MAPPING_C */

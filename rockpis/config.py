@@ -106,10 +106,10 @@ MATRIX_PARALLEL = 1       # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 
 # rpi-rgb-led-matrix hardware mapping.
-# On Rock Pi S use "regular" — the GPIO numbers are passed via RGBMatrixOptions
-# directly so the library's physical-pin-to-signal mapping applies against the
-# Linux GPIO numbers we set below.
-MATRIX_HARDWARE_MAPPING = "regular"
+# IMPORTANT: After running build-with-hardware-mapping.sh, change this to "rockpis"
+# The custom hardware mapping must be compiled into the library first.
+# Default "regular" will cause bus errors on Rock Pi S.
+MATRIX_HARDWARE_MAPPING = "rockpis"  # Custom Rock Pi S GPIO mapping (after library rebuild)
 
 # GPIO slowdown — increase if the panel shows garbage / flickering.
 # Rock Pi S (Cortex-A35 @ 1.3 GHz) is faster than RPi Zero; start at 2.
