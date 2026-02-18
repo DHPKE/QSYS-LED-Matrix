@@ -252,7 +252,7 @@ function GetControlLayout(props)
     -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
         StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
-    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.3",
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.4.0",
         Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
         Color={255,255,255}, Position={0,9}, Size={W,20}})
 
@@ -357,6 +357,9 @@ if Controls then
     local socket   = nil
     local ip_addr  = Properties["IP Address"].Value
     local udp_port = Properties["UDP Port"].Value
+
+    -- Track which segments are part of the current layout (0-indexed keys)
+    local activeLayoutSegments = {}
 
     -- Debounce timer table (keyed by arbitrary string label)
     local debounceTimers = {}
@@ -537,6 +540,9 @@ if Controls then
         Controls.layout.Choices = {"Fullscreen", "Split Vertical", "Split Horizontal", "Quad"}
         Controls.layout.String  = "Fullscreen"
 
+        -- Seed active segments for the default layout (Fullscreen = seg 0 only)
+        activeLayoutSegments = {[0] = true}
+
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
                                "Orange","Purple","Green","Pink","Gold","Silver","Gray","Black"}
         local bgChoices     = {"Black","White","Red","Lime","Blue","Yellow","Magenta","Cyan",
@@ -581,21 +587,27 @@ if Controls then
         end
         print("Applying layout: " .. layoutName)
 
+        -- Update the active-segments set FIRST so AutoSend guards are correct
+        activeLayoutSegments = {}
+        for _, s in ipairs(config.activeSegments) do activeLayoutSegments[s] = true end
+
+        -- Send config geometry for active segments
         for _, cfg in ipairs(config.configs) do
             SendCommand(buildJson({cmd="config", seg=cfg.seg,
                 x=cfg.x, y=cfg.y, w=cfg.w, h=cfg.h}))
         end
 
+        -- Clear (and deactivate on firmware) the segments not in this layout
         for _, seg in ipairs(config.clears) do
             SendCommand(buildJson({cmd="clear", seg=seg}))
         end
 
-        local activeSet = {}
-        for _, s in ipairs(config.activeSegments) do activeSet[s] = true end
+        -- Update LED indicators
         for seg = 0, 3 do
-            Controls["active_"..tostring(seg)].Boolean = activeSet[seg] == true
+            Controls["active_"..tostring(seg)].Boolean = activeLayoutSegments[seg] == true
         end
 
+        -- After a short settling delay, push text content to active segments
         Timer.CallAfter(function()
             for _, seg in ipairs(config.activeSegments) do
                 local _, cmd = BuildTextCommand(seg)
@@ -612,17 +624,21 @@ if Controls then
             local text, cmd = BuildTextCommand(seg)
             if SendCommand(cmd) then
                 Controls["active_"..s].Boolean = true
+                activeLayoutSegments[seg] = true
             end
         end
 
         Controls["clear_"..s].EventHandler = function()
             if SendCommand(buildJson({cmd="clear", seg=seg})) then
                 Controls["active_"..s].Boolean = false
+                activeLayoutSegments[seg] = nil
             end
         end
 
-        -- Auto-send when any display property changes (always send, even empty text)
+        -- Auto-send when any display property changes, but ONLY if this
+        -- segment is part of the currently applied layout.
         local function AutoSend()
+            if not activeLayoutSegments[seg] then return end
             local _, cmd = BuildTextCommand(seg)
             SendCommand(cmd)
         end
@@ -634,6 +650,7 @@ if Controls then
         Controls["effect_"..s].EventHandler     = AutoSend
 
         Controls["intensity_"..s].EventHandler = function(ctl)
+            if not activeLayoutSegments[seg] then return end
             Debounce("intensity_"..s, 0.5, function()
                 local _, cmd = BuildTextCommand(seg)
                 SendCommand(cmd)
