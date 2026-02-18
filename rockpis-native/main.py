@@ -89,12 +89,16 @@ def main():
     logger.info("✓ Text renderer initialised")
 
     # ── 4. UDP listener ──────────────────────────────────────────────────
-    udp_handler = UDPHandler(sm, UDP_PORT)
+    # Create brightness callback for driver
+    def set_driver_brightness(value_255: int):
+        driver.set_brightness(_brightness_255_to_pct(value_255))
+    
+    udp_handler = UDPHandler(sm, brightness_callback=set_driver_brightness)
     udp_handler.start()
     logger.info(f"✓ UDP handler listening on port {UDP_PORT}")
 
     # ── 5. Web server ────────────────────────────────────────────────────
-    web_server = WebServer(sm, driver, WEB_PORT)
+    web_server = WebServer(sm, udp_handler)
     web_server.start()
     logger.info(f"✓ Web server started on port {WEB_PORT}")
 
