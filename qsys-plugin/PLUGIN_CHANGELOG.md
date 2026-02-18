@@ -1,5 +1,30 @@
 # Q-SYS Plugin Changelog
 
+## Version 3.5.0 (2026-02-18) - Auto-Send & Inactive Segment Protection
+
+### ✅ NEW FEATURES
+
+#### 1. **Text Auto-Send**
+- Text input now automatically sends to display when changed
+- No need to press "Display" button after typing
+- Updates happen in real-time as you type
+- Only sends if segment is active (respects layout)
+
+### 🔧 IMPROVEMENTS
+
+#### 2. **Inactive Segment Protection**
+- Editing inactive segments no longer affects the display
+- When in Fullscreen layout, changing segments 2-4 has no effect
+- All property changes (text, color, font, etc.) respect active/inactive state
+- Prevents accidental rendering of hidden segments
+
+#### 3. **Enhanced Comments**
+- Clarified that AutoSend only affects active segments
+- Added documentation for manual Display/Clear button behavior
+- Better code organization and readability
+
+---
+
 ## Version 2.0.0 (2026-02-17) - Complete Overhaul
 
 ### ✅ NEW FEATURES

@@ -1,6 +1,12 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.4.0 - JSON UDP protocol, ComboBox runtime Choices, all bug fixes
+-- Version 3.5.0 - Auto-send text changes, inactive segment protection
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.5.0 Changes:
+--   - Text input now auto-sends immediately when changed (no need for Display button)
+--   - Inactive segments are never rendered (prevents editing inactive segments from
+--     affecting the display when in Fullscreen or other layouts)
+--   - All segment properties (text, colors, fonts, etc.) respect active/inactive state
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
 --   {"cmd":"text","seg":0,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
@@ -11,8 +17,8 @@
 
 PluginInfo = {
     Name = "Olimex~LED Matrix Complete",
-    Version = "3.4.0",
-    Id = "dhpke.olimex.led.matrix.3.4.0",
+    Version = "3.5.0",
+    Id = "dhpke.olimex.led.matrix.3.5.0",
     Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix",
     ShowDebug = true,
     Author = "DHPKE"
@@ -252,7 +258,7 @@ function GetControlLayout(props)
     -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
         StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
-    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.4.0",
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.5.0",
         Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
         Color={255,255,255}, Position={0,9}, Size={W,20}})
 
@@ -620,6 +626,7 @@ if Controls then
     for seg = 0, 3 do
         local s = tostring(seg)
 
+        -- Manual "Display" button — can activate a segment even if not in current layout
         Controls["send_"..s].EventHandler = function()
             local text, cmd = BuildTextCommand(seg)
             if SendCommand(cmd) then
@@ -628,6 +635,7 @@ if Controls then
             end
         end
 
+        -- Manual "Clear" button — deactivates segment
         Controls["clear_"..s].EventHandler = function()
             if SendCommand(buildJson({cmd="clear", seg=seg})) then
                 Controls["active_"..s].Boolean = false
@@ -636,12 +644,17 @@ if Controls then
         end
 
         -- Auto-send when any display property changes, but ONLY if this
-        -- segment is part of the currently applied layout.
+        -- segment is part of the currently applied layout (active).
+        -- This prevents editing inactive segments from affecting the display.
         local function AutoSend()
             if not activeLayoutSegments[seg] then return end
             local _, cmd = BuildTextCommand(seg)
             SendCommand(cmd)
         end
+        
+        -- Text input auto-sends immediately when changed (only if segment is active)
+        Controls["text_"..s].EventHandler = AutoSend
+        
         Controls["text_color_"..s].EventHandler = AutoSend
         Controls["bg_color_"..s].EventHandler   = AutoSend
         Controls["font_"..s].EventHandler       = AutoSend
