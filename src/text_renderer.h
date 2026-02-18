@@ -86,9 +86,13 @@ public:
         if (!seg->isActive || strlen(seg->text) == 0) {
             // Clear segment area
             dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
+            seg->isDirty = false;
             return;
         }
-        
+
+        Serial.printf("RENDER seg%d: '%s' x=%d y=%d w=%d h=%d active=%d\n",
+                      seg->id, seg->text, seg->x, seg->y, seg->width, seg->height, seg->isActive);
+
         // Clear segment background
         dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
         
@@ -102,31 +106,43 @@ public:
         const GFXfont* font = selectFont(fontSize, seg->fontName);
         dma_display->setFont(font);
         
-        // Calculate text bounds
+        // Calculate text bounds relative to cursor at (0,0).
+        // For GFX bitmap fonts y1 is negative (ascent above baseline).
+        // w/h are the bounding box dimensions.
         int16_t x1, y1;
         uint16_t w, h;
         dma_display->getTextBounds(seg->text, 0, 0, &x1, &y1, &w, &h);
-        
+
+        Serial.printf("  bounds: x1=%d y1=%d w=%u h=%u fontSize=%d\n", x1, y1, w, h, fontSize);
+
         // Calculate position based on alignment
         int16_t textX, textY;
         int padding = 2;
         
-        // Calculate cursor position (not bounding box position)
-        // We need to subtract x1 offset from alignment calculations
+        // textX: place bounding box left edge at target X, then convert to cursor X
+        // cursor_x = target_x - x1
         switch (seg->align) {
             case ALIGN_LEFT:
                 textX = seg->x + padding - x1;
                 break;
             case ALIGN_CENTER:
-                textX = seg->x + (seg->width - w) / 2 - x1;
+                textX = seg->x + (seg->width - (int16_t)w) / 2 - x1;
                 break;
             case ALIGN_RIGHT:
-                textX = seg->x + seg->width - w - padding - x1;
+                textX = seg->x + seg->width - (int16_t)w - padding - x1;
+                break;
+            default:
+                textX = seg->x + padding - x1;
                 break;
         }
         
-        // Vertical center - cursor Y position
-        textY = seg->y + (seg->height - y1 + h) / 2;
+        // Vertical centering for GFX fonts:
+        // The bounding box top is at (cursor_y + y1), bottom at (cursor_y + y1 + h).
+        // We want the box centred in the segment:
+        //   box_top = seg->y + (seg->height - h) / 2
+        //   cursor_y = box_top - y1
+        int16_t boxTop = seg->y + ((int16_t)seg->height - (int16_t)h) / 2;
+        textY = boxTop - y1;
         
         // Apply scrolling offset
         if (seg->effect == EFFECT_SCROLL) {
