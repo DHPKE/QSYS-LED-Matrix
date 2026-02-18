@@ -41,16 +41,21 @@ apt install -y \
     python3 \
     python3-pip \
     python3-dev \
-    python3-pillow \
+    python3-pil \
     gpiod \
     libgpiod-dev \
-    python3-gpiod \
+    libgpiod2 \
     fonts-dejavu-core \
     git
 
+# Install Python gpiod via pip (not available in all repos)
+echo ""
+echo "Step 3: Installing Python gpiod library..."
+pip3 install --break-system-packages gpiod 2>/dev/null || pip3 install gpiod
+
 # Verify gpiod installation
 echo ""
-echo "Step 3: Verifying GPIO access..."
+echo "Step 4: Verifying GPIO access..."
 if ! command -v gpiodetect &> /dev/null; then
     echo "✗ gpiod tools not found"
     exit 1
@@ -69,7 +74,7 @@ echo "✓ GPIO chip found"
 
 # Disable UART0 console (frees GPIO 64 & 65)
 echo ""
-echo "Step 4: Disabling UART0 console..."
+echo "Step 5: Disabling UART0 console..."
 if systemctl is-enabled serial-getty@ttyS0.service &> /dev/null; then
     systemctl disable --now serial-getty@ttyS0.service
     echo "✓ UART0 console disabled"
@@ -98,7 +103,7 @@ fi
 
 # Create installation directory
 echo ""
-echo "Step 5: Installing application..."
+echo "Step 6: Installing application..."
 INSTALL_DIR="/opt/led-matrix-native"
 # Create systemd service
 echo ""
@@ -136,7 +141,7 @@ echo "✓ Service installed"
 
 # Test GPIO access
 echo ""
-echo "Step 7: Testing GPIO access..."
+echo "Step 8: Testing GPIO access..."
 python3 <<'PYEOF'
 import sys
 try:
