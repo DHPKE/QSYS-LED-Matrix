@@ -15,19 +15,38 @@ if [ ! -f /proc/device-tree/model ]; then
     exit 1
 fi
 
-MODEL=$(cat /proc/device-tree/model 2>/dev/null || echo "unknown")
+MODEL=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "unknown")
 echo "Detected hardware: $MODEL"
 echo ""
 
 # Update from git
+REPO_DIR=""
 if [ -d ~/QSYS-LED-Matrix ]; then
-    echo "Updating repository..."
-    cd ~/QSYS-LED-Matrix
-    git pull origin main
-    echo "✓ Repository updated"
-else
-    echo "ERROR: ~/QSYS-LED-Matrix not found"
+    REPO_DIR=~/QSYS-LED-Matrix
+elif [ -d ./QSYS-LED-Matrix ]; then
+    REPO_DIR=./QSYS-LED-Matrix
+elif [ -f ../main.py ]; then
+    # Already in rockpis/ subdirectory
+    REPO_DIR=..
+elif [ -f ./main.py ]; then
+    # Already in repository root
+    REPO_DIR=.
+fi
+
+if [ -z "$REPO_DIR" ]; then
+    echo "ERROR: QSYS-LED-Matrix repository not found"
     echo "Clone first: git clone https://github.com/DHPKE/QSYS-LED-Matrix.git"
+    exit 1
+fi
+
+echo "Updating repository..."
+cd "$REPO_DIR"
+git pull origin main || echo "⚠ Git pull failed (continue anyway)"
+echo "✓ Repository updated"
+
+# Make sure we're in the right place
+if [ ! -f rockpis/main.py ]; then
+    echo "ERROR: rockpis/main.py not found in $REPO_DIR"
     exit 1
 fi
 
