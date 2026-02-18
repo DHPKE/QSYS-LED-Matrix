@@ -25,10 +25,10 @@ MAX_SEGMENTS = 4
 MAX_TEXT_LENGTH = 256
 DEFAULT_SCROLL_SPEED = 30  # pixels per second
 DEFAULT_SEGMENTS = [
-    {"id": 1, "x": 0, "y": 0, "w": 64, "h": 8, "color": (255, 255, 255)},
-    {"id": 2, "x": 0, "y": 8, "w": 64, "h": 8, "color": (255, 255, 255)},
-    {"id": 3, "x": 0, "y": 16, "w": 64, "h": 8, "color": (255, 255, 255)},
-    {"id": 4, "x": 0, "y": 24, "w": 64, "h": 8, "color": (255, 255, 255)},
+    {"id": 1, "x": 0, "y": 0, "w": 64, "h": 8, "color": (255, 255, 255), "bgcolor": (0, 0, 0), "align": "left", "effect": "none", "active": True},
+    {"id": 2, "x": 0, "y": 8, "w": 64, "h": 8, "color": (255, 255, 255), "bgcolor": (0, 0, 0), "align": "left", "effect": "none", "active": True},
+    {"id": 3, "x": 0, "y": 16, "w": 64, "h": 8, "color": (255, 255, 255), "bgcolor": (0, 0, 0), "align": "left", "effect": "none", "active": True},
+    {"id": 4, "x": 0, "y": 24, "w": 64, "h": 8, "color": (255, 255, 255), "bgcolor": (0, 0, 0), "align": "left", "effect": "none", "active": True},
 ]
 
 # ─── GPIO Pin Assignments ─────────────────────────────────────────────────
