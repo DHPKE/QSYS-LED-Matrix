@@ -139,13 +139,15 @@ MAPPING_END
 mv "$HWMAP_C.tmp" "$HWMAP_C"
 
 # Add to the end of the array (before the last closing brace and semicolon)
-if ! grep -q "rockpis_mapping" "$HWMAP_C"; then
-    # Find the line with "};" that ends the array
-    LAST_BRACE=$(grep -n "^};" "$HWMAP_C" | tail -1 | cut -d: -f1)
-    if [ -n "$LAST_BRACE" ]; then
-        # Insert before the closing brace
-        sed -i "${LAST_BRACE}i\\  rockpis_mapping," "$HWMAP_C"
-        echo "✓ Mapping registered"
+if ! grep -q "rockpis_mapping," "$HWMAP_C"; then
+    # Find the line with "{0}" sentinel that ends the array
+    SENTINEL_LINE=$(grep -n "^  {0}$" "$HWMAP_C" | tail -1 | cut -d: -f1)
+    if [ -n "$SENTINEL_LINE" ]; then
+        # Insert before the sentinel
+        sed -i "${SENTINEL_LINE}i\\  rockpis_mapping," "$HWMAP_C"
+        echo "✓ Mapping registered in array"
+    else
+        echo "⚠ Could not find array sentinel - check manually"
     fi
 else
     echo "ℹ Mapping already registered"
