@@ -1,22 +1,24 @@
 Rock Pi S → HUB75 LED Matrix Pinout Diagram
 ═══════════════════════════════════════════════════════════════════════════════
 
-RADXA Rock Pi S 26-pin GPIO Header (top view, pins facing you)
+RADXA Rock Pi S - 26-pin GPIO Header 1 (top view, pins facing you)
 ───────────────────────────────────────────────────────────────────────────────
 
-    3V3  [ 1] [ 2]  5V
-    SDA  [ 3] [ 4]  5V          ┌─────────────────────────────────────────┐
-    SCL  [ 5] [ 6]  GND         │  Connect to HUB75 LED Matrix Panel      │
-  GPIO14 [ 7] [ 8]  TXD         │                                         │
-    GND  [ 9] [10]  RXD         │  HUB75 Connector (16-pin IDC):          │
- GPIO16  [11] [12]  GPIO17      │                                         │
- GPIO18  [13] [14]  GND         │   R1  G1  B1  GND                       │
- GPIO19  [15] [16]  GPIO20      │   R2  G2  B2  GND                       │
-    3V3  [17] [18]  GPIO21      │    A   B   C   D                        │
-  MOSI   [19] [20]  GND         │  CLK LAT  OE  GND                       │
-  MISO   [21] [22]  GPIO22      │                                         │
-   CLK   [23] [24]  CS0         └─────────────────────────────────────────┘
-    GND  [25] [26]  CS1
+      3.3V  [ 1] [ 2]  5V
+  GPIO0_B3  [ 3] [ 4]  5V            ┌─────────────────────────────────────────┐
+  GPIO0_B4  [ 5] [ 6]  GND           │  Connect to HUB75 LED Matrix Panel      │
+  GPIO2_A4  [ 7] [ 8]  GPIO2_A1      │                                         │
+       GND  [ 9] [10]  GPIO2_A0      │  HUB75 Connector (16-pin IDC):          │
+  GPIO0_B7  [11] [12]  GPIO2_A5      │                                         │
+  GPIO0_C0  [13] [14]  GND           │   R1  G1  B1  GND                       │
+  GPIO0_C1  [15] [16]  GPIO2_B2      │   R2  G2  B2  GND                       │
+      3.3V  [17] [18]  GPIO2_B1      │    A   B   C   D                        │
+  GPIO1_C7  [19] [20]  GND           │  CLK LAT  OE  GND                       │
+  GPIO1_C6  [21] [22]  GPIO2_A7      │                                         │
+  GPIO1_D0  [23] [24]  GPIO1_D1      └─────────────────────────────────────────┘
+       GND  [25] [26]  ADC_IN0
+
+Note: Pin 8 (GPIO2_A1) = UART0_TX, Pin 10 (GPIO2_A0) = UART0_RX
 
 
 Complete Wiring Table
