@@ -33,24 +33,7 @@ function GetProperties()
     }
 end
 
--- CSS color name to hex mapping
-ColorNames = {
-    ["White"] = "FFFFFF",
-    ["Red"] = "FF0000",
-    ["Lime"] = "00FF00",
-    ["Blue"] = "0000FF",
-    ["Yellow"] = "FFFF00",
-    ["Magenta"] = "FF00FF",
-    ["Cyan"] = "00FFFF",
-    ["Orange"] = "FFA500",
-    ["Purple"] = "800080",
-    ["Green"] = "008000",
-    ["Pink"] = "FFC0CB",
-    ["Gold"] = "FFD700",
-    ["Silver"] = "C0C0C0",
-    ["Gray"] = "808080",
-    ["Black"] = "000000"
-}
+-- CSS color name to hex mapping (inside Runtime scope – moved below)
 
 -- Define controls
 function GetControls(props)
@@ -368,14 +351,22 @@ end
 -- Runtime code
 if Controls then
     -- UDP socket
-    local socket = nil
-    local ip_addr = Properties["IP Address"].Value
+    local socket   = nil
+    local ip_addr  = Properties["IP Address"].Value
     local udp_port = Properties["UDP Port"].Value
 
     -- Debounce timer table (keyed by arbitrary string label)
     local debounceTimers = {}
 
-    -- Font name mapping
+    -- ── Lookup tables ──────────────────────────────────────────────
+    local ColorNames = {
+        ["White"]   = "FFFFFF", ["Red"]     = "FF0000", ["Lime"]    = "00FF00",
+        ["Blue"]    = "0000FF", ["Yellow"]  = "FFFF00", ["Magenta"] = "FF00FF",
+        ["Cyan"]    = "00FFFF", ["Orange"]  = "FFA500", ["Purple"]  = "800080",
+        ["Green"]   = "008000", ["Pink"]    = "FFC0CB", ["Gold"]    = "FFD700",
+        ["Silver"]  = "C0C0C0", ["Gray"]    = "808080", ["Black"]   = "000000"
+    }
+
     local FontMap = {
         ["Arial"]   = "arial",
         ["Verdana"] = "verdana",
@@ -383,74 +374,59 @@ if Controls then
         ["Mono"]    = "mono9"
     }
 
-    -- Alignment mapping
     local AlignMap = {
         ["Left"]   = "L",
         ["Center"] = "C",
         ["Right"]  = "R"
     }
 
-    -- Layout configurations
+    -- ── Layout configurations ──────────────────────────────────────
     local LayoutConfigs = {
         ["Fullscreen"] = {
             activeSegments = {0},
             configs = {
-                {seg = 0, x = 0, y = 0, width = 64, height = 32}
+                {seg=0, x=0,  y=0,  w=64, h=32}
             },
             clears = {1, 2, 3}
         },
         ["Split Vertical"] = {
             activeSegments = {0, 1},
             configs = {
-                {seg = 0, x = 0,  y = 0, width = 32, height = 32},
-                {seg = 1, x = 32, y = 0, width = 32, height = 32}
+                {seg=0, x=0,  y=0, w=32, h=32},
+                {seg=1, x=32, y=0, w=32, h=32}
             },
             clears = {2, 3}
         },
         ["Split Horizontal"] = {
             activeSegments = {0, 1},
             configs = {
-                {seg = 0, x = 0, y = 0,  width = 64, height = 16},
-                {seg = 1, x = 0, y = 16, width = 64, height = 16}
+                {seg=0, x=0, y=0,  w=64, h=16},
+                {seg=1, x=0, y=16, w=64, h=16}
             },
             clears = {2, 3}
         },
         ["Quad"] = {
             activeSegments = {0, 1, 2, 3},
             configs = {
-                {seg = 0, x = 0,  y = 0,  width = 32, height = 16},
-                {seg = 1, x = 32, y = 0,  width = 32, height = 16},
-                {seg = 2, x = 0,  y = 16, width = 32, height = 16},
-                {seg = 3, x = 32, y = 16, width = 32, height = 16}
+                {seg=0, x=0,  y=0,  w=32, h=16},
+                {seg=1, x=32, y=0,  w=32, h=16},
+                {seg=2, x=0,  y=16, w=32, h=16},
+                {seg=3, x=32, y=16, w=32, h=16}
             },
             clears = {}
         }
     }
 
-    -- ---------------------------------------------------------------
-    -- Helpers
-    -- ---------------------------------------------------------------
+    -- ── Helpers ────────────────────────────────────────────────────
 
-    -- Generic debounce: stop any pending timer with the given key,
-    -- then fire fn once after `delay` seconds.
-    -- Q-SYS Timer.New() repeats; we stop it inside the handler to make it one-shot.
     local function Debounce(key, delay, fn)
-        if debounceTimers[key] then
-            debounceTimers[key]:Stop()
-        end
-        if not debounceTimers[key] then
-            debounceTimers[key] = Timer.New()
-        end
+        if debounceTimers[key] then debounceTimers[key]:Stop() end
+        if not debounceTimers[key] then debounceTimers[key] = Timer.New() end
         local t = debounceTimers[key]
-        t.EventHandler = function()
-            t:Stop()
-            fn()
-        end
+        t.EventHandler = function() t:Stop(); fn() end
         t:Start(delay)
     end
 
-    -- (Re)open the UDP socket. UdpSocket is connectionless; IP/port
-    -- are supplied per-Send, not at open time.
     local function ReopenSocket()
         if socket then pcall(function() socket:Close() end) end
         local ok, err = pcall(function()
@@ -459,22 +435,41 @@ if Controls then
         end)
         if ok then
             Controls.connection_status.Value = 0
-            print("✓ UDP socket ready, targeting " .. ip_addr .. ":" .. udp_port)
+            print("✓ UDP socket ready → " .. ip_addr .. ":" .. udp_port)
         else
             Controls.connection_status.Value = 2
             print("✗ Socket error: " .. tostring(err))
         end
     end
 
-    -- Validate port string → number, or nil.
     local function ValidatePort(port)
         local num = tonumber(port)
         if num and num >= 1 and num <= 65535 then return num end
         return nil
     end
 
+    -- ── JSON helpers ───────────────────────────────────────────────
+    -- Minimal JSON serialiser (no external library needed in Lua)
+    local function jsonStr(v)
+        if v == nil then return "null" end
+        if type(v) == "number" then return tostring(math.floor(v)) end
+        if type(v) == "boolean" then return v and "true" or "false" end
+        -- string: escape backslash and double-quote
+        v = tostring(v)
+        v = v:gsub('\\', '\\\\'):gsub('"', '\\"')
+        return '"' .. v .. '"'
+    end
+
+    local function buildJson(t)
+        local parts = {}
+        for k, v in pairs(t) do
+            table.insert(parts, jsonStr(k) .. ":" .. jsonStr(v))
+        end
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+
     -- Send a UDP datagram to the configured target.
-    local function SendCommand(command)
+    local function SendCommand(json)
         if not socket then
             print("✗ ERROR: Socket not initialized")
             Controls.connection_status.Value = 2
@@ -482,11 +477,11 @@ if Controls then
             return false
         end
         local ok, err = pcall(function()
-            socket:Send(ip_addr, udp_port, command .. "\n")
+            socket:Send(ip_addr, udp_port, json .. "\n")
         end)
         if ok then
-            print("→ " .. command)
-            Controls.last_command.String = command
+            print("→ " .. json)
+            Controls.last_command.String = json
             Controls.connection_status.Value = 0
             return true
         else
@@ -497,75 +492,83 @@ if Controls then
         end
     end
 
-    -- Build the TEXT command string for a segment using its current control values.
-    -- Protocol: TEXT|seg|content|color|font|size|align|effect|bgcolor|intensity
+    -- Build a JSON "text" command for a segment from current control values.
     local function BuildTextCommand(seg)
-        local text      = Controls[string.format("text_%d",       seg)].String
-        local textColor = ColorNames[Controls[string.format("text_color_%d", seg)].String] or "FFFFFF"
-        local bgColor   = ColorNames[Controls[string.format("bg_color_%d",   seg)].String] or "000000"
-        local intensity = math.floor(Controls[string.format("intensity_%d",  seg)].Value)
-        local font      = FontMap[Controls[string.format("font_%d",  seg)].String] or "arial"
-        local size      = Controls[string.format("size_%d",   seg)].String or "auto"
-        local align     = AlignMap[Controls[string.format("align_%d", seg)].String] or "C"
-        local effect    = Controls[string.format("effect_%d", seg)].String or "none"
-        return text, string.format("TEXT|%d|%s|%s|%s|%s|%s|%s|%s|%d",
-            seg, text, textColor, font, size, align, effect, bgColor, intensity)
+        local s       = tostring(seg)
+        local text    = Controls["text_"..s].String
+        local color   = ColorNames[Controls["text_color_"..s].String] or "FFFFFF"
+        local bgcolor = ColorNames[Controls["bg_color_"..s].String]   or "000000"
+        local font    = FontMap[Controls["font_"..s].String]          or "arial"
+        local size    = Controls["size_"..s].String                   or "auto"
+        local align   = AlignMap[Controls["align_"..s].String]        or "C"
+        local effect  = Controls["effect_"..s].String                 or "none"
+        local intens  = math.floor(Controls["intensity_"..s].Value)
+
+        local json = buildJson({
+            cmd       = "text",
+            seg       = seg,
+            text      = text,
+            color     = color,
+            bgcolor   = bgcolor,
+            font      = font,
+            size      = size,
+            align     = align,
+            effect    = effect,
+            intensity = intens
+        })
+        return text, json
     end
 
-    -- ---------------------------------------------------------------
-    -- Initialize
-    -- ---------------------------------------------------------------
+    -- ── Initialize ─────────────────────────────────────────────────
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.3.0 Initializing")
+        print("LED Matrix Complete v3.4.0 Initializing")
         print("===========================================")
 
-        Controls.ip_address.String  = ip_addr
-        Controls.udp_port.String    = tostring(udp_port)
-        Controls.brightness.Value   = 128
+        Controls.ip_address.String   = ip_addr
+        Controls.udp_port.String     = tostring(udp_port)
+        Controls.brightness.Value    = 128
         Controls.last_command.String = "Ready"
 
-        -- Set dropdown Choices at runtime (required by Q-SYS for ComboBox to work)
+        -- Choices must be set at runtime for Q-SYS ComboBox to work
         Controls.layout.Choices = {"Fullscreen", "Split Vertical", "Split Horizontal", "Quad"}
         Controls.layout.String  = "Fullscreen"
 
-        local colorChoices  = {"White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan",
-                               "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray", "Black"}
-        local bgChoices     = {"Black", "White", "Red", "Lime", "Blue", "Yellow", "Magenta", "Cyan",
-                               "Orange", "Purple", "Green", "Pink", "Gold", "Silver", "Gray"}
-        local fontChoices   = {"Arial", "Verdana", "Digital", "Mono"}
-        local sizeChoices   = {"auto", "8", "12", "16", "24", "32"}
-        local alignChoices  = {"Left", "Center", "Right"}
-        local effectChoices = {"none", "scroll", "blink", "fade", "rainbow"}
+        local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","Green","Pink","Gold","Silver","Gray","Black"}
+        local bgChoices     = {"Black","White","Red","Lime","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","Green","Pink","Gold","Silver","Gray"}
+        local fontChoices   = {"Arial","Verdana","Digital","Mono"}
+        local sizeChoices   = {"auto","8","12","16","24","32"}
+        local alignChoices  = {"Left","Center","Right"}
+        local effectChoices = {"none","scroll","blink","fade","rainbow"}
 
-        local defaultColors = {"White", "Lime", "Red", "Yellow"}
+        local defaultColors = {"White","Lime","Red","Yellow"}
         for seg = 0, 3 do
             local s = tostring(seg)
-            Controls["text_color_"..s].Choices  = colorChoices
-            Controls["bg_color_"..s].Choices    = bgChoices
-            Controls["font_"..s].Choices        = fontChoices
-            Controls["size_"..s].Choices        = sizeChoices
-            Controls["align_"..s].Choices       = alignChoices
-            Controls["effect_"..s].Choices      = effectChoices
+            Controls["text_color_"..s].Choices = colorChoices
+            Controls["bg_color_"..s].Choices   = bgChoices
+            Controls["font_"..s].Choices       = fontChoices
+            Controls["size_"..s].Choices       = sizeChoices
+            Controls["align_"..s].Choices      = alignChoices
+            Controls["effect_"..s].Choices     = effectChoices
 
-            Controls["text_"..s].String         = ""
-            Controls["text_color_"..s].String   = defaultColors[seg + 1]
-            Controls["bg_color_"..s].String     = "Black"
-            Controls["intensity_"..s].Value     = 255
-            Controls["font_"..s].String         = "Arial"
-            Controls["size_"..s].String         = "auto"
-            Controls["align_"..s].String        = "Center"
-            Controls["effect_"..s].String       = "none"
-            Controls["active_"..s].Boolean      = false
+            Controls["text_"..s].String        = ""
+            Controls["text_color_"..s].String  = defaultColors[seg + 1]
+            Controls["bg_color_"..s].String    = "Black"
+            Controls["intensity_"..s].Value    = 255
+            Controls["font_"..s].String        = "Arial"
+            Controls["size_"..s].String        = "auto"
+            Controls["align_"..s].String       = "Center"
+            Controls["effect_"..s].String      = "none"
+            Controls["active_"..s].Boolean     = false
         end
 
         ReopenSocket()
         print("===========================================")
     end
 
-    -- ---------------------------------------------------------------
-    -- Layout handler
-    -- ---------------------------------------------------------------
+    -- ── Layout handler ─────────────────────────────────────────────
     Controls.apply_layout.EventHandler = function()
         local layoutName = Controls.layout.String
         local config     = LayoutConfigs[layoutName]
@@ -575,27 +578,21 @@ if Controls then
         end
         print("Applying layout: " .. layoutName)
 
-        -- Configure active segments
         for _, cfg in ipairs(config.configs) do
-            SendCommand(string.format("CONFIG|segment|%d|x|%d",      cfg.seg, cfg.x))
-            SendCommand(string.format("CONFIG|segment|%d|y|%d",      cfg.seg, cfg.y))
-            SendCommand(string.format("CONFIG|segment|%d|width|%d",  cfg.seg, cfg.width))
-            SendCommand(string.format("CONFIG|segment|%d|height|%d", cfg.seg, cfg.height))
+            SendCommand(buildJson({cmd="config", seg=cfg.seg,
+                x=cfg.x, y=cfg.y, w=cfg.w, h=cfg.h}))
         end
 
-        -- Clear unused segments
         for _, seg in ipairs(config.clears) do
-            SendCommand(string.format("CLEAR|%d", seg))
+            SendCommand(buildJson({cmd="clear", seg=seg}))
         end
 
-        -- Build active-segment lookup for indicator update
         local activeSet = {}
         for _, s in ipairs(config.activeSegments) do activeSet[s] = true end
         for seg = 0, 3 do
-            Controls[string.format("active_%d", seg)].Boolean = activeSet[seg] == true
+            Controls["active_"..tostring(seg)].Boolean = activeSet[seg] == true
         end
 
-        -- Re-send non-empty text for active segments after layout settles
         Timer.CallAfter(function()
             for _, seg in ipairs(config.activeSegments) do
                 local text, cmd = BuildTextCommand(seg)
@@ -604,31 +601,48 @@ if Controls then
         end, 0.3)
     end
 
-    -- ---------------------------------------------------------------
-    -- Per-segment send / clear handlers (single loop)
-    -- ---------------------------------------------------------------
+    -- ── Per-segment send / clear handlers ──────────────────────────
     for seg = 0, 3 do
-        Controls[string.format("send_%d", seg)].EventHandler = function()
+        local s = tostring(seg)
+
+        Controls["send_"..s].EventHandler = function()
             local text, cmd = BuildTextCommand(seg)
             if SendCommand(cmd) then
-                Controls[string.format("active_%d", seg)].Boolean = true
+                Controls["active_"..s].Boolean = true
             end
         end
 
-        Controls[string.format("clear_%d", seg)].EventHandler = function()
-            if SendCommand(string.format("CLEAR|%d", seg)) then
-                Controls[string.format("active_%d", seg)].Boolean = false
+        Controls["clear_"..s].EventHandler = function()
+            if SendCommand(buildJson({cmd="clear", seg=seg})) then
+                Controls["active_"..s].Boolean = false
             end
+        end
+
+        -- Auto-send when any display property changes
+        local function AutoSend()
+            local text, cmd = BuildTextCommand(seg)
+            if text ~= "" then SendCommand(cmd) end
+        end
+        Controls["text_color_"..s].EventHandler = AutoSend
+        Controls["bg_color_"..s].EventHandler   = AutoSend
+        Controls["font_"..s].EventHandler       = AutoSend
+        Controls["align_"..s].EventHandler      = AutoSend
+        Controls["size_"..s].EventHandler       = AutoSend
+        Controls["effect_"..s].EventHandler     = AutoSend
+
+        Controls["intensity_"..s].EventHandler = function(ctl)
+            Debounce("intensity_"..s, 0.5, function()
+                local text, cmd = BuildTextCommand(seg)
+                if text ~= "" then SendCommand(cmd) end
+            end)
         end
     end
 
-    -- ---------------------------------------------------------------
-    -- Global controls
-    -- ---------------------------------------------------------------
+    -- ── Global controls ─────────────────────────────────────────────
     Controls.clear_all.EventHandler = function()
-        if SendCommand("CLEAR_ALL") then
+        if SendCommand(buildJson({cmd="clear_all"})) then
             for seg = 0, 3 do
-                Controls[string.format("active_%d", seg)].Boolean = false
+                Controls["active_"..tostring(seg)].Boolean = false
             end
         end
     end
@@ -636,34 +650,11 @@ if Controls then
     Controls.brightness.EventHandler = function(ctl)
         local value = math.floor(ctl.Value)
         Debounce("brightness", 0.5, function()
-            SendCommand(string.format("BRIGHTNESS|%d", value))
+            SendCommand(buildJson({cmd="brightness", value=value}))
         end)
     end
 
-    -- ---------------------------------------------------------------
-    -- Per-segment intensity (debounced)
-    -- ---------------------------------------------------------------
-    for seg = 0, 3 do
-        Controls[string.format("intensity_%d", seg)].EventHandler = function(ctl)
-            local value = math.floor(ctl.Value)
-            Debounce("intensity_" .. seg, 0.5, function()
-                local text, cmd = BuildTextCommand(seg)
-                if text ~= "" then SendCommand(cmd) end
-            end)
-        end
-
-        -- Auto-send when size or effect changes
-        local function AutoSend()
-            local text, cmd = BuildTextCommand(seg)
-            if text ~= "" then SendCommand(cmd) end
-        end
-        Controls[string.format("size_%d",   seg)].EventHandler = AutoSend
-        Controls[string.format("effect_%d", seg)].EventHandler = AutoSend
-    end
-
-    -- ---------------------------------------------------------------
-    -- Connection change handlers
-    -- ---------------------------------------------------------------
+    -- ── Connection change handlers ──────────────────────────────────
     Controls.ip_address.EventHandler = function(ctl)
         ip_addr = ctl.String
         print("IP address changed to: " .. ip_addr)
@@ -677,14 +668,12 @@ if Controls then
             print("UDP port changed to: " .. udp_port)
             ReopenSocket()
         else
-            print("✗ Invalid port number: " .. ctl.String)
+            print("✗ Invalid port: " .. ctl.String)
             Controls.last_command.String = "ERROR: Invalid port"
         end
     end
 
-    -- ---------------------------------------------------------------
-    -- Cleanup
-    -- ---------------------------------------------------------------
+    -- ── Cleanup ─────────────────────────────────────────────────────
     function Cleanup()
         print("Cleaning up LED Matrix Controller...")
         for _, t in pairs(debounceTimers) do

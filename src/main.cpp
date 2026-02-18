@@ -1616,27 +1616,12 @@ void handleTest(AsyncWebServerRequest *request) {
         String command = request->getParam("plain", true)->value();
         Serial.print("Web test command: ");
         Serial.println(command);
-        
-        // Actually process the command through UDP handler
+
+        // Pass JSON directly to dispatchCommand
         char buffer[UDP_BUFFER_SIZE];
         command.toCharArray(buffer, UDP_BUFFER_SIZE);
-        
-        // Parse and execute command
-        if (command.startsWith("TEXT|")) {
-            udpHandler->parseTextCommand(buffer);
-            request->send(200, "text/plain", "Text command sent: " + command);
-        } else if (command.startsWith("CLEAR|")) {
-            udpHandler->parseClearCommand(buffer);
-            request->send(200, "text/plain", "Clear command sent: " + command);
-        } else if (command == "CLEAR_ALL") {
-            segmentManager.clearAll();
-            request->send(200, "text/plain", "Cleared all segments");
-        } else if (command.startsWith("BRIGHTNESS|")) {
-            udpHandler->parseBrightnessCommand(buffer);
-            request->send(200, "text/plain", "Brightness command sent: " + command);
-        } else {
-            request->send(400, "text/plain", "Unknown command: " + command);
-        }
+        udpHandler->dispatchCommand(buffer);
+        request->send(200, "text/plain", "Command dispatched: " + command);
     } else {
         request->send(400, "text/plain", "No command provided");
     }
