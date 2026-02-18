@@ -13,6 +13,10 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
+# Uncomment to run in NO_DISPLAY test mode (no bus error, but no physical display)
+# Useful for testing UDP/Web functionality without hardware
+# Environment="LED_MATRIX_NO_DISPLAY=1"
+
 # Allow the process to access /dev/mem and GPIO
 PrivateDevices=no
 PrivateTmp=yes

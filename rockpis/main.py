@@ -32,9 +32,15 @@ Run:
 """
 
 import logging
+import os
 import signal
 import sys
 import time
+
+# CRITICAL: Force NO_DISPLAY mode if environment variable is set
+# This prevents the library from trying to detect Pi model and crashing
+# with bus error on non-Pi hardware
+NO_DISPLAY = os.environ.get('LED_MATRIX_NO_DISPLAY', '').lower() in ('1', 'true', 'yes')
 
 from config import (
     MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_CHAIN, MATRIX_PARALLEL,
@@ -82,65 +88,69 @@ def main():
     canvas   = None
     renderer = None
 
-    try:
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions
-        from text_renderer import TextRenderer
-
-        options = RGBMatrixOptions()
-        options.rows                = MATRIX_HEIGHT
-        options.cols                = MATRIX_WIDTH
-        options.chain_length        = MATRIX_CHAIN
-        options.parallel            = MATRIX_PARALLEL
-        options.hardware_mapping    = MATRIX_HARDWARE_MAPPING
-        options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
-        options.brightness          = MATRIX_BRIGHTNESS
-        
-        # ── Rock Pi S specific ──────────────────────────────────────────
-        # The RK3308 does not have BCM-compatible PWM hardware that the
-        # rpi-rgb-led-matrix library uses for the OE- signal on RPi.
-        # Disabling hardware pulsing forces bit-banged OE-, which works
-        # correctly and introduces only a very slight increase in CPU load.
-        options.disable_hardware_pulsing = MATRIX_DISABLE_HW_PULSING
-        
-        # CRITICAL for non-Raspberry Pi boards:
-        # The library tries to detect Pi model and crashes on non-Pi hardware.
-        # drop_privileges=False prevents the Pi detection code from running.
-        options.drop_privileges = False
-        
-        # Try to set explicit GPIO pins if the library version supports it
-        # (Some builds don't expose gpio_* attributes in Python bindings)
+    if NO_DISPLAY:
+        logger.warning("LED_MATRIX_NO_DISPLAY set — running in NO-DISPLAY test mode")
+        logger.warning("  ↳ UDP and web server functional, but NO physical panel output")
+    else:
         try:
-            options.gpio_r1  = GPIO_R1
-            options.gpio_g1  = GPIO_G1
-            options.gpio_b1  = GPIO_B1
-            options.gpio_r2  = GPIO_R2
-            options.gpio_g2  = GPIO_G2
-            options.gpio_b2  = GPIO_B2
-            options.gpio_a   = GPIO_A
-            options.gpio_b   = GPIO_B
-            options.gpio_c   = GPIO_C
-            options.gpio_d   = GPIO_D
-            options.gpio_clk = GPIO_CLK
-            options.gpio_lat = GPIO_LAT
-            options.gpio_oe  = GPIO_OE
-            logger.info("  ↳ Explicit GPIO pins set via options")
-        except AttributeError:
-            # GPIO attributes not available in this build - library will use
-            # hardware_mapping defaults or custom hardware mapping file
-            logger.info("  ↳ GPIO pin attributes not available in this library build")
-            logger.info("  ↳ Using hardware_mapping='%s' (library defaults)", 
-                       MATRIX_HARDWARE_MAPPING)
-        
-        options.show_refresh_rate   = False
+            from rgbmatrix import RGBMatrix, RGBMatrixOptions
+            from text_renderer import TextRenderer
 
-        matrix = RGBMatrix(options=options)
-        canvas = matrix.CreateFrameCanvas()
-        renderer = TextRenderer(matrix, canvas, sm)
-        logger.info("✓ LED matrix initialised")
-        logger.info("  ↳ Hardware pulsing disabled (bit-bang OE- mode for RK3308)")
-        logger.info("  ↳ Privilege drop disabled (non-Pi hardware mode)")
+            options = RGBMatrixOptions()
+            options.rows                = MATRIX_HEIGHT
+            options.cols                = MATRIX_WIDTH
+            options.chain_length        = MATRIX_CHAIN
+            options.parallel            = MATRIX_PARALLEL
+            options.hardware_mapping    = MATRIX_HARDWARE_MAPPING
+            options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
+            options.brightness          = MATRIX_BRIGHTNESS
+            
+            # ── Rock Pi S specific ──────────────────────────────────────────
+            # The RK3308 does not have BCM-compatible PWM hardware that the
+            # rpi-rgb-led-matrix library uses for the OE- signal on RPi.
+            # Disabling hardware pulsing forces bit-banged OE-, which works
+            # correctly and introduces only a very slight increase in CPU load.
+            options.disable_hardware_pulsing = MATRIX_DISABLE_HW_PULSING
+            
+            # CRITICAL for non-Raspberry Pi boards:
+            # The library tries to detect Pi model and crashes on non-Pi hardware.
+            # drop_privileges=False prevents the Pi detection code from running.
+            options.drop_privileges = False
+            
+            # Try to set explicit GPIO pins if the library version supports it
+            # (Some builds don't expose gpio_* attributes in Python bindings)
+            try:
+                options.gpio_r1  = GPIO_R1
+                options.gpio_g1  = GPIO_G1
+                options.gpio_b1  = GPIO_B1
+                options.gpio_r2  = GPIO_R2
+                options.gpio_g2  = GPIO_G2
+                options.gpio_b2  = GPIO_B2
+                options.gpio_a   = GPIO_A
+                options.gpio_b   = GPIO_B
+                options.gpio_c   = GPIO_C
+                options.gpio_d   = GPIO_D
+                options.gpio_clk = GPIO_CLK
+                options.gpio_lat = GPIO_LAT
+                options.gpio_oe  = GPIO_OE
+                logger.info("  ↳ Explicit GPIO pins set via options")
+            except AttributeError:
+                # GPIO attributes not available in this build - library will use
+                # hardware_mapping defaults or custom hardware mapping file
+                logger.info("  ↳ GPIO pin attributes not available in this library build")
+                logger.info("  ↳ Using hardware_mapping='%s' (library defaults)", 
+                           MATRIX_HARDWARE_MAPPING)
+            
+            options.show_refresh_rate   = False
 
-    except ImportError:
+            matrix = RGBMatrix(options=options)
+            canvas = matrix.CreateFrameCanvas()
+            renderer = TextRenderer(matrix, canvas, sm)
+            logger.info("✓ LED matrix initialised")
+            logger.info("  ↳ Hardware pulsing disabled (bit-bang OE- mode for RK3308)")
+            logger.info("  ↳ Privilege drop disabled (non-Pi hardware mode)")
+
+        except ImportError:
         logger.warning(
             "⚠  rgbmatrix module not found — running in NO_DISPLAY (virtual) mode.\n"
             "   Install rpi-rgb-led-matrix Python bindings to drive the physical panel.\n"
