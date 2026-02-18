@@ -24,12 +24,12 @@ LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR
 MAX_SEGMENTS = 4
 MAX_TEXT_LENGTH = 256
 DEFAULT_SCROLL_SPEED = 30  # pixels per second
-DEFAULT_SEGMENTS = {
-    1: {"x": 0, "y": 0, "w": 64, "h": 8},
-    2: {"x": 0, "y": 8, "w": 64, "h": 8},
-    3: {"x": 0, "y": 16, "w": 64, "h": 8},
-    4: {"x": 0, "y": 24, "w": 64, "h": 8},
-}
+DEFAULT_SEGMENTS = [
+    {"id": 1, "x": 0, "y": 0, "w": 64, "h": 8},
+    {"id": 2, "x": 0, "y": 8, "w": 64, "h": 8},
+    {"id": 3, "x": 0, "y": 16, "w": 64, "h": 8},
+    {"id": 4, "x": 0, "y": 24, "w": 64, "h": 8},
+]
 
 # ─── GPIO Pin Assignments ─────────────────────────────────────────────────
 # These are defined in gpio_config.py and used by hub75_driver.py
