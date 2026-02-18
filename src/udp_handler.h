@@ -134,12 +134,13 @@ public:
             if (segmentManager && seg >= 0 && seg < MAX_SEGMENTS) {
                 Segment* s = segmentManager->getSegment((uint8_t)seg);
                 if (s) {
-                    s->x       = (int16_t)x;
-                    s->y       = (int16_t)y;
-                    s->width   = (uint16_t)w;
-                    s->height  = (uint16_t)h;
-                    s->isActive = true;  // activate segment when configured
-                    s->isDirty  = true;
+                    s->x      = (int16_t)x;
+                    s->y      = (int16_t)y;
+                    s->width  = (uint16_t)w;
+                    s->height = (uint16_t)h;
+                    // Do NOT activate or mark dirty here.
+                    // A segment only renders when a "text" command arrives.
+                    // A "clear" command will deactivate it.
                 }
             }
 

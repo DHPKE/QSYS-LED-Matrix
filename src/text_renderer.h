@@ -86,7 +86,14 @@ public:
         // Always clear dirty flag first — no matter what path we take
         seg->isDirty = false;
 
-        if (!seg->isActive || strlen(seg->text) == 0) {
+        if (!seg->isActive) {
+            // Segment was deactivated (layout change / clear command) — erase it to black
+            dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, 0x0000);
+            return;
+        }
+
+        if (strlen(seg->text) == 0) {
+            // Active segment with no text — fill with its background colour
             dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
             return;
         }

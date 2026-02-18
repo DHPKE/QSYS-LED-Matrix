@@ -179,7 +179,8 @@ public:
     void clearSegment(uint8_t id) {
         if (id < MAX_SEGMENTS) {
             segments[id].text[0] = '\0';
-            segments[id].isDirty = true;
+            segments[id].isActive = false;  // deactivate so it stops rendering
+            segments[id].isDirty  = true;   // mark dirty so background is erased
         }
     }
     
