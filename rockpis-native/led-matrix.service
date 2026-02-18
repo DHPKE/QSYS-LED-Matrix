@@ -1,0 +1,14 @@
+[Unit]
+Description=LED Matrix Display Controller
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/led-matrix-native
+ExecStart=/usr/bin/python3 /opt/led-matrix-native/main.py
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

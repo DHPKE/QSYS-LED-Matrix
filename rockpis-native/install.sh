@@ -118,15 +118,9 @@ echo "✓ Files copied to $INSTALL_DIR"
 
 # Create systemd service
 echo ""
-echo "Step 6: Installing systemd service..."
-sudo tee /etc/systemd/system/led-matrix.service > /dev/null <<'EOF'
-[Unit]
-Description=LED Matrix Display Controller
-After=network.target
-
-[Install]
-WantedBy=multi-user.target
-EOF
+echo "Step 7: Installing systemd service..."
+cp "$SCRIPT_DIR/led-matrix.service" /etc/systemd/system/led-matrix.service
+chmod 644 /etc/systemd/system/led-matrix.service
 
 systemctl daemon-reload
 systemctl enable led-matrix.service
