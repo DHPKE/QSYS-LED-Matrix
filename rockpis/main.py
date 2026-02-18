@@ -41,6 +41,8 @@ from config import (
     MATRIX_HARDWARE_MAPPING, MATRIX_GPIO_SLOWDOWN, MATRIX_BRIGHTNESS,
     MATRIX_DISABLE_HW_PULSING,
     LOG_LEVEL, UDP_PORT, WEB_PORT,
+    GPIO_R1, GPIO_G1, GPIO_B1, GPIO_R2, GPIO_G2, GPIO_B2,
+    GPIO_A, GPIO_B, GPIO_C, GPIO_D, GPIO_CLK, GPIO_LAT, GPIO_OE,
 )
 from segment_manager import SegmentManager
 from udp_handler import UDPHandler
@@ -92,20 +94,44 @@ def main():
         options.hardware_mapping    = MATRIX_HARDWARE_MAPPING
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
+        
         # ── Rock Pi S specific ──────────────────────────────────────────
         # The RK3308 does not have BCM-compatible PWM hardware that the
         # rpi-rgb-led-matrix library uses for the OE- signal on RPi.
         # Disabling hardware pulsing forces bit-banged OE-, which works
         # correctly and introduces only a very slight increase in CPU load.
         options.disable_hardware_pulsing = MATRIX_DISABLE_HW_PULSING
+        
+        # CRITICAL for non-Raspberry Pi boards:
+        # The library tries to detect Pi model and crashes on non-Pi hardware.
+        # drop_privileges=False prevents the Pi detection code from running.
+        options.drop_privileges = False
+        
+        # Explicitly set GPIO pins for Rock Pi S (RK3308 Linux GPIO numbers)
+        # This overrides the library's hardcoded Raspberry Pi BCM mappings.
+        options.gpio_r1  = GPIO_R1
+        options.gpio_g1  = GPIO_G1
+        options.gpio_b1  = GPIO_B1
+        options.gpio_r2  = GPIO_R2
+        options.gpio_g2  = GPIO_G2
+        options.gpio_b2  = GPIO_B2
+        options.gpio_a   = GPIO_A
+        options.gpio_b   = GPIO_B
+        options.gpio_c   = GPIO_C
+        options.gpio_d   = GPIO_D
+        options.gpio_clk = GPIO_CLK
+        options.gpio_lat = GPIO_LAT
+        options.gpio_oe  = GPIO_OE
+        
         options.show_refresh_rate   = False
 
         matrix = RGBMatrix(options=options)
         canvas = matrix.CreateFrameCanvas()
         renderer = TextRenderer(matrix, canvas, sm)
         logger.info("✓ LED matrix initialised")
-        if MATRIX_DISABLE_HW_PULSING:
-            logger.info("  ↳ Hardware pulsing disabled (bit-bang OE- mode for RK3308)")
+        logger.info("  ↳ Hardware pulsing disabled (bit-bang OE- mode for RK3308)")
+        logger.info("  ↳ Privilege drop disabled (non-Pi hardware mode)")
+        logger.info(f"  ↳ GPIO pins: R1={GPIO_R1} G1={GPIO_G1} B1={GPIO_B1} CLK={GPIO_CLK}")
 
     except ImportError:
         logger.warning(

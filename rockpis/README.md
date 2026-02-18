@@ -5,6 +5,10 @@ protocol**, **same web UI**, and **same 4-segment layout system** — running on
 a RADXA Rock Pi S with **built-in 100 Mbps Ethernet**, driving a 64×32 HUB75
 LED panel via [`rpi-rgb-led-matrix`](https://github.com/hzeller/rpi-rgb-led-matrix).
 
+**Note:** This implementation uses explicit GPIO pin assignment and disables
+privilege dropping to work around the library's Raspberry Pi hardware detection,
+which causes bus errors on non-Pi ARM boards.
+
 ---
 
 ## Hardware
@@ -59,6 +63,22 @@ The RK3308 names GPIOs as **GPIOx_Py** where:
 > The HUB75 connector uses 5 V logic; the Rock Pi S GPIOs are 3.3 V.
 > Most HUB75 panels tolerate 3.3 V inputs, but if you see erratic pixels
 > add a simple 74HCT245 level-shifter board between the Pi and the panel.
+
+---
+
+## ⚠ Non-Raspberry Pi Hardware Compatibility
+
+The `rpi-rgb-led-matrix` library was originally designed for Raspberry Pi and
+attempts to auto-detect the Pi model on startup. On non-Pi hardware (like Rock
+Pi S), this detection fails and causes a **bus error (signal 7)**.
+
+**Solution implemented in this port:**
+- `options.drop_privileges = False` — disables Pi model detection
+- Explicit GPIO pin assignment via `options.gpio_*` — overrides BCM defaults
+- `options.disable_hardware_pulsing = True` — uses bit-banged OE- signal
+
+These settings are already configured in `main.py` and `config.py`. The matrix
+will initialize correctly without any Pi-specific hardware dependencies.
 
 ---
 
