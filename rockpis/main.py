@@ -151,13 +151,13 @@ def main():
             logger.info("  ↳ Privilege drop disabled (non-Pi hardware mode)")
 
         except ImportError:
-        logger.warning(
-            "⚠  rgbmatrix module not found — running in NO_DISPLAY (virtual) mode.\n"
-            "   Install rpi-rgb-led-matrix Python bindings to drive the physical panel.\n"
-            "   The web UI and UDP handler are fully functional."
-        )
-    except Exception as exc:
-        logger.error(f"⚠  LED matrix init failed: {exc} — falling back to NO_DISPLAY mode")
+            logger.warning(
+                "⚠  rgbmatrix module not found — running in NO_DISPLAY (virtual) mode.\n"
+                "   Install rpi-rgb-led-matrix Python bindings to drive the physical panel.\n"
+                "   The web UI and UDP handler are fully functional."
+            )
+        except Exception as exc:
+            logger.error(f"⚠  LED matrix init failed: {exc} — falling back to NO_DISPLAY mode")
 
     # ── 3. Brightness callback ────────────────────────────────────────────
     def on_brightness_change(value_255: int):
