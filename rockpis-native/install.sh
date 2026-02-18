@@ -123,21 +123,13 @@ sudo tee /etc/systemd/system/led-matrix.service > /dev/null <<'EOF'
 [Unit]
 Description=LED Matrix Display Controller
 After=network.target
+
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
 systemctl enable led-matrix.service
-
-echo "✓ Service installed"
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable led-matrix.service
 
 echo "✓ Service installed"
 
