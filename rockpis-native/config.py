@@ -13,8 +13,9 @@ MATRIX_HEIGHT = 32
 MATRIX_BRIGHTNESS = 200  # 0-255 (start at ~78%)
 
 # ─── Network Configuration ────────────────────────────────────────────────
-UDP_PORT = 21324  # UDP JSON protocol
-WEB_PORT = 80     # HTTP web interface
+UDP_PORT = 21324         # UDP JSON protocol
+UDP_BIND_ADDR = "0.0.0.0"  # Bind to all interfaces
+WEB_PORT = 80            # HTTP web interface
 
 # ─── Logging ──────────────────────────────────────────────────────────────
 LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR
