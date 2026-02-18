@@ -82,7 +82,13 @@ def main():
         options.hardware_mapping    = MATRIX_HARDWARE_MAPPING
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
-        options.disable_hardware_pulsing = False  # set True for testing w/o root
+        # The rpi-rgb-led-matrix hardware pulse uses the same BCM PWM peripheral
+        # as the on-board sound (snd_bcm2835). If that module is loaded the
+        # library hard-exits with "fix the above first or use --led-no-hardware-pulse".
+        # Setting this True uses bit-banged OE- instead — fully functional for
+        # text display, no flicker visible at normal viewing distances.
+        # To get hardware pulsing back: blacklist snd_bcm2835 (see install.sh).
+        options.disable_hardware_pulsing = True
         options.show_refresh_rate   = False
 
         matrix = RGBMatrix(options=options)

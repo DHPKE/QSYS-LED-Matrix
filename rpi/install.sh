@@ -24,8 +24,36 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# ── 1. System packages ─────────────────────────────────────────────────────
-echo "[1/5] Installing system packages..."
+# ── 1. Blacklist snd_bcm2835 (on-board sound conflicts with LED matrix) ────
+# rpi-rgb-led-matrix uses the BCM PWM hardware for OE- timing.
+# The Pi's on-board sound driver (snd_bcm2835) claims the same peripheral and
+# causes the library to hard-exit.  We disable it here.
+# NOTE: the app already sets disable_hardware_pulsing=True as a safe fallback,
+# but blacklisting the module gives better (hardware-timed) output quality.
+echo "[1/6] Blacklisting snd_bcm2835 (on-board sound)..."
+cat <<'EOF' | tee /etc/modprobe.d/blacklist-rgb-matrix.conf > /dev/null
+# Blacklisted by led-matrix install.sh — conflicts with rpi-rgb-led-matrix PWM
+blacklist snd_bcm2835
+EOF
+# Unload immediately if already loaded (best-effort, may fail if in use)
+modprobe -r snd_bcm2835 2>/dev/null || true
+# Also disable the dtparam in /boot/firmware/config.txt (bookworm path)
+for cfg in /boot/firmware/config.txt /boot/config.txt; do
+  if [ -f "$cfg" ]; then
+    # Comment out dtparam=audio=on if present
+    sed -i 's/^\(dtparam=audio=on\)/#\1  # disabled by led-matrix install/' "$cfg"
+    echo "  ✓ Commented out dtparam=audio=on in $cfg"
+    break
+  fi
+done
+# Regenerate initramfs so the blacklist takes effect after reboot
+if command -v update-initramfs &>/dev/null; then
+  update-initramfs -u -k all 2>/dev/null || true
+fi
+echo "  ✓ snd_bcm2835 blacklisted (reboot to apply fully)"
+
+# ── 2. System packages ─────────────────────────────────────────────────────
+echo "[2/6] Installing system packages..."
 apt-get update -qq
 apt-get install -y \
     python3 \
@@ -37,8 +65,8 @@ apt-get install -y \
     python3-dev \
     cython3
 
-# ── 2. rpi-rgb-led-matrix ──────────────────────────────────────────────────
-echo "[2/5] Building rpi-rgb-led-matrix..."
+# ── 3. rpi-rgb-led-matrix ──────────────────────────────────────────────────
+echo "[3/6] Building rpi-rgb-led-matrix..."
 TMPDIR=$(mktemp -d)
 git clone --depth 1 https://github.com/hzeller/rpi-rgb-led-matrix.git "$TMPDIR/rpi-rgb-led-matrix"
 cd "$TMPDIR/rpi-rgb-led-matrix"
@@ -51,19 +79,19 @@ cd /
 rm -rf "$TMPDIR"
 echo "  ✓ rpi-rgb-led-matrix installed"
 
-# ── 3. Copy app files ──────────────────────────────────────────────────────
-echo "[3/5] Copying application files to /opt/led-matrix..."
+# ── 4. Copy app files ──────────────────────────────────────────────────────
+echo "[4/6] Copying application files to /opt/led-matrix..."
 mkdir -p /opt/led-matrix
 cp "$SCRIPT_DIR"/*.py    /opt/led-matrix/
 echo "  ✓ Files copied"
 
-# ── 4. Config storage directory ────────────────────────────────────────────
-echo "[4/5] Creating config storage..."
+# ── 5. Config storage directory ────────────────────────────────────────────
+echo "[5/6] Creating config storage..."
 mkdir -p /var/lib/led-matrix
 echo "  ✓ /var/lib/led-matrix created"
 
-# ── 5. Systemd service ─────────────────────────────────────────────────────
-echo "[5/5] Installing systemd service..."
+# ── 6. Systemd service ─────────────────────────────────────────────────────
+echo "[6/6] Installing systemd service..."
 cp "$SCRIPT_DIR/led-matrix.service" /etc/systemd/system/led-matrix.service
 systemctl daemon-reload
 systemctl enable led-matrix.service
