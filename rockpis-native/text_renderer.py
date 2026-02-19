@@ -57,7 +57,7 @@ class TextRenderer:
         """
         Render a single segment
         Args:
-            seg_data: Segment data with keys: text, x, y, w, h, color, font_size, etc.
+            seg_data: Segment data with keys: text, x, y, w, h, color, bgcolor, etc.
         """
         text = seg_data.get('text', '')
         if not text:
@@ -74,19 +74,40 @@ class TextRenderer:
         if isinstance(color, str):
             color = self.parse_color(color)
         
-        # Get font size
-        font_size = seg_data.get('font_size', 16)
+        # Get background color (default black)
+        bgcolor = seg_data.get('bgcolor', (0, 0, 0))
+        if isinstance(bgcolor, str):
+            bgcolor = self.parse_color(bgcolor)
+        
+        # Auto-size font to fit segment height (use 80% of height)
+        font_size = max(6, int(h * 0.8))
         font = self.get_font(font_size)
         
         # Create PIL image for this segment
-        img = Image.new('RGB', (w, h), (0, 0, 0))
+        img = Image.new('RGB', (w, h), bgcolor)
         draw = ImageDraw.Draw(img)
         
-        # Draw text
+        # Draw text with alignment
         try:
-            draw.text((0, 0), text, font=font, fill=color)
+            # Get text bounding box
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            # Calculate position based on alignment
+            align = seg_data.get('align', 'C')
+            if align == 'L' or align == 'left':
+                text_x = 2
+            elif align == 'R' or align == 'right':
+                text_x = w - text_width - 2
+            else:  # Center
+                text_x = (w - text_width) // 2
+            
+            text_y = (h - text_height) // 2
+            
+            draw.text((text_x, text_y), text, font=font, fill=color)
         except Exception as e:
-            logger.warning(f"Failed to draw text: {e}")
+            logger.warning(f"Failed to draw text '{text}': {e}")
             return
         
         # Copy to driver's back buffer
