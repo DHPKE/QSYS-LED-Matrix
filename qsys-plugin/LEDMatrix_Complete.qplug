@@ -1,11 +1,14 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.10.1 - Shortened pin names for Control Pins window readability
+-- Version 3.10.2 - Compact UI width optimized for content
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.10.2 Changes:
+--   - Reduced plugin width from 1400px to 600px (minimum for UI elements)
+--   - Fixed text field width formula from W-232 to W-332 to prevent button overlap
+--   - Maintains proper 6px spacing between all elements
 --
 -- v3.10.1 Changes:
 --   - Shortened all PrettyName strings to fit in Q-SYS Control Pins window
---   - Changed "Connection~" to "Conn~", "Segment X~" to "SegX~", etc.
---   - IMPORTANT: Delete and re-drag plugin in Designer to see readable pin names!
 --
 -- v3.10.0 Changes:
 --   - Increased plugin width from 1200px to 1400px for optimal pin visibility
@@ -46,8 +49,8 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.10.1",
-    Id = "dhpke.olimex.led.matrix.3.10.1",
+    Version = "3.10.2",
+    Id = "dhpke.olimex.led.matrix.3.10.2",
     Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix - All pins visible",
     ShowDebug = true,
     Author = "DHPKE"
@@ -277,7 +280,7 @@ end
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
-    local W  = 1400  -- plugin width (increased for optimal pin visibility - delete and re-drag to apply)
+    local W  = 600   -- plugin width (optimized for minimum size without overlapping elements)
     local CH = 24    -- standard control height
     local BH = 28    -- button height
 
@@ -299,7 +302,7 @@ function GetControlLayout(props)
     -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
         StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
-    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.10.1",
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.10.2",
         Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
         Color={255,255,255}, Position={0,9}, Size={W,20}})
 
@@ -350,9 +353,9 @@ function GetControlLayout(props)
         local r1 = sy + 16
         layout[segName.."active"] = {PrettyName=groupName.."~Active", Style="Led",
             Position={6, r1+5}, Size={14, 14}}
-        Lbl("Text", 26, r1-12, W-230)
+        Lbl("Text", 26, r1-12, W-330)
         layout[segName.."text"]  = {PrettyName=groupName.."~Text", Style="Text",
-            Position={26, r1}, Size={W-232, CH}}
+            Position={26, r1}, Size={W-332, CH}}
         layout[segName.."send"]  = {PrettyName=groupName.."~Send", Style="Button",
             ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
             Position={W-300, r1}, Size={95, BH}}
@@ -580,7 +583,7 @@ if Controls then
     -- ── Initialize ─────────────────────────────────────────────────
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.10.1 Initializing")
+        print("LED Matrix Complete v3.10.2 Initializing")
         print("===========================================")
 
         Controls.ip_address.String   = ip_addr
