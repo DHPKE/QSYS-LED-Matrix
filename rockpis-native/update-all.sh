@@ -15,13 +15,16 @@ sudo curl -s -o hub75_driver.py.new https://raw.githubusercontent.com/DHPKE/QSYS
 echo "  - segment_manager.py (added get_active_segments)"
 sudo curl -s -o segment_manager.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/segment_manager.py
 
-echo "  - text_renderer.py (bgcolor support, auto-sizing, alignment)"
+echo "  - text_renderer.py (bgcolor support, auto-sizing, flashing fix)"
 sudo curl -s -o text_renderer.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/text_renderer.py
+
+echo "  - main.py (improved render timing)"
+sudo curl -s -o main.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/main.py
 
 echo ""
 echo "Validating and installing files..."
 SUCCESS=0
-for file in hub75_driver segment_manager text_renderer; do
+for file in hub75_driver segment_manager text_renderer main; do
     if [ -f ${file}.py.new ]; then
         if sudo python3 -m py_compile ${file}.py.new 2>/dev/null; then
             sudo mv ${file}.py.new ${file}.py
@@ -37,7 +40,7 @@ for file in hub75_driver segment_manager text_renderer; do
 done
 
 echo ""
-echo "Files updated: $SUCCESS/3"
+echo "Files updated: $SUCCESS/4"
 
 if [ $SUCCESS -eq 0 ]; then
     echo "❌ No files were updated. Check your internet connection."
