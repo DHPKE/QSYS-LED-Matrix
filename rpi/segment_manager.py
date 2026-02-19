@@ -6,12 +6,15 @@ colour, alignment, and effect state. Thread-safe via a RLock so the UDP
 listener thread and the render thread can both access segments safely.
 """
 
+import logging
 import threading
 import time
 import copy
 from enum import Enum
 from config import (MAX_SEGMENTS, MAX_TEXT_LENGTH, MATRIX_WIDTH,
                     MATRIX_HEIGHT, DEFAULT_SCROLL_SPEED, DEFAULT_SEGMENTS)
+
+logger = logging.getLogger(__name__)
 
 
 class TextAlign(Enum):
@@ -146,6 +149,7 @@ class SegmentManager:
             seg = self.get_segment(seg_id)
             if seg:
                 seg.text = ""
+                seg.is_active = False  # Deactivate when clearing
                 seg.is_dirty = True
 
     def clear_all(self):
@@ -164,6 +168,9 @@ class SegmentManager:
                 seg.height = h
                 seg.is_active = True
                 seg.is_dirty  = True
+                # Mark ALL segments as dirty to force full redraw
+                for s in self._segments:
+                    s.is_dirty = True
 
     def activate(self, seg_id: int, active: bool):
         with self._lock:
@@ -171,6 +178,9 @@ class SegmentManager:
             if seg:
                 seg.is_active = active
                 seg.is_dirty  = True
+                # Mark ALL segments as dirty to force full redraw when activating/deactivating
+                for s in self._segments:
+                    s.is_dirty = True
 
     # ─── Effect tick (call from render loop) ──────────────────────────────
 

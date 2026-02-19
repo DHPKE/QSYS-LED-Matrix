@@ -32,7 +32,7 @@ import time
 from config import (
     MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_CHAIN, MATRIX_PARALLEL,
     MATRIX_HARDWARE_MAPPING, MATRIX_GPIO_SLOWDOWN, MATRIX_BRIGHTNESS,
-    LOG_LEVEL, UDP_PORT, WEB_PORT,
+    MATRIX_PWM_BITS, LOG_LEVEL, UDP_PORT, WEB_PORT, EFFECT_INTERVAL,
 )
 from segment_manager import SegmentManager
 from udp_handler import UDPHandler
@@ -45,9 +45,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-
-# ─── Effect / render interval ───────────────────────────────────────────────
-EFFECT_INTERVAL = 0.05   # seconds (≈ 20 fps; the matrix library itself runs at ~120Hz)
 
 
 def _brightness_255_to_pct(value_255: int) -> int:
@@ -82,14 +79,17 @@ def main():
         options.hardware_mapping    = MATRIX_HARDWARE_MAPPING
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
+        options.pwm_bits            = MATRIX_PWM_BITS
+        options.pwm_lsb_nanoseconds = 200  # Higher = smoother but slower (default 130)
         # The rpi-rgb-led-matrix hardware pulse uses the same BCM PWM peripheral
         # as the on-board sound (snd_bcm2835). If that module is loaded the
         # library hard-exits with "fix the above first or use --led-no-hardware-pulse".
         # Setting this True uses bit-banged OE- instead — fully functional for
         # text display, no flicker visible at normal viewing distances.
         # To get hardware pulsing back: blacklist snd_bcm2835 (see install.sh).
-        options.disable_hardware_pulsing = True
+        options.disable_hardware_pulsing = True  # Software PWM - more stable for Pi Zero 2 W
         options.show_refresh_rate   = False
+        options.limit_refresh_rate_hz = 0  # No limit - as fast as possible
 
         matrix = RGBMatrix(options=options)
         canvas = matrix.CreateFrameCanvas()
@@ -128,6 +128,7 @@ def main():
 
     # ── 7. Main render loop ──────────────────────────────────────────────
     last_effect = time.monotonic()
+    render_count = 0
 
     def _shutdown(sig, frame):
         logger.info("\nShutting down…")
@@ -140,9 +141,11 @@ def main():
     signal.signal(signal.SIGINT,  _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
+    # Optimized render loop with minimal overhead
     while True:
         now = time.monotonic()
 
+        # Update effects at fixed interval
         if now - last_effect >= EFFECT_INTERVAL:
             sm.update_effects()
             last_effect = now
@@ -150,11 +153,10 @@ def main():
             if renderer:
                 try:
                     renderer.render_all()
-                    # canvas reference is updated inside render_all() after SwapOnVSync
                 except Exception as exc:
                     logger.error(f"[RENDER] Exception: {exc}")
 
-        # Sleep for the remainder of the interval
+        # Adaptive sleep to maintain framerate without busy-waiting
         elapsed = time.monotonic() - now
         sleep_for = max(0.001, EFFECT_INTERVAL - elapsed)
         time.sleep(sleep_for)

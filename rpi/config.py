@@ -44,18 +44,28 @@ MATRIX_HEIGHT  = 32
 MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
-MATRIX_HARDWARE_MAPPING = "regular"   # or "adafruit-hat", "adafruit-hat-pwm"
-MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; increase if display flickers (Zero 2 = 2)
+MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
+MATRIX_GPIO_SLOWDOWN    = 1           # 0–4; Controls LED refresh rate
+                                      # 0 = Fastest (~1000Hz+) - BEST for reducing flicker
+                                      # 1 = Fast (~500Hz) - Good balance for Pi Zero 2 W
+                                      # 2 = Good balance (~250-300Hz)
+                                      # 3 = Slower (~200Hz) - very stable
+                                      # 4 = Slowest (~150Hz) - most stable but may appear dim
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
+MATRIX_PWM_BITS        = 8           # 1-11; PWM bits for color depth (11=2048 levels, default)
+                                      # Lower values = faster refresh but less color accuracy
+                                      # 11 = Best color (slower refresh)
+                                      # 7-9 = Good compromise
+                                      # 1-6 = Faster but reduced colors
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Segments
 # ──────────────────────────────────────────────────────────────────────────────
 MAX_SEGMENTS = 4
 
-# Default segment layout: side-by-side split (1|2)
+# Default segment layout: fullscreen on segment 0, others inactive
 DEFAULT_SEGMENTS = [
-    {"id": 0, "x": 0,  "y": 0, "w": MATRIX_WIDTH // 2, "h": MATRIX_HEIGHT,
+    {"id": 0, "x": 0,  "y": 0, "w": MATRIX_WIDTH, "h": MATRIX_HEIGHT,
      "text": "", "color": "#FFFFFF", "bgcolor": "#000000",
      "align": "C", "effect": "none", "active": True},
     {"id": 1, "x": MATRIX_WIDTH // 2, "y": 0, "w": MATRIX_WIDTH // 2, "h": MATRIX_HEIGHT,
@@ -74,15 +84,15 @@ DEFAULT_SEGMENTS = [
 # ──────────────────────────────────────────────────────────────────────────────
 UDP_PORT       = 21324
 UDP_BIND_ADDR  = "0.0.0.0"
-WEB_PORT       = 80        # Change to 8080 if running without sudo
+WEB_PORT       = 8080      # Non-privileged port (no sudo required)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Text rendering
 # ──────────────────────────────────────────────────────────────────────────────
 MAX_TEXT_LENGTH    = 128
 DEFAULT_SCROLL_SPEED = 50   # pixels per second
-FONT_PATH          = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-FONT_PATH_FALLBACK = "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"
+FONT_PATH          = "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"
+FONT_PATH_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Persistence
@@ -94,3 +104,10 @@ SEGMENT_FILE = "/var/lib/led-matrix/segments.json"
 # Logging
 # ──────────────────────────────────────────────────────────────────────────────
 LOG_LEVEL = "INFO"   # DEBUG | INFO | WARNING | ERROR
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Display refresh rate
+# ──────────────────────────────────────────────────────────────────────────────
+EFFECT_INTERVAL = 0.05   # seconds (≈ 20 fps; matrix library itself runs at ~120Hz)
+                        # Increase to reduce CPU usage, decrease for smoother animations
+                        # Recommended: 0.05 (20fps) to 0.1 (10fps)

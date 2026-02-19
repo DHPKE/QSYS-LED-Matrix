@@ -1,27 +1,23 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 2.0.0 - Complete Overhaul
--- Controls Olimex ESP32 Gateway LED Matrix via UDP
+-- Version 3.0.0 - JSON Protocol & Optimization Update
+-- Controls RPi Zero 2 W LED Matrix via UDP (JSON format)
 --
--- CHANGES in v2.0.0:
--- - Added Effect selector (none, scroll, blink)
--- - Added Alignment selector (L, C, R)
--- - Added Font Size selector (auto, 8-32)
--- - Added proper Font ComboBox
--- - Added UDP error handling
--- - Added command success feedback
--- - Added color input validation
--- - Added port number validation
--- - Added brightness debounce (500ms)
--- - Added segment active indicators
--- - Updated UI colors to match v2.x plugins
--- - Added cleanup function
--- - Improved layout spacing
+-- CHANGES in v3.0.0:
+-- - Updated to JSON protocol (matches web UI and UDP handler)
+-- - Changed font list to Arial (installed on system)
+-- - Added background color control
+-- - Added intensity control per segment
+-- - Added auto-send mode (updates on text change)
+-- - Removed "Send" buttons (auto-send enabled)
+-- - Optimized for maximum font sizes
+-- - Updated for RPi Zero 2 W deployment
+-- - Matches web UI functionality
 
 PluginInfo = {
     Name = "Olimex~LED Matrix Text Display",
-    Version = "2.0.0",
-    Id = "dhpke.olimex.led.matrix.2.0.0",
-    Description = "UDP control for Olimex ESP32 Gateway 64x32 LED Matrix (v1.2.0+ firmware)",
+    Version = "3.0.0",
+    Id = "dhpke.olimex.led.matrix.3.0.0",
+    Description = "UDP control for RPi Zero 2 W 64x32 LED Matrix (JSON protocol)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -122,23 +118,44 @@ function GetControls(props)
             PinStyle = "Input"
         })
         
-        -- Font selector
+        -- Background color input (hex)
         table.insert(controls, {
-            Name = string.format("font_%d", seg),
+            Name = string.format("bgcolor_%d", seg),
             ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {"roboto8", "roboto12", "roboto16", "roboto24"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
         })
         
-        -- Font size selector
+        -- Intensity slider
+        table.insert(controls, {
+            Name = string.format("intensity_%d", seg),
+            ControlType = "Knob",
+            ControlUnit = "Integer",
+            Min = 0,
+            Max = 255,
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Input"
+        })
+        
+        -- Font selector (Arial is default on system)
+        table.insert(controls, {
+            Name = string.format("font_%d", seg),
+            ControlType = "Text",
+            ControlUnit = "List",
+            Choices = {"arial", "mono"},
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Input"
+        })
+        
+        -- Font size selector (auto for maximum size)
         table.insert(controls, {
             Name = string.format("size_%d", seg),
             ControlType = "Text",
             ControlUnit = "List",
-            Choices = {"auto", "8", "12", "16", "24", "32"},
+            Choices = {"auto", "6", "8", "10", "12", "14", "16", "18", "20", "24", "28", "32"},
             Count = 1,
             UserPin = true,
             PinStyle = "Input"
@@ -155,7 +172,7 @@ function GetControls(props)
             PinStyle = "Input"
         })
         
-        -- Effect selector (fade/rainbow not in firmware v1.2.0 yet)
+         -- Effect selector
         table.insert(controls, {
             Name = string.format("effect_%d", seg),
             ControlType = "Text",
@@ -166,9 +183,9 @@ function GetControls(props)
             PinStyle = "Input"
         })
         
-        -- Send button
+        -- Clear button
         table.insert(controls, {
-            Name = string.format("send_%d", seg),
+            Name = string.format("clear_%d", seg),
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
@@ -176,9 +193,9 @@ function GetControls(props)
             PinStyle = "Input"
         })
         
-        -- Clear button
+        -- Invert button (swaps color and bgcolor)
         table.insert(controls, {
-            Name = string.format("clear_%d", seg),
+            Name = string.format("invert_%d", seg),
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
@@ -203,6 +220,17 @@ function GetControls(props)
         Name = "clear_all",
         ControlType = "Button",
         ButtonType = "Trigger",
+        Count = 1,
+        UserPin = true,
+        PinStyle = "Input"
+    })
+    
+    -- Layout selector (determines which segments are visible/active)
+    table.insert(controls, {
+        Name = "layout",
+        ControlType = "Text",
+        ControlUnit = "List",
+        Choices = {"fullscreen", "split-vertical", "split-horizontal", "quad"},
         Count = 1,
         UserPin = true,
         PinStyle = "Input"
@@ -288,7 +316,7 @@ function GetControlLayout(props)
         
         table.insert(graphics, {
             Type = "GroupBox",
-            Text = string.format("Segment %d", seg),
+            Text = string.format("Segment %d (Auto-Update)", seg),
             Fill = {140, 140, 140},  -- Bright grey
             StrokeWidth = 1,
             CornerRadius = 4,
@@ -308,65 +336,81 @@ function GetControlLayout(props)
             PrettyName = "Text Content",
             Style = "Text",
             Position = {45, segmentY + 25},
-            Size = {500, 20}
+            Size = {380, 20}
         }
         
         layout[string.format("color_%d", seg)] = {
-            PrettyName = "Color (Hex)",
+            PrettyName = "Text Color",
             Style = "Text",
-            Position = {555, segmentY + 25},
-            Size = {90, 20}
+            Position = {435, segmentY + 25},
+            Size = {85, 20}
+        }
+        
+        layout[string.format("bgcolor_%d", seg)] = {
+            PrettyName = "BG Color",
+            Style = "Text",
+            Position = {530, segmentY + 25},
+            Size = {85, 20}
+        }
+        
+        layout[string.format("intensity_%d", seg)] = {
+            PrettyName = "Intensity",
+            Style = "Fader",
+            Position = {625, segmentY + 25},
+            Size = {60, 20}
         }
         
         layout[string.format("font_%d", seg)] = {
             PrettyName = "Font",
             Style = "ComboBox",
-            Position = {655, segmentY + 25},
-            Size = {120, 20}
+            Position = {695, segmentY + 25},
+            Size = {80, 20}
         }
         
-        -- Row 2: Size, Align, Effect
+        -- Row 2: Size, Align, Effect, Clear
         layout[string.format("size_%d", seg)] = {
             PrettyName = "Size",
             Style = "ComboBox",
             Position = {20, segmentY + 55},
-            Size = {80, 20}
+            Size = {90, 20}
         }
         
         layout[string.format("align_%d", seg)] = {
             PrettyName = "Align",
             Style = "ComboBox",
-            Position = {110, segmentY + 55},
+            Position = {120, segmentY + 55},
             Size = {70, 20}
         }
         
         layout[string.format("effect_%d", seg)] = {
             PrettyName = "Effect",
             Style = "ComboBox",
-            Position = {190, segmentY + 55},
+            Position = {200, segmentY + 55},
             Size = {100, 20}
         }
         
-        -- Row 3: Buttons
-        layout[string.format("send_%d", seg)] = {
-            PrettyName = "Send",
-            Style = "Button",
-            ButtonStyle = "Trigger",
-            Legend = "Send to Matrix",
-            Color = {0, 180, 80},
-            Position = {20, segmentY + 85},
-            Size = {140, 35}
-        }
-        
+        -- Row 3: Clear and Invert buttons
         layout[string.format("clear_%d", seg)] = {
             PrettyName = "Clear",
             Style = "Button",
             ButtonStyle = "Trigger",
             Legend = "Clear Segment",
             Color = {200, 60, 60},
+            Position = {20, segmentY + 85},
+            Size = {140, 35}
+        }
+        
+        layout[string.format("invert_%d", seg)] = {
+            PrettyName = "Invert",
+            Style = "Button",
+            ButtonStyle = "Trigger",
+            Legend = "Invert Colors",
+            Color = {100, 100, 220},
             Position = {170, segmentY + 85},
             Size = {140, 35}
         }
+        }
+        
     end
     
     -- Global controls
@@ -398,6 +442,13 @@ function GetControlLayout(props)
         Size = {180, 50}
     }
     
+    layout["layout"] = {
+        PrettyName = "Display Layout",
+        Style = "ComboBox",
+        Position = {490, yPos + 25},
+        Size = {270, 50}
+    }
+    
     return layout, graphics
 end
 
@@ -412,6 +463,10 @@ if Controls then
     -- Brightness debounce timer
     local brightnessTimer = nil
     local pendingBrightness = nil
+    
+    -- Current layout state - tracks which segments are visible
+    local currentLayout = "fullscreen"  -- default
+    local activeSegments = {0}  -- default: only segment 0 visible
     
     -- Validate hex color
     function ValidateHexColor(color)
@@ -437,7 +492,7 @@ if Controls then
     -- Initialize
     function Initialize()
         print("===========================================")
-        print("LED Matrix Controller v2.0.0 Initializing")
+        print("LED Matrix Controller v3.0.0 Initializing")
         print("===========================================")
         
         -- Set default values
@@ -449,12 +504,19 @@ if Controls then
         -- Set defaults for each segment
         for i = 0, numSegments-1 do
             Controls[string.format("color_%d", i)].String = "FFFFFF"
-            Controls[string.format("font_%d", i)].String = "roboto12"
+            Controls[string.format("bgcolor_%d", i)].String = "000000"
+            Controls[string.format("intensity_%d", i)].Value = 255
+            Controls[string.format("font_%d", i)].String = "arial"
             Controls[string.format("size_%d", i)].String = "auto"
             Controls[string.format("align_%d", i)].String = "C"
             Controls[string.format("effect_%d", i)].String = "none"
             Controls[string.format("active_%d", i)].Boolean = false
         end
+        
+        -- Set default layout
+        Controls.layout.String = "fullscreen"
+        currentLayout = "fullscreen"
+        activeSegments = {0}
         
         -- Open UDP socket with error handling (connectionless — no IP/port at open time)
         local success, err = pcall(function()
@@ -474,7 +536,7 @@ if Controls then
     end
     
     -- Send UDP command with error handling
-    function SendCommand(command)
+    function SendCommand(jsonString)
         if not socket then
             print("✗ ERROR: Socket not initialized")
             Controls.connection_status.Value = 2 -- Fault
@@ -483,12 +545,12 @@ if Controls then
         end
         
         local success, err = pcall(function()
-            socket:Send(ip_addr, udp_port, command .. "\n")
+            socket:Send(ip_addr, udp_port, jsonString .. "\n")
         end)
         
         if success then
-            print("→ Sent: " .. command)
-            Controls.last_command.String = command
+            print("→ Sent: " .. jsonString)
+            Controls.last_command.String = jsonString
             Controls.connection_status.Value = 0 -- OK
             return true
         else
@@ -499,55 +561,203 @@ if Controls then
         end
     end
     
-    -- Send button handlers
-    for i = 0, numSegments-1 do
-        Controls[string.format("send_%d", i)].EventHandler = function()
-            local text = Controls[string.format("text_%d", i)].String
-            local color = Controls[string.format("color_%d", i)].String
-            local font = Controls[string.format("font_%d", i)].String
-            local size = Controls[string.format("size_%d", i)].String
-            local align = Controls[string.format("align_%d", i)].String
-            local effect = Controls[string.format("effect_%d", i)].String
-            
-            -- Validate color
-            color = ValidateHexColor(color)
-            if not color then
-                print("✗ Invalid color format for segment " .. i)
-                Controls.last_command.String = "ERROR: Invalid color"
-                return
-            end
-            
-            -- Build command: TEXT|segment|content|color|font|size|align|effect
-            local command = string.format("TEXT|%d|%s|%s|%s|%s|%s|%s", 
-                                        i, text, color, font, size, align, effect)
-            
-            if SendCommand(command) then
-                -- Mark segment as active
-                Controls[string.format("active_%d", i)].Boolean = true
-            end
+    -- Debounce timers for auto-send
+    local segmentTimers = {}
+    
+    -- Build and send text command (JSON format)
+    function SendTextCommand(segmentIndex)
+        local text = Controls[string.format("text_%d", segmentIndex)].String
+        local color = ValidateHexColor(Controls[string.format("color_%d", segmentIndex)].String)
+        local bgcolor = ValidateHexColor(Controls[string.format("bgcolor_%d", segmentIndex)].String)
+        local intensity = math.floor(Controls[string.format("intensity_%d", segmentIndex)].Value)
+        local font = Controls[string.format("font_%d", segmentIndex)].String
+        local size = Controls[string.format("size_%d", segmentIndex)].String
+        local align = Controls[string.format("align_%d", segmentIndex)].String
+        local effect = Controls[string.format("effect_%d", segmentIndex)].String
+        
+        if not color then
+            color = "FFFFFF"
+            Controls[string.format("color_%d", segmentIndex)].String = color
+        end
+        
+        if not bgcolor then
+            bgcolor = "000000"
+            Controls[string.format("bgcolor_%d", segmentIndex)].String = bgcolor
+        end
+        
+        -- Build JSON command
+        local jsonCmd = string.format(
+            '{"cmd":"text","seg":%d,"text":"%s","color":"%s","bgcolor":"%s","font":"%s","size":"%s","align":"%s","effect":"%s","intensity":%d}',
+            segmentIndex, text:gsub('"', '\\"'), color, bgcolor, font, size, align, effect, intensity
+        )
+        
+        if SendCommand(jsonCmd) then
+            Controls[string.format("active_%d", segmentIndex)].Boolean = (text ~= "")
         end
     end
     
-    -- Clear button handlers
+    -- Check if segment is visible in current layout
+    function IsSegmentVisible(segmentIndex)
+        for _, seg in ipairs(activeSegments) do
+            if seg == segmentIndex then
+                return true
+            end
+        end
+        return false
+    end
+    
+    -- Debounced send for segment (500ms delay, only if visible)
+    function DebouncedSend(segmentIndex)
+        -- Cancel existing timer
+        if segmentTimers[segmentIndex] then
+            segmentTimers[segmentIndex]:Cancel()
+        end
+        
+        -- Create new timer
+        segmentTimers[segmentIndex] = Timer.New()
+        segmentTimers[segmentIndex].EventHandler = function()
+            -- Only send if segment is visible in current layout
+            if IsSegmentVisible(segmentIndex) then
+                SendTextCommand(segmentIndex)
+            else
+                print(string.format("Segment %d edited offline (not visible in %s layout)", segmentIndex, currentLayout))
+            end
+        end
+        segmentTimers[segmentIndex]:Start(0.5)
+    end
+    
+    -- Apply layout configuration
+    function ApplyLayout(layoutType)
+        currentLayout = layoutType
+        local cmds = {}
+        
+        if layoutType == "fullscreen" then
+            activeSegments = {0}
+            table.insert(cmds, '{"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":32}')
+            -- Clear inactive segments
+            for i = 1, 3 do
+                table.insert(cmds, string.format('{"cmd":"clear","seg":%d}', i))
+            end
+        elseif layoutType == "split-vertical" then
+            activeSegments = {0, 1}
+            table.insert(cmds, '{"cmd":"config","seg":0,"x":0,"y":0,"w":32,"h":32}')
+            table.insert(cmds, '{"cmd":"config","seg":1,"x":32,"y":0,"w":32,"h":32}')
+            -- Clear inactive segments
+            for i = 2, 3 do
+                table.insert(cmds, string.format('{"cmd":"clear","seg":%d}', i))
+            end
+        elseif layoutType == "split-horizontal" then
+            activeSegments = {0, 1}
+            table.insert(cmds, '{"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":16}')
+            table.insert(cmds, '{"cmd":"config","seg":1,"x":0,"y":16,"w":64,"h":16}')
+            -- Clear inactive segments
+            for i = 2, 3 do
+                table.insert(cmds, string.format('{"cmd":"clear","seg":%d}', i))
+            end
+        elseif layoutType == "quad" then
+            activeSegments = {0, 1, 2, 3}
+            table.insert(cmds, '{"cmd":"config","seg":0,"x":0,"y":0,"w":32,"h":16}')
+            table.insert(cmds, '{"cmd":"config","seg":1,"x":32,"y":0,"w":32,"h":16}')
+            table.insert(cmds, '{"cmd":"config","seg":2,"x":0,"y":16,"w":32,"h":16}')
+            table.insert(cmds, '{"cmd":"config","seg":3,"x":32,"y":16,"w":32,"h":16}')
+        end
+        
+        -- Send all config commands
+        for _, cmd in ipairs(cmds) do
+            SendCommand(cmd)
+        end
+        
+        print(string.format("✓ Layout changed to %s (active segments: %s)", layoutType, table.concat(activeSegments, ", ")))
+        
+        -- After a brief delay, render all active segments with current values
+        Timer.CallAfter(function()
+            for _, seg in ipairs(activeSegments) do
+                SendTextCommand(seg)
+            end
+        end, 0.3)
+    end
+    
+    -- Auto-send event handlers for all text-related controls
+    for i = 0, numSegments-1 do
+        -- Text changed - auto-send with debounce
+        Controls[string.format("text_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        -- Color changed - auto-send with debounce
+        Controls[string.format("color_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        -- Background color changed - auto-send with debounce
+        Controls[string.format("bgcolor_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        -- Intensity changed - auto-send with debounce
+        Controls[string.format("intensity_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        -- Font/size/align/effect changed - auto-send with debounce
+        Controls[string.format("font_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        Controls[string.format("size_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        Controls[string.format("align_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+        
+        Controls[string.format("effect_%d", i)].EventHandler = function()
+            DebouncedSend(i)
+        end
+    end
+    
+    -- Clear button handlers (JSON format)
     for i = 0, numSegments-1 do
         Controls[string.format("clear_%d", i)].EventHandler = function()
-            local command = string.format("CLEAR|%d", i)
-            if SendCommand(command) then
+            local jsonCmd = string.format('{"cmd":"clear","seg":%d}', i)
+            if SendCommand(jsonCmd) then
                 Controls[string.format("active_%d", i)].Boolean = false
+                Controls[string.format("text_%d", i)].String = ""
             end
         end
     end
     
-    -- Clear all handler
+    -- Invert button handlers (swap color and bgcolor)
+    for i = 0, numSegments-1 do
+        Controls[string.format("invert_%d", i)].EventHandler = function()
+            local colorCtrl = Controls[string.format("color_%d", i)]
+            local bgcolorCtrl = Controls[string.format("bgcolor_%d", i)]
+            
+            -- Swap the values
+            local tempColor = colorCtrl.String
+            colorCtrl.String = bgcolorCtrl.String
+            bgcolorCtrl.String = tempColor
+            
+            print(string.format("⇄ Segment %d colors inverted", i))
+            
+            -- Trigger auto-send (if segment is visible)
+            DebouncedSend(i)
+        end
+    end
+    
+    -- Clear all handler (JSON format)
     Controls.clear_all.EventHandler = function()
-        if SendCommand("CLEAR_ALL") then
+        local jsonCmd = '{"cmd":"clear_all"}'
+        if SendCommand(jsonCmd) then
             for i = 0, numSegments-1 do
                 Controls[string.format("active_%d", i)].Boolean = false
+                Controls[string.format("text_%d", i)].String = ""
             end
         end
     end
     
-    -- Brightness handler with debounce
+    -- Brightness handler with debounce (JSON format)
     Controls.brightness.EventHandler = function(ctl)
         pendingBrightness = math.floor(ctl.Value)
         
@@ -560,12 +770,17 @@ if Controls then
         brightnessTimer = Timer.New()
         brightnessTimer.EventHandler = function()
             if pendingBrightness then
-                local command = string.format("BRIGHTNESS|%d", pendingBrightness)
-                SendCommand(command)
+                local jsonCmd = string.format('{"cmd":"brightness","value":%d}', pendingBrightness)
+                SendCommand(jsonCmd)
                 pendingBrightness = nil
             end
         end
         brightnessTimer:Start(0.5)
+    end
+    
+    -- Layout change handler
+    Controls.layout.EventHandler = function(ctl)
+        ApplyLayout(ctl.String)
     end
     
     -- IP/Port change handlers
@@ -627,6 +842,12 @@ if Controls then
         end
         if brightnessTimer then
             brightnessTimer:Cancel()
+        end
+        -- Cancel all segment timers
+        for i = 0, numSegments-1 do
+            if segmentTimers[i] then
+                segmentTimers[i]:Cancel()
+            end
         end
     end
     

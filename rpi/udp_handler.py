@@ -87,11 +87,10 @@ class UDPHandler:
         try:
             doc = json.loads(raw)
         except json.JSONDecodeError as e:
-            logger.error(f"[UDP] JSON parse error: {e}  raw: {raw[:120]}")
+            logger.error(f"[UDP] JSON parse error: {e}")
             return
 
         cmd = doc.get("cmd", "")
-        logger.debug(f"[UDP] cmd={cmd}")
 
         if cmd == "text":
             seg     = int(doc.get("seg", 0))
@@ -101,28 +100,20 @@ class UDPHandler:
             align   = str(doc.get("align",   "C"))
             effect  = str(doc.get("effect",  "none"))
             intens  = int(doc.get("intensity", 255))
-            font    = str(doc.get("font",    "arial"))
-            logger.info(
-                f'[UDP] TEXT seg{seg} "{text}" col={color} bg={bgcolor} '
-                f'font={font} al={align} fx={effect} i={intens}'
-            )
             self._sm.update_text(seg, text, color=color, bgcolor=bgcolor,
                                  align=align, effect=effect, intensity=intens)
 
         elif cmd == "clear":
             seg = int(doc.get("seg", 0))
-            logger.info(f"[UDP] CLEAR seg{seg}")
             self._sm.clear_segment(seg)
 
         elif cmd == "clear_all":
-            logger.info("[UDP] CLEAR ALL")
             self._sm.clear_all()
 
         elif cmd == "brightness":
             val = doc.get("value", -1)
             if 0 <= int(val) <= 255:
                 _set_brightness(int(val))
-                logger.info(f"[UDP] BRIGHTNESS {val}")
                 if self._brightness_callback:
                     self._brightness_callback(int(val))
 
@@ -132,7 +123,6 @@ class UDPHandler:
             y   = int(doc.get("y", 0))
             w   = int(doc.get("w", 64))
             h   = int(doc.get("h", 32))
-            logger.info(f"[UDP] CONFIG seg{seg} x={x} y={y} w={w} h={h}")
             self._sm.configure(seg, x, y, w, h)
 
         else:
@@ -145,7 +135,6 @@ class UDPHandler:
             try:
                 data, addr = self._sock.recvfrom(4096)
                 raw = data.decode("utf-8", errors="replace").strip()
-                logger.info(f"[UDP] RX {len(raw)} bytes from {addr[0]}: {raw[:120]}")
                 self.dispatch(raw)
             except socket.timeout:
                 continue

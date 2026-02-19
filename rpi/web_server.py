@@ -204,6 +204,9 @@ function makeOptions(selectedColor) {
     `<option value="${v}"${v===selectedColor?' selected':''}>${n}</option>`).join('');
 }
 
+// Auto-update timers for debouncing
+const autoUpdateTimers = {};
+
 function buildSegmentCards() {
   const grid = document.getElementById('segments-grid');
   grid.innerHTML = '';
@@ -213,14 +216,15 @@ function buildSegmentCards() {
     <div class="card compact${i>0?' inactive':''}" id="segment-card-${i}">
       <h2>Segment ${i+1}</h2>
       <div class="form-group"><label>Text</label>
-        <input type="text" id="text${i}" placeholder="Enter message..."></div>
+        <input type="text" id="text${i}" placeholder="Enter message..." 
+          oninput="autoSendText(${i})"></div>
       <div class="form-group"><label>Text Color</label>
-        <select id="color${i}">${makeOptions(fg)}</select></div>
+        <select id="color${i}" onchange="autoSendText(${i})">${makeOptions(fg)}</select></div>
       <div class="form-group"><label>Background</label>
-        <select id="bgcolor${i}">${makeOptions('#000000')}</select></div>
+        <select id="bgcolor${i}" onchange="autoSendText(${i})">${makeOptions('#000000')}</select></div>
       <div class="form-group"><label>Intensity</label>
         <input type="range" id="intensity${i}" min="0" max="255" value="255"
-          oninput="document.getElementById('iv${i}').textContent=this.value">
+          oninput="document.getElementById('iv${i}').textContent=this.value; autoSendText(${i})">
         <span id="iv${i}" style="color:#888;font-size:.85em;">255</span></div>
       <div class="form-group"><label>Font</label>
         <select id="font${i}">
@@ -232,9 +236,9 @@ function buildSegmentCards() {
           <button class="align-btn" onclick="setAlign(${i},'R',this)">Right</button>
         </div></div>
       <div class="button-group">
-        <button class="btn-primary" onclick="sendText(${i})">Display</button>
         <button class="btn-primary" onclick="previewText(${i})">Preview</button>
         <button class="btn-danger"  onclick="clearSegment(${i})">Clear</button>
+        <button class="btn-secondary" onclick="invertColors(${i})" style="background:#6b7280;">Invert</button>
       </div>
     </div>`;
   }
@@ -244,6 +248,18 @@ buildSegmentCards();
 
 window.addEventListener('load', () => { pollSegments(); setInterval(pollSegments,1000); });
 
+// Auto-send text with debounce (waits 500ms after last keystroke)
+function autoSendText(seg) {
+  // Clear existing timer
+  if (autoUpdateTimers[seg]) {
+    clearTimeout(autoUpdateTimers[seg]);
+  }
+  // Set new timer
+  autoUpdateTimers[seg] = setTimeout(() => {
+    sendText(seg);
+  }, 500);
+}
+
 function pollSegments() {
   fetch('/api/segments').then(r=>r.json()).then(data => {
     if (!data.segments) return;
@@ -252,7 +268,17 @@ function pollSegments() {
     data.segments.forEach(s => {
       segmentBounds[s.id] = {x:s.x,y:s.y,width:s.w,height:s.h};
       const el = document.getElementById('text'+s.id);
-      if (el && document.activeElement!==el) el.value = s.text||'';
+      // Only update text field if it's not focused AND either:
+      // - The field is currently empty, OR
+      // - The server has non-empty text (server state wins)
+      if (el && document.activeElement!==el) {
+        const currentVal = el.value || '';
+        const serverVal = s.text || '';
+        // Update if field is empty OR server has content
+        if (!currentVal || serverVal) {
+          el.value = serverVal;
+        }
+      }
     });
     ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
     data.segments.forEach(s => {
@@ -269,6 +295,8 @@ function setAlign(seg,align,btn) {
   segmentAlign[seg]=align;
   btn.parentElement.querySelectorAll('.align-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  // Auto-send when alignment changes
+  autoSendText(seg);
 }
 function updateSegmentStates(active) {
   for(let i=0;i<4;i++){
@@ -296,6 +324,18 @@ function clearSegment(seg) {
   sendJSON({cmd:'clear',seg});
   const b=segmentBounds[seg]; ctx.fillStyle='#000'; ctx.fillRect(b.x,b.y,b.width,b.height);
 }
+function invertColors(seg) {
+  const colorEl = document.getElementById('color'+seg);
+  const bgcolorEl = document.getElementById('bgcolor'+seg);
+  
+  // Swap the values
+  const tempColor = colorEl.value;
+  colorEl.value = bgcolorEl.value;
+  bgcolorEl.value = tempColor;
+  
+  // Auto-send the changes
+  autoSendText(seg);
+}
 function clearAll() {
   sendJSON({cmd:'clear_all'}); ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
 }
@@ -304,30 +344,67 @@ function updateBrightness(v) {
   sendJSON({cmd:'brightness',value:parseInt(v)});
 }
 function applyLayout(type) {
-  let cmds=[],clr=[];
+  // Save current text content from input fields BEFORE reconfiguring
+  const savedText = [];
+  for(let i=0; i<4; i++) {
+    const el = document.getElementById('text'+i);
+    savedText[i] = el ? el.value : '';
+  }
+  
+  let cmds=[],clr=[],activeSegs=[];
+  
+  // FIRST: Clear all segments to reset state
+  for(let i=0; i<4; i++) {
+    cmds.push({cmd:'clear',seg:i});
+  }
+  
   if(type==='split-vertical') {
-    updateSegmentStates([0,1]);
+    activeSegs=[0,1];
     segmentBounds[0]={x:0,y:0,width:32,height:32}; segmentBounds[1]={x:32,y:0,width:32,height:32};
     segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
-    cmds=[{cmd:'config',seg:0,x:0,y:0,w:32,h:32},{cmd:'config',seg:1,x:32,y:0,w:32,h:32}]; clr=[2,3];
+    cmds.push({cmd:'config',seg:0,x:0,y:0,w:32,h:32},{cmd:'config',seg:1,x:32,y:0,w:32,h:32});
   } else if(type==='split-horizontal') {
-    updateSegmentStates([0,1]);
+    activeSegs=[0,1];
     segmentBounds[0]={x:0,y:0,width:64,height:16}; segmentBounds[1]={x:0,y:16,width:64,height:16};
     segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
-    cmds=[{cmd:'config',seg:0,x:0,y:0,w:64,h:16},{cmd:'config',seg:1,x:0,y:16,w:64,h:16}]; clr=[2,3];
+    cmds.push({cmd:'config',seg:0,x:0,y:0,w:64,h:16},{cmd:'config',seg:1,x:0,y:16,w:64,h:16});
   } else if(type==='quad') {
-    updateSegmentStates([0,1,2,3]);
+    activeSegs=[0,1,2,3];
     segmentBounds[0]={x:0,y:0,width:32,height:16}; segmentBounds[1]={x:32,y:0,width:32,height:16};
     segmentBounds[2]={x:0,y:16,width:32,height:16}; segmentBounds[3]={x:32,y:16,width:32,height:16};
-    cmds=[{cmd:'config',seg:0,x:0,y:0,w:32,h:16},{cmd:'config',seg:1,x:32,y:0,w:32,h:16},
-          {cmd:'config',seg:2,x:0,y:16,w:32,h:16},{cmd:'config',seg:3,x:32,y:16,w:32,h:16}];
+    cmds.push({cmd:'config',seg:0,x:0,y:0,w:32,h:16},{cmd:'config',seg:1,x:32,y:0,w:32,h:16},
+              {cmd:'config',seg:2,x:0,y:16,w:32,h:16},{cmd:'config',seg:3,x:32,y:16,w:32,h:16});
   } else if(type==='fullscreen') {
-    updateSegmentStates([0]);
+    activeSegs=[0];
     segmentBounds[0]={x:0,y:0,width:64,height:32};
     segmentBounds[1]=segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
-    cmds=[{cmd:'config',seg:0,x:0,y:0,w:64,h:32}]; clr=[1,2,3];
+    cmds.push({cmd:'config',seg:0,x:0,y:0,w:64,h:32});
   }
-  cmds.forEach(c=>sendJSON(c)); clr.forEach(s=>sendJSON({cmd:'clear',seg:s}));
+  
+  // Update UI state
+  updateSegmentStates(activeSegs);
+  
+  // Send all commands in sequence
+  cmds.forEach(c=>sendJSON(c));
+  
+  // Restore text content for active segments that had text
+  setTimeout(() => {
+    activeSegs.forEach(seg => {
+      const text = savedText[seg];
+      if (text && text.trim()) {
+        // Restore to input field
+        const el = document.getElementById('text'+seg);
+        if (el) el.value = text;
+        // Send to server to preserve on backend
+        const color = document.getElementById('color'+seg).value.replace('#','');
+        const bgcolor = document.getElementById('bgcolor'+seg).value.replace('#','');
+        const intensity = parseInt(document.getElementById('intensity'+seg).value);
+        const align = segmentAlign[seg];
+        sendJSON({cmd:'text',seg,text,color,bgcolor,font:'arial',size:'auto',align,effect:'none',intensity});
+      }
+    });
+  }, 200);
+  
   ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
 }
 function drawSegmentOnCanvas(seg,text,color,bgcolor,align) {
