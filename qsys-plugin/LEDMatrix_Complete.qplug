@@ -1,6 +1,12 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.6.0 - Pin grouping fix
+-- Version 3.7.0 - Clear pin names without grouping
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.7.0 Changes:
+--   - Removed PrettyName grouping approach (not working in Q-SYS Designer)
+--   - Renamed all controls with clear segment prefixes: seg1_text, seg2_text, etc.
+--   - All 48 segment pins now clearly labeled and individually accessible
+--   - Alphabetical sorting in Control Pins window makes segments easy to find
 --
 -- v3.6.0 Changes:
 --   - Fixed pin grouping in Q-SYS Designer Control Pins window
@@ -22,9 +28,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.6.0",
-    Id = "dhpke.olimex.led.matrix.3.6.0",
-    Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix",
+    Version = "3.7.0",
+    Id = "dhpke.olimex.led.matrix.3.7.0",
+    Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix - Clearly labeled segment pins",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -59,8 +65,7 @@ function GetControls(props)
         ControlType = "Text",
         Count = 1,
         UserPin = true,
-        PinStyle = "Input",
-        PrettyName = "Connection~IP Address"
+        PinStyle = "Input"
     })
     
     table.insert(controls, {
@@ -68,8 +73,7 @@ function GetControls(props)
         ControlType = "Text",
         Count = 1,
         UserPin = true,
-        PinStyle = "Input",
-        PrettyName = "Connection~UDP Port"
+        PinStyle = "Input"
     })
     
     table.insert(controls, {
@@ -78,8 +82,7 @@ function GetControls(props)
         IndicatorType = "Status",
         Count = 1,
         UserPin = true,
-        PinStyle = "Output",
-        PrettyName = "Connection~Status"
+        PinStyle = "Output"
     })
     
     table.insert(controls, {
@@ -96,8 +99,7 @@ function GetControls(props)
         ControlType = "Text",
         Count = 1,
         UserPin = true,
-        PinStyle = "Both",
-        PrettyName = "Layout~Layout"
+        PinStyle = "Both"
     })
     
     table.insert(controls, {
@@ -106,8 +108,7 @@ function GetControls(props)
         ButtonType = "Trigger",
         Count = 1,
         UserPin = true,
-        PinStyle = "Input",
-        PrettyName = "Layout~Apply"
+        PinStyle = "Input"
     })
     
     -- Segment controls (4 segments)
@@ -116,129 +117,117 @@ function GetControls(props)
         
         -- Text input
         table.insert(controls, {
-            Name = string.format("text_%d", seg),
+            Name = string.format("seg%d_text", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Text", segNum)
+            PinStyle = "Both"
         })
         
         -- Text color selector
         table.insert(controls, {
-            Name = string.format("text_color_%d", seg),
+            Name = string.format("seg%d_text_color", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Text Color", segNum)
+            PinStyle = "Both"
         })
         
         -- Background color selector
         table.insert(controls, {
-            Name = string.format("bg_color_%d", seg),
+            Name = string.format("seg%d_bg_color", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~BG Color", segNum)
+            PinStyle = "Both"
         })
         
         -- Alignment selector
         table.insert(controls, {
-            Name = string.format("align_%d", seg),
+            Name = string.format("seg%d_align", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Align", segNum)
+            PinStyle = "Both"
         })
 
         -- Effect selector
         table.insert(controls, {
-            Name = string.format("effect_%d", seg),
+            Name = string.format("seg%d_effect", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Effect", segNum)
+            PinStyle = "Both"
         })
         
         -- Font selector
         table.insert(controls, {
-            Name = string.format("font_%d", seg),
+            Name = string.format("seg%d_font", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Font", segNum)
+            PinStyle = "Both"
         })
 
         -- Font size selector
         table.insert(controls, {
-            Name = string.format("size_%d", seg),
+            Name = string.format("seg%d_size", segNum),
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Font Size", segNum)
+            PinStyle = "Both"
         })
         
         -- Intensity control
         table.insert(controls, {
-            Name = string.format("intensity_%d", seg),
+            Name = string.format("seg%d_intensity", segNum),
             ControlType = "Knob",
             ControlUnit = "Integer",
             Min = 0,
             Max = 255,
             Count = 1,
             UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Segment %d~Intensity", segNum)
+            PinStyle = "Both"
         })
 
         -- Send button
         table.insert(controls, {
-            Name = string.format("send_%d", seg),
+            Name = string.format("seg%d_send", segNum),
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input",
-            PrettyName = string.format("Segment %d~Send", segNum)
+            PinStyle = "Input"
         })
         
         -- Clear button
         table.insert(controls, {
-            Name = string.format("clear_%d", seg),
+            Name = string.format("seg%d_clear", segNum),
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input",
-            PrettyName = string.format("Segment %d~Clear", segNum)
+            PinStyle = "Input"
         })
         
         -- Invert button (swaps text and background colors)
         table.insert(controls, {
-            Name = string.format("invert_%d", seg),
+            Name = string.format("seg%d_invert", segNum),
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input",
-            PrettyName = string.format("Segment %d~Invert", segNum)
+            PinStyle = "Input"
         })
         
         -- Active indicator
         table.insert(controls, {
-            Name = string.format("active_%d", seg),
+            Name = string.format("seg%d_active", segNum),
             ControlType = "Indicator",
             IndicatorType = "LED",
             Count = 1,
             UserPin = true,
-            PinStyle = "Output",
-            PrettyName = string.format("Segment %d~Active", segNum)
+            PinStyle = "Output"
         })
     end
     
@@ -251,8 +240,7 @@ function GetControls(props)
         Max = 255,
         Count = 1,
         UserPin = true,
-        PinStyle = "Both",
-        PrettyName = "Global~Brightness"
+        PinStyle = "Both"
     })
     
     table.insert(controls, {
@@ -261,8 +249,7 @@ function GetControls(props)
         ButtonType = "Trigger",
         Count = 1,
         UserPin = true,
-        PinStyle = "Input",
-        PrettyName = "Global~Clear All"
+        PinStyle = "Input"
     })
     
     return controls
@@ -545,15 +532,15 @@ if Controls then
 
     -- Build a JSON "text" command for a segment from current control values.
     local function BuildTextCommand(seg)
-        local s       = tostring(seg)
-        local text    = Controls["text_"..s].String
-        local color   = ColorNames[Controls["text_color_"..s].String] or "FFFFFF"
-        local bgcolor = ColorNames[Controls["bg_color_"..s].String]   or "000000"
-        local font    = FontMap[Controls["font_"..s].String]          or "arial"
-        local size    = Controls["size_"..s].String                   or "auto"
-        local align   = AlignMap[Controls["align_"..s].String]        or "C"
-        local effect  = Controls["effect_"..s].String                 or "none"
-        local intens  = math.floor(Controls["intensity_"..s].Value)
+        local segName = "seg"..(seg+1).."_"
+        local text    = Controls[segName.."text"].String
+        local color   = ColorNames[Controls[segName.."text_color"].String] or "FFFFFF"
+        local bgcolor = ColorNames[Controls[segName.."bg_color"].String]   or "000000"
+        local font    = FontMap[Controls[segName.."font"].String]          or "arial"
+        local size    = Controls[segName.."size"].String                   or "auto"
+        local align   = AlignMap[Controls[segName.."align"].String]        or "C"
+        local effect  = Controls[segName.."effect"].String                 or "none"
+        local intens  = math.floor(Controls[segName.."intensity"].Value)
 
         local json = buildJson({
             cmd       = "text",
@@ -573,7 +560,7 @@ if Controls then
     -- ── Initialize ─────────────────────────────────────────────────
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.4.0 Initializing")
+        print("LED Matrix Complete v3.7.0 Initializing")
         print("===========================================")
 
         Controls.ip_address.String   = ip_addr
@@ -599,23 +586,23 @@ if Controls then
 
         local defaultColors = {"White","Lime","Red","Yellow"}
         for seg = 0, 3 do
-            local s = tostring(seg)
-            Controls["text_color_"..s].Choices = colorChoices
-            Controls["bg_color_"..s].Choices   = bgChoices
-            Controls["font_"..s].Choices       = fontChoices
-            Controls["size_"..s].Choices       = sizeChoices
-            Controls["align_"..s].Choices      = alignChoices
-            Controls["effect_"..s].Choices     = effectChoices
+            local segName = "seg"..(seg+1).."_"
+            Controls[segName.."text_color"].Choices = colorChoices
+            Controls[segName.."bg_color"].Choices   = bgChoices
+            Controls[segName.."font"].Choices       = fontChoices
+            Controls[segName.."size"].Choices       = sizeChoices
+            Controls[segName.."align"].Choices      = alignChoices
+            Controls[segName.."effect"].Choices     = effectChoices
 
-            Controls["text_"..s].String        = ""
-            Controls["text_color_"..s].String  = defaultColors[seg + 1]
-            Controls["bg_color_"..s].String    = "Black"
-            Controls["intensity_"..s].Value    = 255
-            Controls["font_"..s].String        = "Arial"
-            Controls["size_"..s].String        = "auto"
-            Controls["align_"..s].String       = "Center"
-            Controls["effect_"..s].String      = "none"
-            Controls["active_"..s].Boolean     = false
+            Controls[segName.."text"].String        = ""
+            Controls[segName.."text_color"].String  = defaultColors[seg + 1]
+            Controls[segName.."bg_color"].String    = "Black"
+            Controls[segName.."intensity"].Value    = 255
+            Controls[segName.."font"].String        = "Arial"
+            Controls[segName.."size"].String        = "auto"
+            Controls[segName.."align"].String       = "Center"
+            Controls[segName.."effect"].String      = "none"
+            Controls[segName.."active"].Boolean     = false
         end
 
         ReopenSocket()
@@ -649,7 +636,7 @@ if Controls then
 
         -- Update LED indicators
         for seg = 0, 3 do
-            Controls["active_"..tostring(seg)].Boolean = activeLayoutSegments[seg] == true
+            Controls["seg"..(seg+1).."_active"].Boolean = activeLayoutSegments[seg] == true
         end
 
         -- After a short settling delay, push text content to active segments
@@ -663,29 +650,29 @@ if Controls then
 
     -- ── Per-segment send / clear handlers ──────────────────────────
     for seg = 0, 3 do
-        local s = tostring(seg)
+        local segName = "seg"..(seg+1).."_"
 
         -- Manual "Display" button — can activate a segment even if not in current layout
-        Controls["send_"..s].EventHandler = function()
+        Controls[segName.."send"].EventHandler = function()
             local text, cmd = BuildTextCommand(seg)
             if SendCommand(cmd) then
-                Controls["active_"..s].Boolean = true
+                Controls[segName.."active"].Boolean = true
                 activeLayoutSegments[seg] = true
             end
         end
 
         -- Manual "Clear" button — deactivates segment
-        Controls["clear_"..s].EventHandler = function()
+        Controls[segName.."clear"].EventHandler = function()
             if SendCommand(buildJson({cmd="clear", seg=seg})) then
-                Controls["active_"..s].Boolean = false
+                Controls[segName.."active"].Boolean = false
                 activeLayoutSegments[seg] = nil
             end
         end
         
         -- "Invert" button — swaps text color and background color
-        Controls["invert_"..s].EventHandler = function()
-            local textColorCtrl = Controls["text_color_"..s]
-            local bgColorCtrl = Controls["bg_color_"..s]
+        Controls[segName.."invert"].EventHandler = function()
+            local textColorCtrl = Controls[segName.."text_color"]
+            local bgColorCtrl = Controls[segName.."bg_color"]
             
             -- Swap the values
             local tempColor = textColorCtrl.String
@@ -709,18 +696,18 @@ if Controls then
         end
         
         -- Text input auto-sends immediately when changed (only if segment is active)
-        Controls["text_"..s].EventHandler = AutoSend
+        Controls[segName.."text"].EventHandler = AutoSend
         
-        Controls["text_color_"..s].EventHandler = AutoSend
-        Controls["bg_color_"..s].EventHandler   = AutoSend
-        Controls["font_"..s].EventHandler       = AutoSend
-        Controls["align_"..s].EventHandler      = AutoSend
-        Controls["size_"..s].EventHandler       = AutoSend
-        Controls["effect_"..s].EventHandler     = AutoSend
+        Controls[segName.."text_color"].EventHandler = AutoSend
+        Controls[segName.."bg_color"].EventHandler   = AutoSend
+        Controls[segName.."font"].EventHandler       = AutoSend
+        Controls[segName.."align"].EventHandler      = AutoSend
+        Controls[segName.."size"].EventHandler       = AutoSend
+        Controls[segName.."effect"].EventHandler     = AutoSend
 
-        Controls["intensity_"..s].EventHandler = function(ctl)
+        Controls[segName.."intensity"].EventHandler = function(ctl)
             if not activeLayoutSegments[seg] then return end
-            Debounce("intensity_"..s, 0.5, function()
+            Debounce("intensity_"..seg, 0.5, function()
                 local _, cmd = BuildTextCommand(seg)
                 SendCommand(cmd)
             end)
@@ -731,7 +718,7 @@ if Controls then
     Controls.clear_all.EventHandler = function()
         if SendCommand(buildJson({cmd="clear_all"})) then
             for seg = 0, 3 do
-                Controls["active_"..tostring(seg)].Boolean = false
+                Controls["seg"..(seg+1).."_active"].Boolean = false
             end
         end
     end
