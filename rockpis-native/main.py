@@ -121,6 +121,7 @@ def main():
     last_effect_time = time.time()
     frame_count = 0
     last_fps_time = time.time()
+    last_render = None  # Track if we need to re-render
 
     try:
         while not shutdown_requested:
@@ -131,7 +132,8 @@ def main():
                 sm.update_effects()
                 last_effect_time = now
 
-            # ── Render all segments to back buffer ───────────────────────
+            # ── Render all segments to back buffer (only when needed) ────
+            # Always render to keep display active, but at controlled rate
             renderer.render()
             
             # ── Swap buffers (display what we just rendered) ─────────────
@@ -143,13 +145,13 @@ def main():
                 fps = frame_count / (now - last_fps_time)
                 status = driver.get_status()
                 logger.info(f"Status: Render {fps:.1f} FPS, "
-                           f"Display {status['refresh_rate']} Hz, "
+                           f"Display {status['refresh_rate']:.0f} Hz, "
                            f"Brightness {status['brightness']}/255")
                 frame_count = 0
                 last_fps_time = now
 
-            # ── Small delay to target ~20 FPS rendering ──────────────────
-            time.sleep(max(0.001, EFFECT_INTERVAL - (time.time() - now)))
+            # ── Delay to target ~30 FPS rendering (smoother than 20) ─────
+            time.sleep(0.033)  # ~30 FPS
 
     except KeyboardInterrupt:
         logger.info("\n⚠  Keyboard interrupt received")

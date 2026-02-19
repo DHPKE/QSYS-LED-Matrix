@@ -39,19 +39,31 @@ class TextRenderer:
     def render(self):
         """
         Render all active segments to the driver's back buffer
+        Only clears and re-renders if segments have changed
         """
-        # Clear back buffer
-        self.driver.clear(0, 0, 0)
-        
         # Get active segments
         active_segments = self.sm.get_active_segments()
         
-        if not active_segments:
+        # Check if any segment is dirty (needs re-render)
+        needs_render = False
+        for seg_data in active_segments.values():
+            if seg_data.get('dirty', True):  # Default to True if not present
+                needs_render = True
+                break
+        
+        # If nothing changed and we have content, skip render to avoid flashing
+        if not needs_render and hasattr(self, '_last_rendered') and self._last_rendered:
             return
         
-        # Render each segment
+        # Clear back buffer completely
+        self.driver.clear(0, 0, 0)
+        
+        # Render each active segment
         for seg_id, seg_data in active_segments.items():
             self.render_segment(seg_data)
+        
+        # Mark that we've rendered content
+        self._last_rendered = len(active_segments) > 0
     
     def render_segment(self, seg_data: dict):
         """
