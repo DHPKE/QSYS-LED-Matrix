@@ -1,12 +1,16 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.7.0 - Clear pin names without grouping
+-- Version 3.8.0 - Fixed pin grouping in GetControlLayout
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.8.0 Changes:
+--   - FIXED: PrettyName grouping now set in GetControlLayout() (not GetControls())
+--   - This is where Q-SYS reads grouped pin names for Control Pins window
+--   - Format: "Segment 1~Text", "Segment 1~Text Color", etc.
+--   - All 48 segment pins organized in collapsible groups
 --
 -- v3.7.0 Changes:
 --   - Removed PrettyName grouping approach (not working in Q-SYS Designer)
 --   - Renamed all controls with clear segment prefixes: seg1_text, seg2_text, etc.
---   - All 48 segment pins now clearly labeled and individually accessible
---   - Alphabetical sorting in Control Pins window makes segments easy to find
 --
 -- v3.6.0 Changes:
 --   - Fixed pin grouping in Q-SYS Designer Control Pins window
@@ -28,9 +32,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.7.0",
-    Id = "dhpke.olimex.led.matrix.3.7.0",
-    Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix - Clearly labeled segment pins",
+    Version = "3.8.0",
+    Id = "dhpke.olimex.led.matrix.3.8.0",
+    Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix - Grouped pins",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -281,7 +285,7 @@ function GetControlLayout(props)
     -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
         StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
-    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.5.0",
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.8.0",
         Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
         Color={255,255,255}, Position={0,9}, Size={W,20}})
 
@@ -292,23 +296,23 @@ function GetControlLayout(props)
     Lbl("Port",       138, y+5,  62)
     Lbl("Status",     208, y+5,  62)
     Lbl("Last Command", 278, y+5, W-284)
-    layout["ip_address"]        = {PrettyName="IP Address",   Style="Text",
+    layout["ip_address"]        = {PrettyName="Connection~IP Address",   Style="Text",
         Position={6,   y+18}, Size={124, CH}}
-    layout["udp_port"]          = {PrettyName="Port",         Style="Text",
+    layout["udp_port"]          = {PrettyName="Connection~Port",         Style="Text",
         Position={138, y+18}, Size={62,  CH}}
-    layout["connection_status"] = {PrettyName="Status",       Style="Indicator",
+    layout["connection_status"] = {PrettyName="Connection~Status",       Style="Indicator",
         Position={208, y+18}, Size={62,  CH}}
-    layout["last_command"]      = {PrettyName="Last Command", Style="Text",
+    layout["last_command"]      = {PrettyName="Connection~Last Command", Style="Text",
         Position={278, y+18}, Size={W-284, CH}}
 
     -- ── Display Layout ─────────────────────────────────────────────
     y = y + 60
     GBox(0, y, W, 50, "Display Layout")
     Lbl("Layout Preset", 6, y+5, 190)
-    layout["layout"] = {PrettyName="Layout Preset", Style="ComboBox",
+    layout["layout"] = {PrettyName="Layout~Preset", Style="ComboBox",
         IsReadOnly=false,
         Position={6, y+18}, Size={190, CH}}
-    layout["apply_layout"] = {PrettyName="Apply", Style="Button",
+    layout["apply_layout"] = {PrettyName="Layout~Apply", Style="Button",
         ButtonStyle="Trigger", Legend="Apply Layout", Color=C_BTN_B,
         Position={204, y+18}, Size={130, CH}}
 
@@ -321,52 +325,54 @@ function GetControlLayout(props)
     local SEG_H = 122
 
     for seg = 0, 3 do
-        local s  = tostring(seg)
+        local segNum = seg + 1  -- Display as Segment 1-4
+        local segName = "seg"..segNum.."_"
+        local groupName = "Segment "..segNum
         local sy = y + seg * (SEG_H + 4)
 
-        GBox(0, sy, W, SEG_H, "Segment " .. (seg+1))
+        GBox(0, sy, W, SEG_H, groupName)
 
         -- Row 1
         local r1 = sy + 16
-        layout["active_"..s] = {PrettyName="Active", Style="Led",
+        layout[segName.."active"] = {PrettyName=groupName.."~Active", Style="Led",
             Position={6, r1+5}, Size={14, 14}}
         Lbl("Text", 26, r1-12, W-230)
-        layout["text_"..s]  = {PrettyName="Text", Style="Text",
+        layout[segName.."text"]  = {PrettyName=groupName.."~Text", Style="Text",
             Position={26, r1}, Size={W-232, CH}}
-        layout["send_"..s]  = {PrettyName="Display", Style="Button",
+        layout[segName.."send"]  = {PrettyName=groupName.."~Send", Style="Button",
             ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
             Position={W-300, r1}, Size={95, BH}}
-        layout["invert_"..s] = {PrettyName="Invert", Style="Button",
+        layout[segName.."invert"] = {PrettyName=groupName.."~Invert", Style="Button",
             ButtonStyle="Trigger", Legend="Invert", Color=C_BTN_B,
             Position={W-199,  r1}, Size={95, BH}}
-        layout["clear_"..s] = {PrettyName="Clear", Style="Button",
+        layout[segName.."clear"] = {PrettyName=groupName.."~Clear", Style="Button",
             ButtonStyle="Trigger", Legend="Clear", Color=C_BTN_R,
             Position={W-98,  r1}, Size={92, BH}}
 
         -- Row 2: 6 ComboBoxes
         local r2 = sy + 52
-        -- {label, control_name_prefix, width}
+        -- {label, control_name_suffix, display_name, width}
         local cols = {
-            {"Text Color", "text_color_", 114},
-            {"BG Color",   "bg_color_",   114},
-            {"Font",       "font_",        84},
-            {"Size",       "size_",        68},
-            {"Align",      "align_",       78},
-            {"Effect",     "effect_",      96},
+            {"Text Color", "text_color", "Text Color", 114},
+            {"BG Color",   "bg_color",   "BG Color",   114},
+            {"Font",       "font",        "Font",        84},
+            {"Size",       "size",        "Size",        68},
+            {"Align",      "align",       "Align",       78},
+            {"Effect",     "effect",      "Effect",      96},
         }
         local cx = 6
         for _, col in ipairs(cols) do
-            Lbl(col[1], cx, r2-13, col[3])
-            layout[col[2]..s] = {PrettyName=col[1], Style="ComboBox",
+            Lbl(col[1], cx, r2-13, col[4])
+            layout[segName..col[2]] = {PrettyName=groupName.."~"..col[3], Style="ComboBox",
                 IsReadOnly=false,
-                Position={cx, r2}, Size={col[3], CH}}
-            cx = cx + col[3] + 6
+                Position={cx, r2}, Size={col[4], CH}}
+            cx = cx + col[4] + 6
         end
 
         -- Row 3: Intensity fader
         local r3 = sy + 88
         Lbl("Intensity  (0 = off, 255 = full)", 6, r3-13, 260)
-        layout["intensity_"..s] = {PrettyName="Intensity", Style="Fader",
+        layout[segName.."intensity"] = {PrettyName=groupName.."~Intensity", Style="Fader",
             Position={6, r3}, Size={W-14, 22}}
     end
 
@@ -374,9 +380,9 @@ function GetControlLayout(props)
     y = y + 4 * (SEG_H + 4) + 4
     GBox(0, y, W, 64, "Global Controls")
     Lbl("Global Brightness", 6, y+5, 220)
-    layout["brightness"] = {PrettyName="Global Brightness", Style="Fader",
+    layout["brightness"] = {PrettyName="Global~Brightness", Style="Fader",
         Position={6, y+18}, Size={340, 36}}
-    layout["clear_all"] = {PrettyName="Clear All", Style="Button",
+    layout["clear_all"] = {PrettyName="Global~Clear All", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All Segments", Color=C_BTN_R,
         Position={354, y+18}, Size={200, 36}}
 
@@ -560,7 +566,7 @@ if Controls then
     -- ── Initialize ─────────────────────────────────────────────────
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.7.0 Initializing")
+        print("LED Matrix Complete v3.8.0 Initializing")
         print("===========================================")
 
         Controls.ip_address.String   = ip_addr
