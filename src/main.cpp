@@ -1,26 +1,24 @@
 /*
- * Olimex ESP32 Gateway LED Matrix Text Display
- * WLED-based firmware for 64x32 HUB75 LED Matrix
- * Receives UDP commands from Q-SYS plugin to display dynamic text
- * 
- * Compatible with Arduino IDE
- * 
+ * WT32-ETH01 LED Matrix Controller
+ * Ethernet firmware for 64x32 HUB75 LED Matrix
+ * Receives UDP JSON commands from Q-SYS plugin to display dynamic text
+ *
  * Hardware:
- * - Olimex ESP32 Gateway (ALL revisions A-I)
+ * - WT32-ETH01 (ESP32 + LAN8720, ETH_CLOCK_GPIO0_OUT)
  * - 64x32 HUB75 LED Matrix Panel
- * 
- * Author: Generated for DHPKE/OlimexLED-Matrix
- * Version: 1.2.0 - Critical fixes applied
- * 
- * CHANGELOG v1.2.0:
- * - FIXED: GPIO17→GPIO32 (Ethernet PHY conflict, rev D+ compatibility)
- * - FIXED: BRIGHTNESS command parsing (now works as documented)
- * - FIXED: UDP command bounds checking (memory safety)
- * - FIXED: Web test command now actually executes commands
- * - ADDED: Watchdog timer (10 second timeout)
- * - ADDED: WiFi configuration compile-time warning
- * - IMPROVED: UDP buffer size reduced to 256 bytes (was wasteful)
- * - IMPROVED: Error messages and validation throughout
+ *
+ * Author: Generated for DHPKE/QSYS-LED-Matrix
+ * Version: 2.0.0
+ *
+ * CHANGELOG v2.0.0:
+ * - PORTED: WiFi (Olimex ESP32 Gateway) → Ethernet (WT32-ETH01)
+ * - CHANGED: ETH.begin() with ETH_CLOCK_GPIO0_OUT (ESP32 drives 50 MHz to LAN8720)
+ * - CHANGED: UDP protocol from pipe-delimited to JSON
+ * - CHANGED: Pin assignments for WT32-ETH01 (no ETH GPIO conflicts)
+ * - ADDED: Hostname wt32-led-matrix
+ * - ADDED: IP address in /api/config response
+ * - IMPROVED: text_renderer.h — correct x1/y1 offset handling, border support
+ * - IMPROVED: segment_manager.h — clearSegment() deactivates and marks dirty
  */
 
 #include <Arduino.h>
@@ -70,8 +68,8 @@ void handleTest(AsyncWebServerRequest *request);
 void setup() {
     Serial.begin(115200);
     Serial.println("\n\n==================================");
-    Serial.println("Olimex LED Matrix Text Display");
-    Serial.println("Version: 1.2.0");
+    Serial.println("WT32-ETH01 LED Matrix Controller");
+    Serial.println("Version: 2.0.0");
     Serial.println("==================================\n");
     
     // Initialize watchdog timer
@@ -271,12 +269,15 @@ void setupEthernet() {
     // WT32-ETH01 Ethernet configuration
     // PHY Type    : LAN8720A
     // PHY Address : 1
-    // Power Pin   : -1 (no enable pin; PHY is always powered on WT32-ETH01)
+    // Power Pin   : -1 (no dedicated enable pin; PHY is always powered)
     // MDC Pin     : 23
     // MDIO Pin    : 18
-    // Clock Mode  : ETH_CLOCK_GPIO0_IN (50 MHz external oscillator on GPIO0)
+    // Clock Mode  : ETH_CLOCK_GPIO0_OUT
+    //               The ESP32 outputs a 50 MHz ref clock on GPIO0 to drive
+    //               the LAN8720A. The WT32-ETH01 has no standalone oscillator.
+    //               GPIO0_IN would listen for an external clock — wrong here.
     
-    if (!ETH.begin(1, -1, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN)) {
+    if (!ETH.begin(1, -1, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_OUT)) {
         Serial.println("ERROR: Ethernet initialization failed!");
         return;
     }
@@ -1514,6 +1515,7 @@ void handleRoot(AsyncWebServerRequest *request) {
 void handleConfig(AsyncWebServerRequest *request) {
     StaticJsonDocument<512> doc;
     
+    doc["ip_address"] = ETH.localIP().toString();
     doc["udp_port"] = UDP_PORT;
     doc["brightness"] = currentBrightness;
     doc["matrix_width"] = LED_MATRIX_WIDTH;
