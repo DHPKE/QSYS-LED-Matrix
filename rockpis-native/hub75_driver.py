@@ -137,51 +137,93 @@ class HUB75Driver:
     
     def set_address(self, row: int):
         """Set row address lines (A, B, C, D) for scanning"""
-        self._set_pin('A', row & 0x01)
-        self._set_pin('B', (row >> 1) & 0x01)
-        self._set_pin('C', (row >> 2) & 0x01)
-        self._set_pin('D', (row >> 3) & 0x01)
+        # Cache request objects for speed
+        from gpiod.line import Value
+        a_chip, a_off = self.gpio_pins['A']
+        b_chip, b_off = self.gpio_pins['B']
+        c_chip, c_off = self.gpio_pins['C']
+        d_chip, d_off = self.gpio_pins['D']
+        a_req = self.requests[a_chip]
+        b_req = self.requests[b_chip]
+        c_req = self.requests[c_chip]
+        d_req = self.requests[d_chip]
+        
+        # Set address bits directly
+        a_req.set_value(a_off, Value.ACTIVE if row & 0x01 else Value.INACTIVE)
+        b_req.set_value(b_off, Value.ACTIVE if (row >> 1) & 0x01 else Value.INACTIVE)
+        c_req.set_value(c_off, Value.ACTIVE if (row >> 2) & 0x01 else Value.INACTIVE)
+        d_req.set_value(d_off, Value.ACTIVE if (row >> 3) & 0x01 else Value.INACTIVE)
     
     def shift_out_row(self, row: int):
         """
-        Shift out one row of data for both panels
+        Shift out one row of data for both panels - OPTIMIZED
         Args:
             row: Row number (0-15)
         """
-        # Calculate which rows to display (top and bottom panel)
+        from gpiod.line import Value
+        
+        # Cache GPIO request objects and offsets for inner loop speed
+        r1_chip, r1_off = self.gpio_pins['R1']
+        g1_chip, g1_off = self.gpio_pins['G1']
+        b1_chip, b1_off = self.gpio_pins['B1']
+        r2_chip, r2_off = self.gpio_pins['R2']
+        g2_chip, g2_off = self.gpio_pins['G2']
+        b2_chip, b2_off = self.gpio_pins['B2']
+        clk_chip, clk_off = self.gpio_pins['CLK']
+        
+        r1_req = self.requests[r1_chip]
+        g1_req = self.requests[g1_chip]
+        b1_req = self.requests[b1_chip]
+        r2_req = self.requests[r2_chip]
+        g2_req = self.requests[g2_chip]
+        b2_req = self.requests[b2_chip]
+        clk_req = self.requests[clk_chip]
+        
+        # Cache values for speed
+        brightness = self.brightness
+        front_buffer = self.front_buffer
         top_row = row
         bottom_row = row + self.rows
+        ACTIVE = Value.ACTIVE
+        INACTIVE = Value.INACTIVE
         
-        # Shift out all columns for this row
-        for x in range(self.width):
+        # Shift out all 64 columns for this row
+        for x in range(64):  # Hardcode for speed
             # Get pixel colors
-            r1, g1, b1 = self.front_buffer[top_row][x]
-            r2, g2, b2 = self.front_buffer[bottom_row][x]
+            r1, g1, b1 = front_buffer[top_row][x]
+            r2, g2, b2 = front_buffer[bottom_row][x]
             
-            # Apply brightness
-            r1 = (r1 * self.brightness) >> 8
-            g1 = (g1 * self.brightness) >> 8
-            b1 = (b1 * self.brightness) >> 8
-            r2 = (r2 * self.brightness) >> 8
-            g2 = (g2 * self.brightness) >> 8
-            b2 = (b2 * self.brightness) >> 8
+            # Apply brightness and threshold (1-bit color)
+            r1 = ACTIVE if (r1 * brightness) > 32512 else INACTIVE  # 127 * 256
+            g1 = ACTIVE if (g1 * brightness) > 32512 else INACTIVE
+            b1 = ACTIVE if (b1 * brightness) > 32512 else INACTIVE
+            r2 = ACTIVE if (r2 * brightness) > 32512 else INACTIVE
+            g2 = ACTIVE if (g2 * brightness) > 32512 else INACTIVE
+            b2 = ACTIVE if (b2 * brightness) > 32512 else INACTIVE
             
-            # Set data lines (1-bit for now, can add PWM later)
-            self._set_pin('R1', 1 if r1 > 127 else 0)
-            self._set_pin('G1', 1 if g1 > 127 else 0)
-            self._set_pin('B1', 1 if b1 > 127 else 0)
-            self._set_pin('R2', 1 if r2 > 127 else 0)
-            self._set_pin('G2', 1 if g2 > 127 else 0)
-            self._set_pin('B2', 1 if b2 > 127 else 0)
+            # Set data lines directly (no function call overhead)
+            r1_req.set_value(r1_off, r1)
+            g1_req.set_value(g1_off, g1)
+            b1_req.set_value(b1_off, b1)
+            r2_req.set_value(r2_off, r2)
+            g2_req.set_value(g2_off, g2)
+            b2_req.set_value(b2_off, b2)
             
             # Clock pulse
-            self._set_pin('CLK', 1)
-            self._set_pin('CLK', 0)
+            clk_req.set_value(clk_off, ACTIVE)
+            clk_req.set_value(clk_off, INACTIVE)
     
     def display_row(self, row: int):
-        """Display one row on the matrix"""
-        # Disable output while updating
-        self._set_pin('OE', 1)
+        """Display one row on the matrix - OPTIMIZED"""
+        from gpiod.line import Value
+        
+        # Cache OE and LAT requests
+        oe_chip, oe_off = self.gpio_pins['OE']
+        lat_chip, lat_off = self.gpio_pins['LAT']
+        oe_req = self.requests[oe_chip]
+        lat_req = self.requests[lat_chip]
+        \n        # Disable output while updating
+        oe_req.set_value(oe_off, Value.ACTIVE)
         
         # Set row address
         self.set_address(row)
@@ -190,11 +232,11 @@ class HUB75Driver:
         self.shift_out_row(row)
         
         # Latch data
-        self._set_pin('LAT', 1)
-        self._set_pin('LAT', 0)
+        lat_req.set_value(lat_off, Value.ACTIVE)
+        lat_req.set_value(lat_off, Value.INACTIVE)
         
         # Enable output
-        self._set_pin('OE', 0)
+        oe_req.set_value(oe_off, Value.INACTIVE)
     
     def refresh_loop(self):
         """Main refresh loop - scans all rows continuously"""
