@@ -1,108 +1,170 @@
 #!/bin/bash
-# install.sh — Install the LED Matrix controller on a fresh RPi Zero 2 W
+# install.sh — Install the LED Matrix controller on a Raspberry Pi Zero 2 W
+#              running Raspberry Pi OS (Bookworm / Bullseye)
 #
-# Run as root:  sudo bash install.sh
+# Run WITHOUT sudo:  bash install.sh
+# (Script will prompt for sudo when needed)
 #
 # What this does:
-#   1. Installs system packages (Python 3, Pillow, fonts)
-#   2. Builds and installs rpi-rgb-led-matrix Python bindings
-#   3. Copies app files to /opt/led-matrix
-#   4. Creates config storage directory
-#   5. Installs and enables the systemd service
+#   0. Pre-flight checks (hardware detection, OS check)
+#   1. Blacklist snd_bcm2835 (conflicts with rpi-rgb-led-matrix PWM)
+#   2. Install system packages (Python 3, Pillow, fonts, build tools)
+#   3. Clone and build rpi-rgb-led-matrix library
+#   4. Install Python bindings
+#   5. Copy app files to /opt/led-matrix
+#   6. Install and enable the systemd service
 
 set -e
 
 # Capture script directory FIRST — before any cd commands change $PWD.
+# ${BASH_SOURCE[0]} is the path to this script file regardless of CWD.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=== LED Matrix Controller — Install Script ==="
+echo "========================================="
+echo "RPi Zero 2 W LED Matrix - Installation"
+echo "========================================="
 echo ""
 
-# ── Check running as root ──────────────────────────────────────────────────
-if [ "$EUID" -ne 0 ]; then
-  echo "ERROR: Please run as root:  sudo bash install.sh"
+# ── Check NOT running as root ──────────────────────────────────────────────
+if [ "$EUID" -eq 0 ]; then
+  echo "ERROR: Do not run this script as root (don't use sudo)"
+  echo "The script will prompt for sudo when needed"
   exit 1
 fi
 
-# ── 1. Blacklist snd_bcm2835 (on-board sound conflicts with LED matrix) ────
+# ── 0. Pre-flight ──────────────────────────────────────────────────────────
+echo "[0/6] Pre-flight checks..."
+
+# Detect hardware model
+if [ -f /proc/device-tree/model ]; then
+    MODEL=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "unknown")
+    echo "  Detected: $MODEL"
+else
+    echo "  ⚠  Cannot detect hardware model"
+fi
+
+# Warn if not Raspberry Pi OS
+if [ ! -f /etc/rpi-issue ] && ! grep -qi "raspberry" /etc/os-release 2>/dev/null; then
+  echo "  ⚠  This does not appear to be a Raspberry Pi OS system."
+  echo "     The script is written for RPi OS Bookworm/Bullseye."
+  read -p "  Continue anyway? [y/N] " confirm
+  [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
+fi
+
+echo "  ✓ Pre-flight passed"
+echo ""
+
+# ── 1. Blacklist snd_bcm2835 ───────────────────────────────────────────────
 # rpi-rgb-led-matrix uses the BCM PWM hardware for OE- timing.
-# The Pi's on-board sound driver (snd_bcm2835) claims the same peripheral and
-# causes the library to hard-exit.  We disable it here.
-# NOTE: the app already sets disable_hardware_pulsing=True as a safe fallback,
-# but blacklisting the module gives better (hardware-timed) output quality.
-echo "[1/6] Blacklisting snd_bcm2835 (on-board sound)..."
-cat <<'EOF' | tee /etc/modprobe.d/blacklist-rgb-matrix.conf > /dev/null
+# The Pi on-board sound driver (snd_bcm2835) claims the same peripheral and
+# causes the library to hard-exit unless disable_hardware_pulsing is set.
+# Blacklisting the module allows hardware-timed (better quality) OE-.
+echo "[1/6] Blacklisting snd_bcm2835 (on-board sound conflicts with LED matrix PWM)..."
+cat <<'EOF' | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf > /dev/null
 # Blacklisted by led-matrix install.sh — conflicts with rpi-rgb-led-matrix PWM
 blacklist snd_bcm2835
 EOF
 # Unload immediately if already loaded (best-effort, may fail if in use)
-modprobe -r snd_bcm2835 2>/dev/null || true
-# Also disable the dtparam in /boot/firmware/config.txt (bookworm path)
+sudo modprobe -r snd_bcm2835 2>/dev/null || true
+# Comment out dtparam=audio=on in /boot/firmware/config.txt (Bookworm path)
 for cfg in /boot/firmware/config.txt /boot/config.txt; do
   if [ -f "$cfg" ]; then
-    # Comment out dtparam=audio=on if present
-    sed -i 's/^\(dtparam=audio=on\)/#\1  # disabled by led-matrix install/' "$cfg"
+    sudo sed -i 's/^\(dtparam=audio=on\)/#\1  # disabled by led-matrix install/' "$cfg"
     echo "  ✓ Commented out dtparam=audio=on in $cfg"
     break
   fi
 done
 # Regenerate initramfs so the blacklist takes effect after reboot
 if command -v update-initramfs &>/dev/null; then
-  update-initramfs -u -k all 2>/dev/null || true
+  sudo update-initramfs -u -k all 2>/dev/null || true
 fi
-echo "  ✓ snd_bcm2835 blacklisted (reboot to apply fully)"
+echo "  ✓ snd_bcm2835 blacklisted (reboot to fully apply)"
+echo ""
 
 # ── 2. System packages ─────────────────────────────────────────────────────
 echo "[2/6] Installing system packages..."
-apt-get update -qq
-apt-get install -y \
+sudo apt-get update -qq
+sudo apt-get install -y \
     python3 \
-    python3-pip \
+    python3-dev \
     python3-pillow \
     fonts-dejavu-core \
     git \
     build-essential \
-    python3-dev \
-    cython3
+    cython3 \
+    libgraphicsmagick++-dev \
+    libwebp-dev
+echo "  ✓ Dependencies installed"
+echo ""
 
-# ── 3. rpi-rgb-led-matrix ──────────────────────────────────────────────────
-echo "[3/6] Building rpi-rgb-led-matrix..."
-TMPDIR=$(mktemp -d)
-git clone --depth 1 https://github.com/hzeller/rpi-rgb-led-matrix.git "$TMPDIR/rpi-rgb-led-matrix"
-cd "$TMPDIR/rpi-rgb-led-matrix"
-make -j"$(nproc)" HARDWARE_DESC=adafruit-hat 2>/dev/null || make -j"$(nproc)"
-cd bindings/python
-PYTHON3="$(which python3)"
-make build-python PYTHON="$PYTHON3"
-make install-python PYTHON="$PYTHON3"
-cd /
-rm -rf "$TMPDIR"
-echo "  ✓ rpi-rgb-led-matrix installed"
+# ── 3. Clone / update rpi-rgb-led-matrix ──────────────────────────────────
+echo "[3/6] Installing rpi-rgb-led-matrix library..."
 
-# ── 4. Copy app files ──────────────────────────────────────────────────────
-echo "[4/6] Copying application files to /opt/led-matrix..."
-mkdir -p /opt/led-matrix
-cp "$SCRIPT_DIR"/*.py    /opt/led-matrix/
+if [ -d ~/rpi-rgb-led-matrix ]; then
+    echo "  ℹ  Library already exists at ~/rpi-rgb-led-matrix"
+    read -p "  Update existing library? [y/N]: " UPDATE_LIB
+    if [[ "$UPDATE_LIB" =~ ^[Yy]$ ]]; then
+        cd ~/rpi-rgb-led-matrix
+        git pull
+        echo "  ✓ Library updated"
+    fi
+else
+    echo "  Cloning rpi-rgb-led-matrix library..."
+    cd ~
+    git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+    echo "  ✓ Library cloned"
+fi
+echo ""
+
+# ── 4. Compile library + Python bindings ──────────────────────────────────
+echo "[4/6] Compiling library (takes 2-3 minutes on Pi Zero 2 W)..."
+cd ~/rpi-rgb-led-matrix
+make clean
+# Use 'regular' hardware mapping (matches MATRIX_HARDWARE_MAPPING in config.py)
+make -j"$(nproc)"
+echo "  ✓ Library compiled"
+
+echo "  Installing Python bindings..."
+cd ~/rpi-rgb-led-matrix/bindings/python
+sudo make install
+echo "  ✓ Python bindings installed"
+echo ""
+
+# ── 5. Copy app files ──────────────────────────────────────────────────────
+echo "[5/6] Copying application files to /opt/led-matrix..."
+sudo mkdir -p /opt/led-matrix
+sudo cp "$SCRIPT_DIR"/*.py /opt/led-matrix/
 echo "  ✓ Files copied"
-
-# ── 5. Config storage directory ────────────────────────────────────────────
-echo "[5/6] Creating config storage..."
-mkdir -p /var/lib/led-matrix
-echo "  ✓ /var/lib/led-matrix created"
+echo ""
 
 # ── 6. Systemd service ─────────────────────────────────────────────────────
 echo "[6/6] Installing systemd service..."
-cp "$SCRIPT_DIR/led-matrix.service" /etc/systemd/system/led-matrix.service
-systemctl daemon-reload
-systemctl enable led-matrix.service
-systemctl start  led-matrix.service
+sudo mkdir -p /var/lib/led-matrix
+sudo cp "$SCRIPT_DIR/led-matrix.service" /etc/systemd/system/led-matrix.service
+sudo systemctl daemon-reload
+sudo systemctl enable led-matrix.service
+
+# Remove NO_DISPLAY override if present from a previous test install
+if [ -f /etc/systemd/system/led-matrix.service.d/override.conf ]; then
+    echo "  Removing NO_DISPLAY override..."
+    sudo rm /etc/systemd/system/led-matrix.service.d/override.conf
+    sudo rmdir /etc/systemd/system/led-matrix.service.d 2>/dev/null || true
+    sudo systemctl daemon-reload
+fi
+
+sudo systemctl start led-matrix.service
 echo "  ✓ Service installed and started"
 
 echo ""
-echo "=== Installation complete ==="
+echo "========================================="
+echo "Installation complete!"
+echo "========================================="
 echo ""
 echo "Check status:   sudo systemctl status led-matrix"
 echo "View logs:      sudo journalctl -u led-matrix -f"
 echo "Stop:           sudo systemctl stop led-matrix"
-echo "Web UI:         http://$(hostname -I | awk '{print $1}')/"
+echo "Web UI:         http://$(hostname -I | awk '{print $1}'):8080/"
+echo ""
+echo "NOTE: A reboot is recommended to fully apply the snd_bcm2835"
+echo "      blacklist and get hardware-timed PWM for best display quality."
 echo ""

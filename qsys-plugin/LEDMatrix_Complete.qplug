@@ -89,7 +89,7 @@ function GetControls(props)
         Name = "ip_address",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
@@ -97,7 +97,7 @@ function GetControls(props)
         Name = "udp_port",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
@@ -106,7 +106,7 @@ function GetControls(props)
         ControlType = "Indicator",
         IndicatorType = "Status",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Output"
     })
     
@@ -114,7 +114,7 @@ function GetControls(props)
         Name = "last_command",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Output"
     })
     
@@ -132,7 +132,7 @@ function GetControls(props)
         ControlType = "Button",
         ButtonType = "Trigger",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
@@ -154,7 +154,7 @@ function GetControls(props)
             Name = string.format("seg%d_text_color", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -163,7 +163,7 @@ function GetControls(props)
             Name = string.format("seg%d_bg_color", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -172,7 +172,7 @@ function GetControls(props)
             Name = string.format("seg%d_align", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
 
@@ -181,7 +181,7 @@ function GetControls(props)
             Name = string.format("seg%d_effect", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -190,7 +190,7 @@ function GetControls(props)
             Name = string.format("seg%d_font", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
 
@@ -199,7 +199,7 @@ function GetControls(props)
             Name = string.format("seg%d_size", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -211,7 +211,7 @@ function GetControls(props)
             Min = 0,
             Max = 255,
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
 
@@ -221,7 +221,7 @@ function GetControls(props)
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Input"
         })
         
@@ -231,7 +231,7 @@ function GetControls(props)
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Input"
         })
         
@@ -251,7 +251,7 @@ function GetControls(props)
             ControlType = "Indicator",
             IndicatorType = "LED",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Output"
         })
     end
@@ -264,7 +264,7 @@ function GetControls(props)
         Min = 0,
         Max = 255,
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Both"
     })
     
@@ -273,7 +273,7 @@ function GetControls(props)
         ControlType = "Button",
         ButtonType = "Trigger",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
