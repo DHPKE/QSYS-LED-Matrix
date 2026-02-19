@@ -55,7 +55,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Connection"
+        ControlGroup = "Connection",
+        Legend = "IP Address"
     })
     
     table.insert(controls, {
@@ -64,7 +65,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Connection"
+        ControlGroup = "Connection",
+        Legend = "UDP Port"
     })
     
     table.insert(controls, {
@@ -74,7 +76,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Output",
-        ControlGroup = "Connection"
+        ControlGroup = "Connection",
+        Legend = "Status"
     })
     
     table.insert(controls, {
@@ -92,7 +95,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Both",
-        ControlGroup = "Layout"
+        ControlGroup = "Layout",
+        Legend = "Layout"
     })
     
     table.insert(controls, {
@@ -102,7 +106,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Layout"
+        ControlGroup = "Layout",
+        Legend = "Apply"
     })
     
     -- Segment controls (4 segments)
@@ -117,7 +122,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Text"
         })
         
         -- Text color selector
@@ -127,7 +133,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Text Color"
         })
         
         -- Background color selector
@@ -137,7 +144,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "BG Color"
         })
         
         -- Alignment selector
@@ -147,7 +155,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Align"
         })
 
         -- Effect selector
@@ -157,7 +166,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Effect"
         })
         
         -- Font selector
@@ -167,7 +177,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Font"
         })
 
         -- Font size selector
@@ -177,7 +188,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Size"
         })
         
         -- Intensity control
@@ -190,7 +202,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Intensity"
         })
 
         -- Send button
@@ -201,7 +214,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Send"
         })
         
         -- Clear button
@@ -212,7 +226,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Clear"
         })
         
         -- Invert button (swaps text and background colors)
@@ -223,7 +238,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Invert"
         })
         
         -- Active indicator
@@ -234,7 +250,8 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Output",
-            ControlGroup = groupName
+            ControlGroup = groupName,
+            Legend = "Active"
         })
     end
     
@@ -248,7 +265,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Both",
-        ControlGroup = "Global"
+        ControlGroup = "Global",
+        Legend = "Brightness"
     })
     
     table.insert(controls, {
@@ -258,7 +276,8 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Global"
+        ControlGroup = "Global",
+        Legend = "Clear All"
     })
     
     return controls
