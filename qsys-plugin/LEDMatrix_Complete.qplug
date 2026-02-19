@@ -1,6 +1,11 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.9.1 - Wider UI for better pin name visibility
+-- Version 3.10.0 - Properly grouped control pins following official Q-SYS guide
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.10.0 Changes:
+--   - Increased plugin width from 1200px to 1400px for optimal pin visibility
+--   - Verified PrettyName grouping follows official Q-SYS plugin guide standards
+--   - IMPORTANT: Delete and re-drag plugin in Designer to see grouped pins!
 --
 -- v3.9.1 Changes:
 --   - Increased plugin width from 900px to 1200px for better pin label visibility
@@ -37,8 +42,8 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.9.1",
-    Id = "dhpke.olimex.led.matrix.3.9.1",
+    Version = "3.10.0",
+    Id = "dhpke.olimex.led.matrix.3.10.0",
     Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix - All pins visible",
     ShowDebug = true,
     Author = "DHPKE"
@@ -268,7 +273,7 @@ end
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
-    local W  = 1200  -- plugin width (increased for better pin name visibility)
+    local W  = 1400  -- plugin width (increased for optimal pin visibility - delete and re-drag to apply)
     local CH = 24    -- standard control height
     local BH = 28    -- button height
 
@@ -290,7 +295,7 @@ function GetControlLayout(props)
     -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
         StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
-    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.9.1",
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.10.0",
         Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
         Color={255,255,255}, Position={0,9}, Size={W,20}})
 
@@ -571,7 +576,7 @@ if Controls then
     -- ── Initialize ─────────────────────────────────────────────────
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.9.1 Initializing")
+        print("LED Matrix Complete v3.10.0 Initializing")
         print("===========================================")
 
         Controls.ip_address.String   = ip_addr
