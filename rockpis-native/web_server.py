@@ -178,6 +178,27 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
         <span style="color:#888;">Bright</span>
       </div>
     </div>
+    <div class="form-group">
+      <label>Render FPS</label>
+      <input type="range" id="render-fps" min="1" max="60" value="30" oninput="updateRenderFPS(this.value)">
+      <div class="brightness-display">
+        <span style="color:#888;">1 FPS</span>
+        <span class="brightness-value" id="render-fps-value">30</span>
+        <span style="color:#888;">60 FPS</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Display Refresh Rate</label>
+      <input type="range" id="refresh-delay" min="0" max="1000" step="10" value="0" oninput="updateRefreshDelay(this.value)">
+      <div class="brightness-display">
+        <span style="color:#888;">Max</span>
+        <span class="brightness-value" id="refresh-delay-value">0 µs</span>
+        <span style="color:#888;">Slow</span>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#888;">
+        Current: <span id="actual-refresh-rate" style="color:#4a9eff;">-- Hz</span>
+      </div>
+    </div>
     <button class="btn-clear-all" onclick="clearAll()">Clear All Segments</button>
   </div>
 </div><!-- /container -->
@@ -243,7 +264,36 @@ function buildSegmentCards() {
 
 buildSegmentCards();
 
-window.addEventListener('load', () => { pollSegments(); setInterval(pollSegments,2000); });
+window.addEventListener('load', () => { 
+  pollSegments(); 
+  pollConfig();
+  setInterval(pollSegments,2000); 
+  setInterval(pollConfig,1000);
+});
+
+function pollConfig() {
+  fetch('/api/config').then(r=>r.json()).then(data => {
+    if (data.refresh_rate !== undefined) {
+      document.getElementById('actual-refresh-rate').textContent = data.refresh_rate.toFixed(1) + ' Hz';
+    }
+    // Update sliders if they haven't been modified by user
+    const brightnessEl = document.getElementById('brightness');
+    if (brightnessEl && document.activeElement !== brightnessEl && data.brightness !== undefined) {
+      brightnessEl.value = data.brightness;
+      document.getElementById('brightness-value').textContent = data.brightness;
+    }
+    const fpsEl = document.getElementById('render-fps');
+    if (fpsEl && document.activeElement !== fpsEl && data.render_fps !== undefined) {
+      fpsEl.value = data.render_fps;
+      document.getElementById('render-fps-value').textContent = data.render_fps;
+    }
+    const delayEl = document.getElementById('refresh-delay');
+    if (delayEl && document.activeElement !== delayEl && data.refresh_delay_us !== undefined) {
+      delayEl.value = data.refresh_delay_us;
+      document.getElementById('refresh-delay-value').textContent = data.refresh_delay_us + ' µs';
+    }
+  }).catch(e=>console.error('Failed to poll config:',e));
+}
 
 function pollSegments() {
   fetch('/api/segments').then(r=>r.json()).then(data => {
@@ -309,6 +359,18 @@ function clearAll() {
 function updateBrightness(v) {
   document.getElementById('brightness-value').textContent=v;
   sendJSON({cmd:'brightness',value:parseInt(v)});
+}
+function updateRenderFPS(v) {
+  document.getElementById('render-fps-value').textContent=v;
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({render_fps:parseInt(v)})})
+    .catch(e=>console.error('Failed to update FPS:',e));
+}
+function updateRefreshDelay(v) {
+  document.getElementById('refresh-delay-value').textContent=v+' µs';
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({refresh_delay_us:parseInt(v)})})
+    .catch(e=>console.error('Failed to update refresh delay:',e));
 }
 function applyLayout(type) {
   let cmds=[],clr=[];
@@ -402,11 +464,16 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, "text/html", html)
 
         elif path == "/api/config":
+            status = self._driver.get_status() if self._driver else {}
+            render_fps = self._get_render_fps() if self._get_render_fps else 30
             doc = {
                 "udp_port":      UDP_PORT,
                 "brightness":    get_brightness(),
                 "matrix_width":  MATRIX_WIDTH,
                 "matrix_height": MATRIX_HEIGHT,
+                "render_fps":    render_fps,
+                "refresh_rate":  status.get('refresh_rate', 0),
+                "refresh_delay_us": status.get('refresh_delay_us', 0),
             }
             self._send(200, "application/json", json.dumps(doc))
 
@@ -426,6 +493,21 @@ class _Handler(BaseHTTPRequestHandler):
             logger.info(f"[HTTP] /api/test  body={body[:120]}")
             self._udp.dispatch(body)
             self._send(200, "text/plain", f"Command dispatched: {body}")
+        
+        elif path == "/api/settings":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode("utf-8", errors="replace")
+            try:
+                data = json.loads(body)
+                if 'render_fps' in data and self._set_render_fps:
+                    self._set_render_fps(int(data['render_fps']))
+                if 'refresh_delay_us' in data and self._set_display_refresh_delay:
+                    self._set_display_refresh_delay(int(data['refresh_delay_us']))
+                self._send(200, "text/plain", "Settings updated")
+            except Exception as e:
+                logger.error(f"Failed to update settings: {e}")
+                self._send(400, "text/plain", f"Error: {e}")
+        
         else:
             self._send(404, "text/plain", "Not found")
 
@@ -442,9 +524,17 @@ class WebServer:
     """Thin wrapper: creates the HTTPServer in a daemon thread."""
 
     def __init__(self, segment_manager: SegmentManager,
-                 udp_handler: UDPHandler):
+                 udp_handler: UDPHandler, 
+                 driver=None,
+                 get_render_fps_func=None,
+                 set_render_fps_func=None,
+                 set_display_refresh_delay_func=None):
         _Handler._sm  = segment_manager
         _Handler._udp = udp_handler
+        _Handler._driver = driver
+        _Handler._get_render_fps = get_render_fps_func
+        _Handler._set_render_fps = set_render_fps_func
+        _Handler._set_display_refresh_delay = set_display_refresh_delay_func
         self._httpd = HTTPServer(("", WEB_PORT), _Handler)
         self._thread = threading.Thread(target=self._httpd.serve_forever,
                                         name="web-server", daemon=True)

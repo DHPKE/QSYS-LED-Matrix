@@ -40,6 +40,7 @@ class HUB75Driver:
         self.refresh_thread = None
         self.brightness = 255  # 0-255
         self.refresh_rate = 0  # Hz, calculated
+        self.refresh_delay_us = 0  # Microseconds delay per row (0=max speed)
         
         print(f"Initializing HUB75 driver for {width}×{height} matrix")
         
@@ -245,12 +246,14 @@ class HUB75Driver:
         last_fps_time = time.time()
         
         while self.running:
-            # Scan all rows as fast as possible
+            # Scan all rows as fast as possible (or with delay if configured)
             for row in range(self.rows):
                 if not self.running:
                     break
                 self.display_row(row)
-                # No delay - run at maximum speed for best refresh rate
+                # Optional delay for throttling refresh rate
+                if self.refresh_delay_us > 0:
+                    time.sleep(self.refresh_delay_us / 1_000_000)
             
             # Calculate refresh rate
             frame_count += 1
@@ -304,12 +307,17 @@ class HUB75Driver:
         """Set brightness (0-255)"""
         self.brightness = max(0, min(255, brightness))
     
+    def set_refresh_delay(self, delay_us: int):
+        """Set refresh delay in microseconds (0=max speed, higher=slower)"""
+        self.refresh_delay_us = max(0, min(10000, delay_us))
+    
     def get_status(self) -> dict:
         """Get driver status information"""
         return {
             'running': self.running,
             'refresh_rate': round(self.refresh_rate, 1),
             'brightness': self.brightness,
+            'refresh_delay_us': self.refresh_delay_us,
             'resolution': f"{self.width}×{self.height}",
             'gpio_chip': self.chip_path
         }

@@ -37,6 +37,7 @@ import time
 from config import (
     MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_BRIGHTNESS,
     LOG_LEVEL, UDP_PORT, WEB_PORT,
+    RENDER_FPS, DISPLAY_REFRESH_DELAY_US,
 )
 from hub75_driver import HUB75Driver
 from segment_manager import SegmentManager
@@ -55,10 +56,38 @@ logger = logging.getLogger(__name__)
 # ─── Effect / render interval ───────────────────────────────────────────────
 EFFECT_INTERVAL = 0.05   # seconds (≈ 20 fps)
 
+# Global settings that can be changed via web UI
+render_fps = RENDER_FPS
+display_refresh_delay = DISPLAY_REFRESH_DELAY_US
+
 
 def _brightness_255_to_pct(value_255: int) -> int:
     """Convert 0-255 protocol brightness to 0-255 native driver value."""
     return max(0, min(255, value_255))
+
+
+def set_render_fps(fps: int):
+    """Set the target render FPS (1-60)"""
+    global render_fps
+    render_fps = max(1, min(60, fps))
+    logger.info(f"Render FPS set to {render_fps}")
+
+
+def set_display_refresh_delay(delay_us: int):
+    """Set the display refresh delay in microseconds"""
+    global display_refresh_delay
+    display_refresh_delay = max(0, min(10000, delay_us))
+    logger.info(f"Display refresh delay set to {display_refresh_delay} μs")
+
+
+def get_render_fps() -> int:
+    """Get the current target render FPS"""
+    return render_fps
+
+
+def get_display_refresh_delay() -> int:
+    """Get the current display refresh delay"""
+    return display_refresh_delay
 
 
 def main():
@@ -81,8 +110,9 @@ def main():
     
     logger.info(f"✓ Native HUB75 driver started")
     
-    # Set initial brightness
+    # Set initial brightness and refresh delay
     driver.set_brightness(_brightness_255_to_pct(MATRIX_BRIGHTNESS))
+    driver.set_refresh_delay(display_refresh_delay)
     
     # ── 3. Text renderer (uses Pillow, writes to driver's back buffer) ────
     renderer = TextRenderer(driver, sm)
@@ -98,7 +128,17 @@ def main():
     logger.info(f"✓ UDP handler listening on port {UDP_PORT}")
 
     # ── 5. Web server ────────────────────────────────────────────────────
-    web_server = WebServer(sm, udp_handler)
+    # Create callbacks for web UI to modify settings
+    def web_set_render_fps(fps: int):
+        set_render_fps(fps)
+    
+    def web_set_display_refresh_delay(delay_us: int):
+        set_display_refresh_delay(delay_us)
+        driver.set_refresh_delay(delay_us)
+    
+    web_server = WebServer(sm, udp_handler, driver, 
+                          get_render_fps, web_set_render_fps,
+                          web_set_display_refresh_delay)
     web_server.start()
     logger.info(f"✓ Web server started on port {WEB_PORT}")
 
@@ -150,8 +190,8 @@ def main():
                 frame_count = 0
                 last_fps_time = now
 
-            # ── Delay to target ~30 FPS rendering (smoother than 20) ─────
-            time.sleep(0.033)  # ~30 FPS
+            # ── Delay to target configured FPS ───────────────────────────
+            time.sleep(1.0 / render_fps)
 
     except KeyboardInterrupt:
         logger.info("\n⚠  Keyboard interrupt received")

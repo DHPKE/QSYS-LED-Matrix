@@ -11,6 +11,8 @@ Hardware:
 MATRIX_WIDTH = 64
 MATRIX_HEIGHT = 32
 MATRIX_BRIGHTNESS = 200  # 0-255 (start at ~78%)
+RENDER_FPS = 30          # Target render FPS (1-60)
+DISPLAY_REFRESH_DELAY_US = 0  # Microseconds delay per row (0=max speed, 100=throttle)
 
 # ─── Network Configuration ────────────────────────────────────────────────
 UDP_PORT = 21324         # UDP JSON protocol
