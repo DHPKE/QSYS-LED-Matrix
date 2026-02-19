@@ -9,7 +9,10 @@ echo "Downloading all updated files..."
 cd /opt/led-matrix-native
 
 # Download all fixed files
-echo "  - hub75_driver.py (multi-chip GPIO + max refresh rate)"
+echo "  - config.py (FPS and refresh rate settings)"
+sudo curl -s -o config.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/config.py
+
+echo "  - hub75_driver.py (multi-chip GPIO + configurable refresh rate)"
 sudo curl -s -o hub75_driver.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/hub75_driver.py
 
 echo "  - segment_manager.py (added get_active_segments)"
@@ -18,16 +21,16 @@ sudo curl -s -o segment_manager.py.new https://raw.githubusercontent.com/DHPKE/Q
 echo "  - text_renderer.py (bgcolor support, auto-sizing, flashing fix)"
 sudo curl -s -o text_renderer.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/text_renderer.py
 
-echo "  - main.py (improved render timing)"
+echo "  - main.py (configurable render FPS)"
 sudo curl -s -o main.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/main.py
 
-echo "  - web_server.py (UI field preservation fix)"
+echo "  - web_server.py (UI controls for all settings)"
 sudo curl -s -o web_server.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/web_server.py
 
 echo ""
 echo "Validating and installing files..."
 SUCCESS=0
-for file in hub75_driver segment_manager text_renderer main web_server; do
+for file in config hub75_driver segment_manager text_renderer main web_server; do
     if [ -f ${file}.py.new ]; then
         if sudo python3 -m py_compile ${file}.py.new 2>/dev/null; then
             sudo mv ${file}.py.new ${file}.py
@@ -43,7 +46,7 @@ for file in hub75_driver segment_manager text_renderer main web_server; do
 done
 
 echo ""
-echo "Files updated: $SUCCESS/4"
+echo "Files updated: $SUCCESS/6"
 
 if [ $SUCCESS -eq 0 ]; then
     echo "❌ No files were updated. Check your internet connection."
