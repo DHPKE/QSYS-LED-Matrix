@@ -206,6 +206,16 @@ function GetControls(props)
             UserPin = true,
             PinStyle = "Input"
         })
+        
+        -- Invert button (swaps text and background colors)
+        table.insert(controls, {
+            Name = string.format("invert_%d", seg),
+            ControlType = "Button",
+            ButtonType = "Trigger",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Input"
+        })
     end
     
     -- Global controls
@@ -312,10 +322,13 @@ function GetControlLayout(props)
             Position={26, r1}, Size={W-232, CH}}
         layout["send_"..s]  = {PrettyName="Display", Style="Button",
             ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
-            Position={W-200, r1}, Size={95, BH}}
+            Position={W-300, r1}, Size={95, BH}}
+        layout["invert_"..s] = {PrettyName="Invert", Style="Button",
+            ButtonStyle="Trigger", Legend="Invert", Color=C_BTN_B,
+            Position={W-199,  r1}, Size={95, BH}}
         layout["clear_"..s] = {PrettyName="Clear", Style="Button",
             ButtonStyle="Trigger", Legend="Clear", Color=C_BTN_R,
-            Position={W-99,  r1}, Size={93, BH}}
+            Position={W-98,  r1}, Size={92, BH}}
 
         -- Row 2: 6 ComboBoxes
         local r2 = sy + 52
@@ -556,7 +569,7 @@ if Controls then
         local fontChoices   = {"Arial","Verdana","Digital","Mono"}
         local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}
-        local effectChoices = {"none","scroll","blink","fade","rainbow"}
+        local effectChoices = {"none","scroll","blink","fade"}
 
         local defaultColors = {"White","Lime","Red","Yellow"}
         for seg = 0, 3 do
@@ -640,6 +653,23 @@ if Controls then
             if SendCommand(buildJson({cmd="clear", seg=seg})) then
                 Controls["active_"..s].Boolean = false
                 activeLayoutSegments[seg] = nil
+            end
+        end
+        
+        -- "Invert" button — swaps text color and background color
+        Controls["invert_"..s].EventHandler = function()
+            local textColorCtrl = Controls["text_color_"..s]
+            local bgColorCtrl = Controls["bg_color_"..s]
+            
+            -- Swap the values
+            local tempColor = textColorCtrl.String
+            textColorCtrl.String = bgColorCtrl.String
+            bgColorCtrl.String = tempColor
+            
+            -- Auto-send if segment is active
+            if activeLayoutSegments[seg] then
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
             end
         end
 

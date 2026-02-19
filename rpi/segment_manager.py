@@ -28,7 +28,6 @@ class TextEffect(Enum):
     SCROLL  = "scroll"
     BLINK   = "blink"
     FADE    = "fade"
-    RAINBOW = "rainbow"
 
 
 def _parse_align(value: str) -> TextAlign:
@@ -96,6 +95,9 @@ class SegmentManager:
     def __init__(self):
         self._lock = threading.RLock()
         self._segments: list[Segment] = []
+        # Master blink state for synchronized blinking across all segments
+        self._master_blink_state = True
+        self._master_blink_last_update = 0.0
         self._init_default_layout()
 
     # ─── Initialisation ────────────────────────────────────────────────────
@@ -187,6 +189,15 @@ class SegmentManager:
     def update_effects(self):
         now = time.monotonic()
         with self._lock:
+            # Update master blink state (synchronized for all segments)
+            if now - self._master_blink_last_update >= 0.5:
+                self._master_blink_state = not self._master_blink_state
+                self._master_blink_last_update = now
+                # Mark all blinking segments as dirty
+                for seg in self._segments:
+                    if seg.is_active and seg.effect == TextEffect.BLINK:
+                        seg.is_dirty = True
+            
             for seg in self._segments:
                 if not seg.is_active:
                     continue
@@ -197,7 +208,5 @@ class SegmentManager:
                         seg.last_scroll_update = now
                         seg.is_dirty = True
                 elif seg.effect == TextEffect.BLINK:
-                    if now - seg.last_blink_update >= 0.5:
-                        seg.blink_state = not seg.blink_state
-                        seg.last_blink_update = now
-                        seg.is_dirty = True
+                    # Use master blink state for synchronized blinking
+                    seg.blink_state = self._master_blink_state
