@@ -21,10 +21,13 @@ sudo curl -s -o text_renderer.py.new https://raw.githubusercontent.com/DHPKE/QSY
 echo "  - main.py (improved render timing)"
 sudo curl -s -o main.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/main.py
 
+echo "  - web_server.py (UI field preservation fix)"
+sudo curl -s -o web_server.py.new https://raw.githubusercontent.com/DHPKE/QSYS-LED-Matrix/main/rockpis-native/web_server.py
+
 echo ""
 echo "Validating and installing files..."
 SUCCESS=0
-for file in hub75_driver segment_manager text_renderer main; do
+for file in hub75_driver segment_manager text_renderer main web_server; do
     if [ -f ${file}.py.new ]; then
         if sudo python3 -m py_compile ${file}.py.new 2>/dev/null; then
             sudo mv ${file}.py.new ${file}.py
