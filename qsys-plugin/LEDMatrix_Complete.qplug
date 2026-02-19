@@ -1,11 +1,15 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.10.0 - Properly grouped control pins following official Q-SYS guide
+-- Version 3.10.1 - Shortened pin names for Control Pins window readability
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.10.1 Changes:
+--   - Shortened all PrettyName strings to fit in Q-SYS Control Pins window
+--   - Changed "Connection~" to "Conn~", "Segment X~" to "SegX~", etc.
+--   - IMPORTANT: Delete and re-drag plugin in Designer to see readable pin names!
 --
 -- v3.10.0 Changes:
 --   - Increased plugin width from 1200px to 1400px for optimal pin visibility
 --   - Verified PrettyName grouping follows official Q-SYS plugin guide standards
---   - IMPORTANT: Delete and re-drag plugin in Designer to see grouped pins!
 --
 -- v3.9.1 Changes:
 --   - Increased plugin width from 900px to 1200px for better pin label visibility
@@ -42,8 +46,8 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.10.0",
-    Id = "dhpke.olimex.led.matrix.3.10.0",
+    Version = "3.10.1",
+    Id = "dhpke.olimex.led.matrix.3.10.1",
     Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix - All pins visible",
     ShowDebug = true,
     Author = "DHPKE"
@@ -295,7 +299,7 @@ function GetControlLayout(props)
     -- ── Title ──────────────────────────────────────────────────────
     table.insert(graphics, {Type="GroupBox", Text="", Fill={38,38,38},
         StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36}})
-    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.10.0",
+    table.insert(graphics, {Type="Text", Text="LED Matrix Complete Controller  v3.10.1",
         Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
         Color={255,255,255}, Position={0,9}, Size={W,20}})
 
@@ -306,13 +310,13 @@ function GetControlLayout(props)
     Lbl("Port",       138, y+5,  62)
     Lbl("Status",     208, y+5,  62)
     Lbl("Last Command", 278, y+5, W-284)
-    layout["ip_address"]        = {PrettyName="Connection~IP Address",   Style="Text",
+    layout["ip_address"]        = {PrettyName="Conn~IP",        Style="Text",
         Position={6,   y+18}, Size={124, CH}}
-    layout["udp_port"]          = {PrettyName="Connection~Port",         Style="Text",
+    layout["udp_port"]          = {PrettyName="Conn~Port",      Style="Text",
         Position={138, y+18}, Size={62,  CH}}
-    layout["connection_status"] = {PrettyName="Connection~Status",       Style="Indicator",
+    layout["connection_status"] = {PrettyName="Conn~Status",    Style="Indicator",
         Position={208, y+18}, Size={62,  CH}}
-    layout["last_command"]      = {PrettyName="Connection~Last Command", Style="Text",
+    layout["last_command"]      = {PrettyName="Conn~LastCmd",   Style="Text",
         Position={278, y+18}, Size={W-284, CH}}
 
     -- ── Display Layout ─────────────────────────────────────────────
@@ -337,7 +341,7 @@ function GetControlLayout(props)
     for seg = 0, 3 do
         local segNum = seg + 1  -- Display as Segment 1-4
         local segName = "seg"..segNum.."_"
-        local groupName = "Segment "..segNum
+        local groupName = "Seg"..segNum  -- Short name for Control Pins window
         local sy = y + seg * (SEG_H + 4)
 
         GBox(0, sy, W, SEG_H, groupName)
@@ -363,12 +367,12 @@ function GetControlLayout(props)
         local r2 = sy + 52
         -- {label, control_name_suffix, display_name, width}
         local cols = {
-            {"Text Color", "text_color", "Text Color", 114},
-            {"BG Color",   "bg_color",   "BG Color",   114},
-            {"Font",       "font",        "Font",        84},
-            {"Size",       "size",        "Size",        68},
-            {"Align",      "align",       "Align",       78},
-            {"Effect",     "effect",      "Effect",      96},
+            {"Text Color", "text_color", "TxtColor", 114},
+            {"BG Color",   "bg_color",   "BgColor",  114},
+            {"Font",       "font",        "Font",     84},
+            {"Size",       "size",        "Size",     68},
+            {"Align",      "align",       "Align",    78},
+            {"Effect",     "effect",      "Effect",   96},
         }
         local cx = 6
         for _, col in ipairs(cols) do
@@ -390,9 +394,9 @@ function GetControlLayout(props)
     y = y + 4 * (SEG_H + 4) + 4
     GBox(0, y, W, 64, "Global Controls")
     Lbl("Global Brightness", 6, y+5, 220)
-    layout["brightness"] = {PrettyName="Global~Brightness", Style="Fader",
+    layout["brightness"] = {PrettyName="Global~Bright", Style="Fader",
         Position={6, y+18}, Size={340, 36}}
-    layout["clear_all"] = {PrettyName="Global~Clear All", Style="Button",
+    layout["clear_all"] = {PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All Segments", Color=C_BTN_R,
         Position={354, y+18}, Size={200, 36}}
 
@@ -576,7 +580,7 @@ if Controls then
     -- ── Initialize ─────────────────────────────────────────────────
     local function Initialize()
         print("===========================================")
-        print("LED Matrix Complete v3.10.0 Initializing")
+        print("LED Matrix Complete v3.10.1 Initializing")
         print("===========================================")
 
         Controls.ip_address.String   = ip_addr
