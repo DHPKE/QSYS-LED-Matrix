@@ -16,7 +16,7 @@
 --   {"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":32}
 
 PluginInfo = {
-    Name = "Olimex~LED Matrix Complete",
+    Name = "PKE~LED Matrix Display",
     Version = "3.5.0",
     Id = "dhpke.olimex.led.matrix.3.5.0",
     Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix",
