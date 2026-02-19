@@ -203,13 +203,12 @@ class HUB75Driver:
         last_fps_time = time.time()
         
         while self.running:
-            # Scan all rows
+            # Scan all rows as fast as possible
             for row in range(self.rows):
                 if not self.running:
                     break
                 self.display_row(row)
-                # Small delay for brightness control (adjust as needed)
-                time.sleep(0.0001)  # 100 microseconds per row = ~625 Hz refresh
+                # No delay - run at maximum speed for best refresh rate
             
             # Calculate refresh rate
             frame_count += 1
