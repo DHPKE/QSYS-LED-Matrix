@@ -223,7 +223,8 @@ class HUB75Driver:
         lat_chip, lat_off = self.gpio_pins['LAT']
         oe_req = self.requests[oe_chip]
         lat_req = self.requests[lat_chip]
-        \n        # Disable output while updating
+        
+        # Disable output while updating
         oe_req.set_value(oe_off, Value.ACTIVE)
         
         # Set row address
