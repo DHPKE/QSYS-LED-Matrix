@@ -175,7 +175,7 @@ void setupMatrix() {
         MATRIX_CHAIN        // Chain length
     );
     
-    // Pin configuration for Olimex ESP32 Gateway
+    // Pin configuration for WT32-ETH01 (see src/config.h for pin assignment rationale)
     mxconfig.gpio.r1 = R1_PIN;
     mxconfig.gpio.g1 = G1_PIN;
     mxconfig.gpio.b1 = B1_PIN;
@@ -227,7 +227,7 @@ void WiFiEvent(WiFiEvent_t event) {
     switch (event) {
         case ARDUINO_EVENT_ETH_START:
             Serial.println("ETH Started");
-            ETH.setHostname("olimex-led-matrix");
+            ETH.setHostname("wt32-led-matrix");
             break;
         case ARDUINO_EVENT_ETH_CONNECTED:
             Serial.println("ETH Connected");
@@ -268,15 +268,15 @@ void setupEthernet() {
     // Register event handler
     WiFi.onEvent(WiFiEvent);
     
-    // Olimex ESP32 Gateway Ethernet configuration
-    // PHY Type: LAN8720
-    // PHY Address: 0
-    // Power Pin: 5 (enable pin)
-    // MDC Pin: 23
-    // MDIO Pin: 18
-    // Clock Mode: ETH_CLOCK_GPIO17_OUT (external oscillator)
+    // WT32-ETH01 Ethernet configuration
+    // PHY Type    : LAN8720A
+    // PHY Address : 1
+    // Power Pin   : -1 (no enable pin; PHY is always powered on WT32-ETH01)
+    // MDC Pin     : 23
+    // MDIO Pin    : 18
+    // Clock Mode  : ETH_CLOCK_GPIO0_IN (50 MHz external oscillator on GPIO0)
     
-    if (!ETH.begin(0, 5, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO17_OUT)) {
+    if (!ETH.begin(1, -1, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN)) {
         Serial.println("ERROR: Ethernet initialization failed!");
         return;
     }
