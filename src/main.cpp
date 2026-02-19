@@ -24,6 +24,7 @@
 #include <Arduino.h>
 #include <ETH.h>
 #include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
@@ -246,6 +247,13 @@ void WiFiEvent(WiFiEvent_t event) {
             eth_connected = true;
             // Start UDP listener now that the network interface is up
             setupUDP();
+            // Start mDNS responder so device is reachable as wt32-led-matrix.local
+            if (MDNS.begin("wt32-led-matrix")) {
+                MDNS.addService("http", "tcp", 80);
+                Serial.println("✓ mDNS started: wt32-led-matrix.local");
+            } else {
+                Serial.println("WARNING: mDNS failed to start");
+            }
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             Serial.println("ETH Disconnected");
