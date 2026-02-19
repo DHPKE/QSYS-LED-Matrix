@@ -243,7 +243,7 @@ function buildSegmentCards() {
 
 buildSegmentCards();
 
-window.addEventListener('load', () => { pollSegments(); setInterval(pollSegments,1000); });
+window.addEventListener('load', () => { pollSegments(); setInterval(pollSegments,2000); });
 
 function pollSegments() {
   fetch('/api/segments').then(r=>r.json()).then(data => {
@@ -252,9 +252,15 @@ function pollSegments() {
     updateSegmentStates(active);
     data.segments.forEach(s => {
       segmentBounds[s.id] = {x:s.x,y:s.y,width:s.w,height:s.h};
-      const el = document.getElementById('text'+s.id);
-      if (el && document.activeElement!==el) el.value = s.text||'';
+      // Only update text field if user is not actively typing in ANY field
+      const textEl = document.getElementById('text'+s.id);
+      if (textEl && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+        if (textEl.value !== (s.text||'')) {
+          textEl.value = s.text||'';
+        }
+      }
     });
+    // Only redraw canvas, don't update form controls during user interaction
     ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
     data.segments.forEach(s => {
       if (s.active&&s.w>0&&s.h>0&&s.text)
