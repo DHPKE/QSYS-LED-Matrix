@@ -118,7 +118,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
         
         -- Text color selector
@@ -127,7 +127,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
         
         -- Background color selector
@@ -136,7 +136,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
         
         -- Intensity control
@@ -157,7 +157,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
         
         -- Alignment selector
@@ -166,7 +166,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
 
         -- Font size selector
@@ -175,7 +175,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
 
         -- Effect selector
@@ -184,7 +184,7 @@ function GetControls(props)
             ControlType = "Text",
             Count = 1,
             UserPin = true,
-            PinStyle = "Input"
+            PinStyle = "Both"
         })
 
         -- Send button
