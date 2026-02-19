@@ -109,17 +109,6 @@ function GetControls(props)
     for seg = 0, 3 do
         local segNum = seg + 1  -- Display as Segment 1-4
         
-        -- Active indicator
-        table.insert(controls, {
-            Name = string.format("active_%d", seg),
-            ControlType = "Indicator",
-            IndicatorType = "LED",
-            Count = 1,
-            UserPin = true,
-            PinStyle = "Output",
-            PrettyName = string.format("Seg %d Active", segNum)
-        })
-        
         -- Text input
         table.insert(controls, {
             Name = string.format("text_%d", seg),
@@ -127,7 +116,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            PrettyName = string.format("Seg %d Text", segNum)
+            PrettyName = string.format("Segment %d - Text", segNum)
         })
         
         -- Text color selector
@@ -137,7 +126,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            PrettyName = string.format("Seg %d Text Color", segNum)
+            PrettyName = string.format("Segment %d - Text Color", segNum)
         })
         
         -- Background color selector
@@ -147,7 +136,47 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            PrettyName = string.format("Seg %d BG Color", segNum)
+            PrettyName = string.format("Segment %d - BG Color", segNum)
+        })
+        
+        -- Alignment selector
+        table.insert(controls, {
+            Name = string.format("align_%d", seg),
+            ControlType = "Text",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Both",
+            PrettyName = string.format("Segment %d - Align", segNum)
+        })
+
+        -- Effect selector
+        table.insert(controls, {
+            Name = string.format("effect_%d", seg),
+            ControlType = "Text",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Both",
+            PrettyName = string.format("Segment %d - Effect", segNum)
+        })
+        
+        -- Font selector
+        table.insert(controls, {
+            Name = string.format("font_%d", seg),
+            ControlType = "Text",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Both",
+            PrettyName = string.format("Segment %d - Font", segNum)
+        })
+
+        -- Font size selector
+        table.insert(controls, {
+            Name = string.format("size_%d", seg),
+            ControlType = "Text",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Both",
+            PrettyName = string.format("Segment %d - Size", segNum)
         })
         
         -- Intensity control
@@ -160,47 +189,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            PrettyName = string.format("Seg %d Intensity", segNum)
-        })
-        
-        -- Font selector
-        table.insert(controls, {
-            Name = string.format("font_%d", seg),
-            ControlType = "Text",
-            Count = 1,
-            UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Seg %d Font", segNum)
-        })
-        
-        -- Alignment selector
-        table.insert(controls, {
-            Name = string.format("align_%d", seg),
-            ControlType = "Text",
-            Count = 1,
-            UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Seg %d Align", segNum)
-        })
-
-        -- Font size selector
-        table.insert(controls, {
-            Name = string.format("size_%d", seg),
-            ControlType = "Text",
-            Count = 1,
-            UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Seg %d Size", segNum)
-        })
-
-        -- Effect selector
-        table.insert(controls, {
-            Name = string.format("effect_%d", seg),
-            ControlType = "Text",
-            Count = 1,
-            UserPin = true,
-            PinStyle = "Both",
-            PrettyName = string.format("Seg %d Effect", segNum)
+            PrettyName = string.format("Segment %d - Intensity", segNum)
         })
 
         -- Send button
@@ -211,7 +200,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            PrettyName = string.format("Seg %d Send", segNum)
+            PrettyName = string.format("Segment %d - Send", segNum)
         })
         
         -- Clear button
@@ -222,7 +211,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            PrettyName = string.format("Seg %d Clear", segNum)
+            PrettyName = string.format("Segment %d - Clear", segNum)
         })
         
         -- Invert button (swaps text and background colors)
@@ -233,7 +222,18 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            PrettyName = string.format("Seg %d Invert", segNum)
+            PrettyName = string.format("Segment %d - Invert", segNum)
+        })
+        
+        -- Active indicator
+        table.insert(controls, {
+            Name = string.format("active_%d", seg),
+            ControlType = "Indicator",
+            IndicatorType = "LED",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Output",
+            PrettyName = string.format("Segment %d - Active", segNum)
         })
     end
     
