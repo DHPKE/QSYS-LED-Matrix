@@ -1,6 +1,11 @@
 -- Q-SYS LED Matrix Controller Plugin - Complete Version
--- Version 3.5.0 - Auto-send text changes, inactive segment protection
+-- Version 3.6.0 - Pin grouping fix
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
+--
+-- v3.6.0 Changes:
+--   - Fixed pin grouping in Q-SYS Designer Control Pins window
+--   - Now uses PrettyName with tilde separator (e.g., "Segment 1~Text") for proper grouping
+--   - Removed ControlGroup/Legend properties in favor of PrettyName standard
 --
 -- v3.5.0 Changes:
 --   - Text input now auto-sends immediately when changed (no need for Display button)
@@ -17,8 +22,8 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.5.0",
-    Id = "dhpke.olimex.led.matrix.3.5.0",
+    Version = "3.6.0",
+    Id = "dhpke.olimex.led.matrix.3.6.0",
     Description = "Complete JSON UDP control for Olimex ESP32 Gateway 64x32 LED Matrix",
     ShowDebug = true,
     Author = "DHPKE"
@@ -55,8 +60,7 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Connection",
-        Legend = "IP Address"
+        PrettyName = "Connection~IP Address"
     })
     
     table.insert(controls, {
@@ -65,8 +69,7 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Connection",
-        Legend = "UDP Port"
+        PrettyName = "Connection~UDP Port"
     })
     
     table.insert(controls, {
@@ -76,8 +79,7 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Output",
-        ControlGroup = "Connection",
-        Legend = "Status"
+        PrettyName = "Connection~Status"
     })
     
     table.insert(controls, {
@@ -95,8 +97,7 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Both",
-        ControlGroup = "Layout",
-        Legend = "Layout"
+        PrettyName = "Layout~Layout"
     })
     
     table.insert(controls, {
@@ -106,14 +107,12 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Layout",
-        Legend = "Apply"
+        PrettyName = "Layout~Apply"
     })
     
     -- Segment controls (4 segments)
     for seg = 0, 3 do
         local segNum = seg + 1  -- Display as Segment 1-4
-        local groupName = string.format("Segment %d", segNum)
         
         -- Text input
         table.insert(controls, {
@@ -122,8 +121,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Text"
+            PrettyName = string.format("Segment %d~Text", segNum)
         })
         
         -- Text color selector
@@ -133,8 +131,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Text Color"
+            PrettyName = string.format("Segment %d~Text Color", segNum)
         })
         
         -- Background color selector
@@ -144,8 +141,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "BG Color"
+            PrettyName = string.format("Segment %d~BG Color", segNum)
         })
         
         -- Alignment selector
@@ -155,8 +151,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Align"
+            PrettyName = string.format("Segment %d~Align", segNum)
         })
 
         -- Effect selector
@@ -166,8 +161,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Effect"
+            PrettyName = string.format("Segment %d~Effect", segNum)
         })
         
         -- Font selector
@@ -177,8 +171,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Font"
+            PrettyName = string.format("Segment %d~Font", segNum)
         })
 
         -- Font size selector
@@ -188,8 +181,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Size"
+            PrettyName = string.format("Segment %d~Font Size", segNum)
         })
         
         -- Intensity control
@@ -202,8 +194,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Both",
-            ControlGroup = groupName,
-            Legend = "Intensity"
+            PrettyName = string.format("Segment %d~Intensity", segNum)
         })
 
         -- Send button
@@ -214,8 +205,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            ControlGroup = groupName,
-            Legend = "Send"
+            PrettyName = string.format("Segment %d~Send", segNum)
         })
         
         -- Clear button
@@ -226,8 +216,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            ControlGroup = groupName,
-            Legend = "Clear"
+            PrettyName = string.format("Segment %d~Clear", segNum)
         })
         
         -- Invert button (swaps text and background colors)
@@ -238,8 +227,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Input",
-            ControlGroup = groupName,
-            Legend = "Invert"
+            PrettyName = string.format("Segment %d~Invert", segNum)
         })
         
         -- Active indicator
@@ -250,8 +238,7 @@ function GetControls(props)
             Count = 1,
             UserPin = true,
             PinStyle = "Output",
-            ControlGroup = groupName,
-            Legend = "Active"
+            PrettyName = string.format("Segment %d~Active", segNum)
         })
     end
     
@@ -265,8 +252,7 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Both",
-        ControlGroup = "Global",
-        Legend = "Brightness"
+        PrettyName = "Global~Brightness"
     })
     
     table.insert(controls, {
@@ -276,8 +262,7 @@ function GetControls(props)
         Count = 1,
         UserPin = true,
         PinStyle = "Input",
-        ControlGroup = "Global",
-        Legend = "Clear All"
+        PrettyName = "Global~Clear All"
     })
     
     return controls
