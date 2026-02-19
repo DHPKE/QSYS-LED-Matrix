@@ -213,9 +213,8 @@ const COLORS = [
 const DEFAULT_FG = ['#FFFFFF','#00FF00','#FF0000','#FFFF00'];
 const canvas = document.getElementById('preview');
 const ctx = canvas.getContext('2d');
-const segmentAlign = ['C','C','C','C','C'];  // Index 0 unused, indices 1-4 match segment IDs
+const segmentAlign = ['C','C','C','C'];
 const segmentBounds = [
-  {x:0,y:0,width:0,height:0},  // Index 0 unused
   {x:0,y:0,width:32,height:32},{x:32,y:0,width:32,height:32},
   {x:0,y:16,width:32,height:16},{x:32,y:16,width:32,height:16}
 ];
@@ -231,34 +230,33 @@ function buildSegmentCards() {
   const grid = document.getElementById('segments-grid');
   grid.innerHTML = '';
   for (let i=0;i<4;i++) {
-    const segId = i+1;  // Backend uses 1-based IDs
     const fg = DEFAULT_FG[i] || '#FFFFFF';
     grid.innerHTML += `
     <div class="card compact${i>0?' inactive':''}" id="segment-card-${i}">
-      <h2>Segment ${segId}</h2>
+      <h2>Segment ${i+1}</h2>
       <div class="form-group"><label>Text</label>
-        <input type="text" id="text${segId}" placeholder="Enter message..."></div>
+        <input type="text" id="text${i}" placeholder="Enter message..."></div>
       <div class="form-group"><label>Text Color</label>
-        <select id="color${segId}">${makeOptions(fg)}</select></div>
+        <select id="color${i}">${makeOptions(fg)}</select></div>
       <div class="form-group"><label>Background</label>
-        <select id="bgcolor${segId}">${makeOptions('#000000')}</select></div>
+        <select id="bgcolor${i}">${makeOptions('#000000')}</select></div>
       <div class="form-group"><label>Intensity</label>
-        <input type="range" id="intensity${segId}" min="0" max="255" value="255"
-          oninput="document.getElementById('iv${segId}').textContent=this.value">
-        <span id="iv${segId}" style="color:#888;font-size:.85em;">255</span></div>
+        <input type="range" id="intensity${i}" min="0" max="255" value="255"
+          oninput="document.getElementById('iv${i}').textContent=this.value">
+        <span id="iv${i}" style="color:#888;font-size:.85em;">255</span></div>
       <div class="form-group"><label>Font</label>
-        <select id="font${segId}">
+        <select id="font${i}">
           <option value="arial">Arial</option><option value="mono">Mono</option></select></div>
       <div class="form-group"><label>Alignment</label>
         <div class="align-group">
-          <button class="align-btn" onclick="setAlign(${segId},'L',this)">Left</button>
-          <button class="align-btn active" onclick="setAlign(${segId},'C',this)">Center</button>
-          <button class="align-btn" onclick="setAlign(${segId},'R',this)">Right</button>
+          <button class="align-btn" onclick="setAlign(${i},'L',this)">Left</button>
+          <button class="align-btn active" onclick="setAlign(${i},'C',this)">Center</button>
+          <button class="align-btn" onclick="setAlign(${i},'R',this)">Right</button>
         </div></div>
       <div class="button-group">
-        <button class="btn-primary" onclick="sendText(${segId})">Display</button>
-        <button class="btn-primary" onclick="previewText(${segId})">Preview</button>
-        <button class="btn-danger"  onclick="clearSegment(${segId})">Clear</button>
+        <button class="btn-primary" onclick="sendText(${i})">Display</button>
+        <button class="btn-primary" onclick="previewText(${i})">Preview</button>
+        <button class="btn-danger"  onclick="clearSegment(${i})">Clear</button>
       </div>
     </div>`;
   }
@@ -332,7 +330,7 @@ function setAlign(seg,align,btn) {
 function updateSegmentStates(active) {
   for(let i=0;i<4;i++){
     const c=document.getElementById('segment-card-'+i);
-    if(c) active.includes(i+1)?c.classList.remove('inactive'):c.classList.add('inactive');
+    if(c) active.includes(i)?c.classList.remove('inactive'):c.classList.add('inactive');
   }
 }
 function sendJSON(obj) {
@@ -377,26 +375,26 @@ function updateRefreshDelay(v) {
 function applyLayout(type) {
   let cmds=[],clr=[];
   if(type==='split-vertical') {
-    updateSegmentStates([1,2]);
-    segmentBounds[1]={x:0,y:0,width:32,height:32}; segmentBounds[2]={x:32,y:0,width:32,height:32};
-    segmentBounds[3]=segmentBounds[4]={x:0,y:0,width:0,height:0};
-    cmds=[{cmd:'config',seg:1,x:0,y:0,w:32,h:32},{cmd:'config',seg:2,x:32,y:0,w:32,h:32}]; clr=[3,4];
+    updateSegmentStates([0,1]);
+    segmentBounds[0]={x:0,y:0,width:32,height:32}; segmentBounds[1]={x:32,y:0,width:32,height:32};
+    segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
+    cmds=[{cmd:'config',seg:0,x:0,y:0,w:32,h:32},{cmd:'config',seg:1,x:32,y:0,w:32,h:32}]; clr=[2,3];
   } else if(type==='split-horizontal') {
-    updateSegmentStates([1,2]);
-    segmentBounds[1]={x:0,y:0,width:64,height:16}; segmentBounds[2]={x:0,y:16,width:64,height:16};
-    segmentBounds[3]=segmentBounds[4]={x:0,y:0,width:0,height:0};
-    cmds=[{cmd:'config',seg:1,x:0,y:0,w:64,h:16},{cmd:'config',seg:2,x:0,y:16,w:64,h:16}]; clr=[3,4];
+    updateSegmentStates([0,1]);
+    segmentBounds[0]={x:0,y:0,width:64,height:16}; segmentBounds[1]={x:0,y:16,width:64,height:16};
+    segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
+    cmds=[{cmd:'config',seg:0,x:0,y:0,w:64,h:16},{cmd:'config',seg:1,x:0,y:16,w:64,h:16}]; clr=[2,3];
   } else if(type==='quad') {
-    updateSegmentStates([1,2,3,4]);
-    segmentBounds[1]={x:0,y:0,width:32,height:16}; segmentBounds[2]={x:32,y:0,width:32,height:16};
-    segmentBounds[3]={x:0,y:16,width:32,height:16}; segmentBounds[4]={x:32,y:16,width:32,height:16};
-    cmds=[{cmd:'config',seg:1,x:0,y:0,w:32,h:16},{cmd:'config',seg:2,x:32,y:0,w:32,h:16},
-          {cmd:'config',seg:3,x:0,y:16,w:32,h:16},{cmd:'config',seg:4,x:32,y:16,w:32,h:16}];
+    updateSegmentStates([0,1,2,3]);
+    segmentBounds[0]={x:0,y:0,width:32,height:16}; segmentBounds[1]={x:32,y:0,width:32,height:16};
+    segmentBounds[2]={x:0,y:16,width:32,height:16}; segmentBounds[3]={x:32,y:16,width:32,height:16};
+    cmds=[{cmd:'config',seg:0,x:0,y:0,w:32,h:16},{cmd:'config',seg:1,x:32,y:0,w:32,h:16},
+          {cmd:'config',seg:2,x:0,y:16,w:32,h:16},{cmd:'config',seg:3,x:32,y:16,w:32,h:16}];
   } else if(type==='fullscreen') {
-    updateSegmentStates([1]);
-    segmentBounds[1]={x:0,y:0,width:64,height:32};
-    segmentBounds[2]=segmentBounds[3]=segmentBounds[4]={x:0,y:0,width:0,height:0};
-    cmds=[{cmd:'config',seg:1,x:0,y:0,w:64,h:32}]; clr=[2,3,4];
+    updateSegmentStates([0]);
+    segmentBounds[0]={x:0,y:0,width:64,height:32};
+    segmentBounds[1]=segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
+    cmds=[{cmd:'config',seg:0,x:0,y:0,w:64,h:32}]; clr=[1,2,3];
   }
   cmds.forEach(c=>sendJSON(c)); clr.forEach(s=>sendJSON({cmd:'clear',seg:s}));
   ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
@@ -466,8 +464,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, "text/html", html)
 
         elif path == "/api/config":
-            status = self._driver.get_status() if self._driver else {}
-            render_fps = self._get_render_fps() if self._get_render_fps else 30
+            status = _Handler._driver.get_status() if _Handler._driver else {}
+            render_fps = _Handler._get_render_fps() if _Handler._get_render_fps else 30
             doc = {
                 "udp_port":      UDP_PORT,
                 "brightness":    get_brightness(),
@@ -501,10 +499,10 @@ class _Handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length).decode("utf-8", errors="replace")
             try:
                 data = json.loads(body)
-                if 'render_fps' in data and self._set_render_fps:
-                    self._set_render_fps(int(data['render_fps']))
-                if 'refresh_delay_us' in data and self._set_display_refresh_delay:
-                    self._set_display_refresh_delay(int(data['refresh_delay_us']))
+                if 'render_fps' in data and _Handler._set_render_fps:
+                    _Handler._set_render_fps(int(data['render_fps']))
+                if 'refresh_delay_us' in data and _Handler._set_display_refresh_delay:
+                    _Handler._set_display_refresh_delay(int(data['refresh_delay_us']))
                 self._send(200, "text/plain", "Settings updated")
             except Exception as e:
                 logger.error(f"Failed to update settings: {e}")
