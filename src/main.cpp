@@ -288,13 +288,25 @@ void WiFiEvent(WiFiEvent_t event) {
 
 void setupEthernet() {
     Serial.println("Initializing Ethernet...");
-    
-    // Register event handler
+
+    // Register event handler BEFORE ETH.begin() so we never miss ETH_START.
     WiFi.onEvent(WiFiEvent);
-    
-    // WT32-ETH01 board package pre-defines all ETH parameters:
-    // PHY=LAN8720, addr=1, power=-1, MDC=23, MDIO=18, CLK=ETH_CLOCK_GPIO0_OUT
-    if (!ETH.begin()) {
+
+    // Give GPIO0 REF_CLK output time to stabilise before the LAN8720 samples it.
+    // The LAN8720 latches its strap pins (PHYAD, CLK_IN/OUT mode) on rising nRST.
+    // Without this delay, the clock may not be clean yet → PHY stays in reset.
+    delay(250);
+
+    // WT32-ETH01 explicit parameters — never rely on board-package defaults:
+    //   phy_addr  : 1                   (PHYAD0 strapped HIGH on WT32-ETH01)
+    //   power pin : -1                  (no GPIO-controlled power rail)
+    //   MDC  pin  : 23
+    //   MDIO pin  : 18
+    //   PHY type  : ETH_PHY_LAN8720
+    //   Clock mode: ETH_CLOCK_GPIO0_OUT (ESP32 APLL → GPIO0 → LAN8720 REF_CLK)
+    //
+    // Signature: begin(phy_addr, power, mdc, mdio, type, clk_mode)
+    if (!ETH.begin(1, -1, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_OUT)) {
         Serial.println("ERROR: Ethernet initialization failed!");
         return;
     }
