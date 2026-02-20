@@ -1,259 +1,226 @@
--- Q-SYS LED Matrix Controller Plugin
--- Version 4.0.0 - WT32-ETH01 / Integer Protocol
+﻿-- Q-SYS LED Matrix Controller Plugin - Complete Version
+-- Version 5.0.0 - WT32-ETH01 / Integer Protocol / Production
 --
--- Protocol changes vs v3.x:
---   • Layout: single {"cmd":"layout","preset":N}  (N = 1-6)
---   • Color:  integer 1-14  OR  hex string RRGGBB
---   • Font:   integer 1=Arial  2=Verdana  3=Impact
---   • Effect: integer 0=none  1=scroll  2=blink  3=fade
---   • Align:  "L" | "C" | "R"  (unchanged)
+-- Merged from v3.11.0 (full UI, pin naming, CSS colors, ComboBox choices)
+-- and v4.0.0 (integer protocol, 6 layout presets, new fonts)
+--
+-- PROTOCOL (JSON over UDP port 21324):
+--   {"cmd":"text","seg":0,"text":"Hello","color":1,"bgcolor":14,
+--    "font":1,"align":"C","effect":0,"intensity":255}
+--   {"cmd":"layout","preset":N}   -- N = 1-6 or 11-14
+--   {"cmd":"clear","seg":0}  |  {"cmd":"clear_all"}
+--   {"cmd":"brightness","value":200}
 --
 -- Layout presets:
---   1 = Fullscreen          (seg 0: 64×32)
---   2 = Split Horizontal    (seg 0: top 64×16 / seg 1: bottom 64×16)
---   3 = Split Vertical      (seg 0: left 32×32 / seg 1: right 32×32)
---   4 = Quad                (4× 32×16)
---   5 = Thirds              (3 equal columns 21-21-22 × 32)
---   6 = Triple              (seg 0: left 32×32 / seg 1: top-right / seg 2: bottom-right)
+--   1 = Fullscreen              (seg0: 64x32)
+--   2 = Split Horizontal        (seg0: top 64x16 / seg1: bottom 64x16)
+--   3 = Split Vertical          (seg0: left 32x32 / seg1: right 32x32)
+--   4 = Quad                    (4x 32x16)
+--   5 = Thirds                  (3 equal columns)
+--   6 = Triple                  (seg0: left / seg1: top-right / seg2: bottom-right)
+--   11-14 = Single segment fullscreen (seg0-3 respectively)
 --
--- Color IDs:
+-- Color IDs (1-14):
 --   1=White  2=Red  3=Lime  4=Blue  5=Yellow  6=Magenta  7=Cyan
 --   8=Orange 9=Purple 10=Pink 11=Gold 12=Silver 13=Grey 14=Black
+--
+-- Font IDs: 1=Arial(Bold)  2=Verdana  3=Impact
+-- Effect IDs: 0=None  1=Scroll  2=Blink  3=Fade
+-- Align: "L" | "C" | "R"
+--
+-- Pin naming: seg1_text, seg1_text_color, seg1_bg_color, seg1_font,
+--             seg1_size, seg1_align, seg1_effect, seg1_intensity,
+--             seg1_send, seg1_clear, seg1_invert, seg1_active
 
 PluginInfo = {
-    Name    = "WT32~LED Matrix WT32-ETH01",
-    Version = "4.0.0",
-    Id      = "dhpke.wt32.led.matrix.4.0.0",
-    Description = "UDP control for WT32-ETH01 64×32 LED Matrix (integer protocol)",
-    ShowDebug = true,
-    Author  = "DHPKE"
+    Name        = "PKE~LED Matrix Display",
+    Version     = "5.0.0",
+    Id          = "dhpke.wt32.led.matrix.5.0.0",
+    Description = "WT32-ETH01 64x32 LED Matrix - integer protocol, 6 layouts, all pins exposed",
+    ShowDebug   = true,
+    Author      = "DHPKE"
 }
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Properties
--- ─────────────────────────────────────────────────────────────────────────────
 function GetProperties()
     return {
-        { Name = "IP Address",        Type = "string",  Value = "10.1.1.22" },
-        { Name = "UDP Port",          Type = "integer", Min = 1, Max = 65535, Value = 21324 },
-        { Name = "Number of Segments",Type = "integer", Min = 1, Max = 4,     Value = 4 }
+        { Name = "IP Address", Type = "string",  Value = "10.1.1.22" },
+        { Name = "UDP Port",   Type = "integer", Min = 1, Max = 65535, Value = 21324 }
     }
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Controls
--- ─────────────────────────────────────────────────────────────────────────────
 function GetControls(props)
-    local ctrls = {}
-    local n = props["Number of Segments"].Value
-
-    -- Connection
-    table.insert(ctrls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
-    table.insert(ctrls, { Name="udp_port",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
-    table.insert(ctrls, { Name="connection_status",  ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
-    table.insert(ctrls, { Name="last_command",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
-
-    -- Layout preset selector (integer 1-6)
-    table.insert(ctrls, {
-        Name = "layout",
-        ControlType = "Text",
-        ControlUnit = "List",
-        Choices = {
-            "1 – Fullscreen",
-            "2 – Split Horizontal",
-            "3 – Split Vertical",
-            "4 – Quad",
-            "5 – Thirds",
-            "6 – Triple"
-        },
-        Count = 1, UserPin = true, PinStyle = "Input"
-    })
-
-    -- Per-segment controls
-    for i = 1, n do
-        local s = i - 1
-
-        table.insert(ctrls, { Name=string.format("active_%d",s), ControlType="Indicator", IndicatorType="LED", Count=1, UserPin=true, PinStyle="Output" })
-        table.insert(ctrls, { Name=string.format("text_%d",  s), ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
-
-        -- Text color (integer 1-14)
-        table.insert(ctrls, {
-            Name = string.format("color_%d", s),
-            ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {
-                "1 – White","2 – Red","3 – Lime","4 – Blue","5 – Yellow",
-                "6 – Magenta","7 – Cyan","8 – Orange","9 – Purple",
-                "10 – Pink","11 – Gold","12 – Silver","13 – Grey","14 – Black"
-            },
-            Count=1, UserPin=true, PinStyle="Input"
-        })
-
-        -- Background color (integer 1-14)
-        table.insert(ctrls, {
-            Name = string.format("bgcolor_%d", s),
-            ControlType = "Text",
-            ControlUnit = "List",
-            Choices = {
-                "1 – White","2 – Red","3 – Lime","4 – Blue","5 – Yellow",
-                "6 – Magenta","7 – Cyan","8 – Orange","9 – Purple",
-                "10 – Pink","11 – Gold","12 – Silver","13 – Grey","14 – Black"
-            },
-            Count=1, UserPin=true, PinStyle="Input"
-        })
-
-        -- Font (integer 1-3)
-        table.insert(ctrls, {
-            Name = string.format("font_%d", s),
-            ControlType = "Text",
-            ControlUnit = "List",
-            Choices = { "1 – Arial (Bold)", "2 – Verdana", "3 – Impact" },
-            Count=1, UserPin=true, PinStyle="Input"
-        })
-
-        -- Effect (integer 0-3)
-        table.insert(ctrls, {
-            Name = string.format("effect_%d", s),
-            ControlType = "Text",
-            ControlUnit = "List",
-            Choices = { "0 – None", "1 – Scroll", "2 – Blink", "3 – Fade" },
-            Count=1, UserPin=true, PinStyle="Input"
-        })
-
-        -- Alignment
-        table.insert(ctrls, {
-            Name = string.format("align_%d", s),
-            ControlType = "Text",
-            ControlUnit = "List",
-            Choices = { "L", "C", "R" },
-            Count=1, UserPin=true, PinStyle="Input"
-        })
-
-        -- Buttons
-        table.insert(ctrls, { Name=string.format("clear_%d", s),  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
-        table.insert(ctrls, { Name=string.format("invert_%d", s), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    local controls = {}
+    table.insert(controls, { Name="ip_address",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Input"  })
+    table.insert(controls, { Name="udp_port",          ControlType="Text",      Count=1, UserPin=false, PinStyle="Input"  })
+    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=false, PinStyle="Output" })
+    table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=false, PinStyle="Output" })
+    table.insert(controls, { Name="layout",       ControlType="Text",   Count=1, UserPin=false, PinStyle="Both"  })
+    table.insert(controls, { Name="apply_layout", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+    for seg = 0, 3 do
+        local s = seg + 1
+        local p = "seg"..s.."_"
+        table.insert(controls, { Name=p.."text",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."text_color", ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."bg_color",   ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."font",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."size",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."align",      ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."effect",     ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."intensity",  ControlType="Knob", ControlUnit="Integer", Min=0, Max=255, Count=1, UserPin=false, PinStyle="Both" })
+        table.insert(controls, { Name=p.."send",   ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+        table.insert(controls, { Name=p.."clear",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+        table.insert(controls, { Name=p.."invert", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+        table.insert(controls, { Name=p.."active", ControlType="Indicator", IndicatorType="LED", Count=1, UserPin=false, PinStyle="Output" })
     end
-
-    -- Global
-    table.insert(ctrls, { Name="brightness", ControlType="Knob", ControlUnit="Integer", Min=0, Max=255, Count=1, UserPin=true, PinStyle="Both"  })
-    table.insert(ctrls, { Name="clear_all",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
-
-    return ctrls
+    table.insert(controls, { Name="brightness", ControlType="Knob",   ControlUnit="Integer", Min=0, Max=255, Count=1, UserPin=false, PinStyle="Both"  })
+    table.insert(controls, { Name="clear_all",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+    return controls
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- UI Layout
--- ─────────────────────────────────────────────────────────────────────────────
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
-    local n        = props["Number of Segments"].Value
-
-    -- Title bar
-    table.insert(graphics, { Type="GroupBox", Fill={50,50,50}, StrokeWidth=2, CornerRadius=8,
-        Position={0,0}, Size={820,50} })
-    table.insert(graphics, { Type="Text", Text="WT32-ETH01 LED Matrix Controller v4.0",
-        Font="Roboto", FontSize=18, FontStyle="Bold", HTextAlign="Center",
-        Color={220,220,220}, Position={0,14}, Size={820,28} })
-
-    -- Connection bar
-    local yConn = 58
-    table.insert(graphics, { Type="GroupBox", Text="Connection", Fill={60,60,60},
-        StrokeWidth=1, CornerRadius=4, Position={10,yConn}, Size={800,75} })
-
-    layout["ip_address"]       = { PrettyName="IP Address", Style="Text",
-        Position={20,yConn+25}, Size={180,22} }
-    layout["udp_port"]         = { PrettyName="UDP Port",   Style="Text",
-        Position={210,yConn+25}, Size={80,22} }
-    layout["connection_status"]= { PrettyName="Status",     Style="Indicator",
-        Position={300,yConn+25}, Size={40,22} }
-    layout["last_command"]     = { PrettyName="Last Command", Style="Text",
-        Position={20,yConn+52}, Size={770,18}, Color={140,140,140} }
-
-    -- Segment rows
-    local ySegs = yConn + 85
-    local rowH  = 148
-
-    for i = 1, n do
-        local s  = i - 1
-        local yB = ySegs + s * rowH
-
-        table.insert(graphics, { Type="GroupBox",
-            Text = string.format("Segment %d", s),
-            Fill={60,60,60}, StrokeWidth=1, CornerRadius=4,
-            Position={10,yB}, Size={800,rowH-6} })
-
-        -- Row 1: LED  Text  Color  BgColor  Font
-        layout[string.format("active_%d",s)] = { PrettyName="Active", Style="Led",
-            Position={22, yB+26}, Size={16,16} }
-        layout[string.format("text_%d",  s)] = { PrettyName="Text", Style="Text",
-            Position={44, yB+24}, Size={330,22} }
-        layout[string.format("color_%d", s)] = { PrettyName="Color",    Style="ComboBox",
-            Position={380,yB+24}, Size={130,22} }
-        layout[string.format("bgcolor_%d",s)] = { PrettyName="BG Color", Style="ComboBox",
-            Position={516,yB+24}, Size={130,22} }
-        layout[string.format("font_%d",  s)] = { PrettyName="Font",     Style="ComboBox",
-            Position={652,yB+24}, Size={148,22} }
-
-        -- Row 2: Effect  Align  (spacer)
-        layout[string.format("effect_%d",s)] = { PrettyName="Effect", Style="ComboBox",
-            Position={22, yB+54}, Size={130,22} }
-        layout[string.format("align_%d", s)] = { PrettyName="Align",  Style="ComboBox",
-            Position={158,yB+54}, Size={70,22} }
-
-        -- Row 3: Buttons
-        layout[string.format("clear_%d", s)] = { PrettyName="Clear", Style="Button",
-            ButtonStyle="Trigger", Legend="Clear",
-            Color={200,60,60}, Position={22,yB+84}, Size={120,34} }
-        layout[string.format("invert_%d",s)] = { PrettyName="Invert", Style="Button",
-            ButtonStyle="Trigger", Legend="Invert Colors",
-            Color={80,80,200}, Position={150,yB+84}, Size={120,34} }
+    local W   = 600
+    local CH  = 24
+    local BH  = 28
+    local C_GRP   = {62,  62,  62 }
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55 }
+    local C_BTN_R = {165, 38,  38 }
+    local C_BTN_B = {45,  105, 195}
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, { Type="GroupBox", Text=title or "", Fill=C_GRP,
+            StrokeWidth=1, CornerRadius=4, Position={x,y}, Size={w,h} })
     end
-
-    -- Global bar
-    local yGlob = ySegs + n * rowH + 4
-    table.insert(graphics, { Type="GroupBox", Text="Global", Fill={60,60,60},
-        StrokeWidth=1, CornerRadius=4, Position={10,yGlob}, Size={800,80} })
-
-    layout["brightness"] = { PrettyName="Brightness (0-255)", Style="Fader",
-        Position={20,yGlob+22}, Size={240,46} }
-    layout["clear_all"]  = { PrettyName="Clear All", Style="Button",
-        ButtonStyle="Trigger", Legend="Clear All",
-        Color={200,60,60}, Position={270,yGlob+22}, Size={150,46} }
-    layout["layout"]     = { PrettyName="Layout Preset", Style="ComboBox",
-        Position={430,yGlob+22}, Size={370,46} }
-
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, { Type="Text", Text=text, Font="Roboto", FontSize=9,
+            HTextAlign="Left", Color=C_LBL, Position={x,y}, Size={w,12} })
+    end
+    -- Title bar
+    table.insert(graphics, { Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5, Position={0,0}, Size={W,36} })
+    table.insert(graphics, { Type="Text", Text="LED Matrix Controller  v5.0.0  |  WT32-ETH01",
+        Font="Roboto", FontSize=14, FontStyle="Bold", HTextAlign="Center",
+        Color={255,255,255}, Position={0,9}, Size={W,20} })
+    -- Connection row
+    local y = 42
+    GBox(0, y, W, 54, "Connection")
+    Lbl("IP Address",   6,   y+5, 124)
+    Lbl("Port",         138, y+5, 62)
+    Lbl("Status",       208, y+5, 62)
+    Lbl("Last Command", 278, y+5, W-284)
+    layout["ip_address"]        = { PrettyName="Conn~IP",      Style="Text",      Position={6,   y+18}, Size={124, CH} }
+    layout["udp_port"]          = { PrettyName="Conn~Port",    Style="Text",      Position={138, y+18}, Size={62,  CH} }
+    layout["connection_status"] = { PrettyName="Conn~Status",  Style="Indicator", Position={208, y+18}, Size={62,  CH} }
+    layout["last_command"]      = { PrettyName="Conn~LastCmd", Style="Text",      Position={278, y+18}, Size={W-284, CH} }
+    -- Layout row
+    y = y + 60
+    GBox(0, y, W, 50, "Display Layout")
+    Lbl("Layout Preset", 6, y+5, 190)
+    layout["layout"]       = { PrettyName="Layout~Preset", Style="ComboBox", IsReadOnly=false,
+        Position={6,   y+18}, Size={190, CH} }
+    layout["apply_layout"] = { PrettyName="Layout~Apply",  Style="Button",
+        ButtonStyle="Trigger", Legend="Apply Layout", Color=C_BTN_B,
+        Position={204, y+18}, Size={130, CH} }
+    -- Segment rows
+    y = y + 56
+    local SEG_H = 122
+    for seg = 0, 3 do
+        local s  = seg + 1
+        local p  = "seg"..s.."_"
+        local G  = "Seg"..s
+        local sy = y + seg * (SEG_H + 4)
+        GBox(0, sy, W, SEG_H, G)
+        -- Row 1: active LED, text field, send/invert/clear buttons
+        local r1 = sy + 16
+        layout[p.."active"] = { PrettyName=G.."~Active", Style="Led",    Position={6, r1+5}, Size={14, 14} }
+        Lbl("Text", 26, r1-12, W-330)
+        layout[p.."text"]   = { PrettyName=G.."~Text",   Style="Text",   Position={26, r1}, Size={W-332, CH} }
+        layout[p.."send"]   = { PrettyName=G.."~Send",   Style="Button", ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G, Position={W-300, r1}, Size={95, BH} }
+        layout[p.."invert"] = { PrettyName=G.."~Invert", Style="Button", ButtonStyle="Trigger", Legend="Invert",  Color=C_BTN_B, Position={W-199, r1}, Size={95, BH} }
+        layout[p.."clear"]  = { PrettyName=G.."~Clear",  Style="Button", ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R, Position={W-98,  r1}, Size={92, BH} }
+        -- Row 2: color/font/size/align/effect combos
+        local r2 = sy + 52
+        local cols = {
+            { "Text Color", "text_color", "TxtColor", 114 },
+            { "BG Color",   "bg_color",   "BgColor",  114 },
+            { "Font",       "font",       "Font",       84 },
+            { "Size",       "size",       "Size",       68 },
+            { "Align",      "align",      "Align",      78 },
+            { "Effect",     "effect",     "Effect",     96 },
+        }
+        local cx = 6
+        for _, col in ipairs(cols) do
+            Lbl(col[1], cx, r2-13, col[4])
+            layout[p..col[2]] = { PrettyName=G.."~"..col[3], Style="ComboBox", IsReadOnly=false,
+                Position={cx, r2}, Size={col[4], CH} }
+            cx = cx + col[4] + 6
+        end
+        -- Row 3: intensity fader
+        local r3 = sy + 88
+        Lbl("Intensity  (0 = off, 255 = full)", 6, r3-13, 260)
+        layout[p.."intensity"] = { PrettyName=G.."~Intensity", Style="Fader", Position={6, r3}, Size={W-14, 22} }
+    end
+    -- Global controls
+    y = y + 4 * (SEG_H + 4) + 4
+    GBox(0, y, W, 64, "Global Controls")
+    Lbl("Global Brightness", 6, y+5, 220)
+    layout["brightness"] = { PrettyName="Global~Bright",   Style="Fader",  Position={6,   y+18}, Size={340, 36} }
+    layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button", ButtonStyle="Trigger", Legend="Clear All Segments", Color=C_BTN_R, Position={354, y+18}, Size={200, 36} }
     return layout, graphics
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Runtime
--- ─────────────────────────────────────────────────────────────────────────────
 if Controls then
+    local socket   = nil
+    local ip_addr  = Properties["IP Address"].Value
+    local udp_port = Properties["UDP Port"].Value
+    local activeLayoutSegments = { [0] = true }
+    local debounceTimers = {}
 
-    local socket      = nil
-    local ip_addr     = Properties["IP Address"].Value
-    local udp_port    = Properties["UDP Port"].Value
-    local n           = Properties["Number of Segments"].Value
-
-    -- Which segments are active per layout preset
-    local LAYOUT_ACTIVE = {
-        [1]={0},        [2]={0,1},      [3]={0,1},
-        [4]={0,1,2,3},  [5]={0,1,2},    [6]={0,1,2}
+    local ColorId = {
+        ["White"]=1,  ["Red"]=2,    ["Lime"]=3,   ["Blue"]=4,
+        ["Yellow"]=5, ["Magenta"]=6,["Cyan"]=7,   ["Orange"]=8,
+        ["Purple"]=9, ["Pink"]=10,  ["Gold"]=11,  ["Silver"]=12,
+        ["Grey"]=13,  ["Gray"]=13,  ["Black"]=14, ["Green"]=3
+    }
+    local FontId = {
+        ["Arial (Bold)"]=1, ["Arial"]=1,
+        ["Verdana"]=2,
+        ["Impact"]=3, ["Digital"]=3, ["Mono"]=3
+    }
+    local EffectId = {
+        ["none"]=0,  ["None"]=0,
+        ["scroll"]=1,["Scroll"]=1,
+        ["blink"]=2, ["Blink"]=2,
+        ["fade"]=3,  ["Fade"]=3
+    }
+    local AlignLetter = {
+        ["Left"]="L", ["Center"]="C", ["Right"]="R",
+        ["L"]="L",    ["C"]="C",      ["R"]="R"
+    }
+    local LayoutActiveSegs = {
+        [1]={0},       [2]={0,1},     [3]={0,1},
+        [4]={0,1,2,3}, [5]={0,1,2},   [6]={0,1,2},
+        [11]={0},      [12]={1},      [13]={2},    [14]={3}
     }
 
-    local currentPreset = 1
-    local activeSegments = {0}
-
-    -- ── Helpers ───────────────────────────────────────────────────────────────
-
-    -- Extract the leading integer from a combo choice like "2 – Red" → 2
-    local function choiceToInt(str)
-        return tonumber(str:match("^(%d+)"))
+    local function resolvePreset(input)
+        local n = tonumber(input)
+        if n then return n end
+        n = tonumber(tostring(input):match("^(%d+)"))
+        if n then return n end
+        return nil
     end
 
-    -- Validate / reconnect socket
-    local function OpenSocket()
+    local function Debounce(key, delay, fn)
+        if debounceTimers[key] then debounceTimers[key]:Stop() end
+        if not debounceTimers[key] then debounceTimers[key] = Timer.New() end
+        local t = debounceTimers[key]
+        t.EventHandler = function() t:Stop(); fn() end
+        t:Start(delay)
+    end
+
+    local function ReopenSocket()
         if socket then pcall(function() socket:Close() end) end
         local ok, err = pcall(function()
             socket = UdpSocket.New()
@@ -261,213 +228,203 @@ if Controls then
         end)
         if ok then
             Controls.connection_status.Value = 0
-            print("✓ UDP socket ready → " .. ip_addr .. ":" .. udp_port)
+            print("UDP ready -> " .. ip_addr .. ":" .. udp_port)
         else
             Controls.connection_status.Value = 2
-            print("✗ Socket error: " .. tostring(err))
+            print("Socket error: " .. tostring(err))
         end
     end
 
-    -- Send raw JSON string
+    local function jsonStr(v)
+        if v == nil then return "null" end
+        if type(v) == "number" then return tostring(math.floor(v)) end
+        if type(v) == "boolean" then return v and "true" or "false" end
+        v = tostring(v):gsub("\\","\\\\"):gsub('"','\\"')
+        return '"' .. v .. '"'
+    end
+    local function buildJson(t)
+        local parts = {}
+        for k, v in pairs(t) do table.insert(parts, jsonStr(k)..":"..jsonStr(v)) end
+        return "{"..table.concat(parts,",").."}"
+    end
+
     local function SendCommand(json)
         if not socket then
             Controls.connection_status.Value = 2
-            Controls.last_command.String = "ERROR: no socket"
+            Controls.last_command.String = "ERROR: No socket"
             return false
         end
-        local ok, err = pcall(function()
-            socket:Send(ip_addr, udp_port, json .. "\n")
-        end)
+        local ok, err = pcall(function() socket:Send(ip_addr, udp_port, json.."\n") end)
         if ok then
             Controls.connection_status.Value = 0
             Controls.last_command.String = json
-            print("→ " .. json)
+            print("-> "..json)
             return true
         else
             Controls.connection_status.Value = 2
-            Controls.last_command.String = "ERR: " .. tostring(err)
-            print("✗ " .. tostring(err))
+            Controls.last_command.String = "ERR: "..tostring(err)
             return false
         end
     end
 
-    -- Build + send a "text" command for one segment
-    local function SendTextCommand(seg)
-        local text    = Controls[string.format("text_%d",    seg)].String
-        local colorId = choiceToInt(Controls[string.format("color_%d",  seg)].String) or 1
-        local bgId    = choiceToInt(Controls[string.format("bgcolor_%d",seg)].String) or 14
-        local fontId  = choiceToInt(Controls[string.format("font_%d",   seg)].String) or 1
-        local fxId    = choiceToInt(Controls[string.format("effect_%d", seg)].String) or 0
-        local align   = Controls[string.format("align_%d",  seg)].String
-
-        local json = string.format(
-            '{"cmd":"text","seg":%d,"text":"%s","color":%d,"bgcolor":%d,"font":%d,"effect":%d,"align":"%s"}',
-            seg, text:gsub('"', '\\"'), colorId, bgId, fontId, fxId, align
-        )
-        if SendCommand(json) then
-            Controls[string.format("active_%d", seg)].Boolean = (text ~= "")
-        end
+    local function BuildTextCommand(seg)
+        local s = seg + 1
+        local p = "seg"..s.."_"
+        local text    = Controls[p.."text"].String
+        local colorId = ColorId[Controls[p.."text_color"].String] or 1
+        local bgId    = ColorId[Controls[p.."bg_color"].String]   or 14
+        local fontId  = FontId[Controls[p.."font"].String]        or 1
+        local fxId    = EffectId[Controls[p.."effect"].String]    or 0
+        local align   = AlignLetter[Controls[p.."align"].String]  or "C"
+        local intens  = math.floor(Controls[p.."intensity"].Value)
+        local json = buildJson({cmd="text", seg=seg, text=text, color=colorId,
+            bgcolor=bgId, font=fontId, effect=fxId, align=align, intensity=intens})
+        return text, json
     end
 
-    -- Check if segment is active in current layout
-    local function IsActive(seg)
-        for _, s in ipairs(activeSegments) do
-            if s == seg then return true end
-        end
-        return false
-    end
-
-    -- ── Debounce timers ───────────────────────────────────────────────────────
-    local segTimers   = {}
-    local brightTimer = nil
-    local pendingBrightness = nil
-
-    local function DebouncedSend(seg)
-        if segTimers[seg] then segTimers[seg]:Cancel() end
-        segTimers[seg] = Timer.New()
-        segTimers[seg].EventHandler = function()
-            if IsActive(seg) then
-                SendTextCommand(seg)
-            else
-                print(string.format("Seg %d edited offline (layout %d)", seg, currentPreset))
-            end
-        end
-        segTimers[seg]:Start(0.4)
-    end
-
-    -- ── Layout ────────────────────────────────────────────────────────────────
-    local function ApplyLayout(preset)
-        currentPreset  = preset
-        activeSegments = LAYOUT_ACTIVE[preset] or {0}
-
-        -- Single command — device handles all geometry
+    local function ApplyLayout(input)
+        local preset = resolvePreset(input)
+        if not preset then print("Unknown layout: "..tostring(input)); return end
         SendCommand(string.format('{"cmd":"layout","preset":%d}', preset))
-
-        print(string.format("✓ Layout %d applied (active: %s)",
-            preset, table.concat(activeSegments, ",")))
-
-        -- Re-send text for all now-active segments after device settles
+        activeLayoutSegments = {}
+        local segs = LayoutActiveSegs[preset] or {0}
+        for _, s in ipairs(segs) do activeLayoutSegments[s] = true end
+        for seg = 0, 3 do
+            Controls["seg"..(seg+1).."_active"].Boolean = activeLayoutSegments[seg] == true
+        end
+        print(string.format("Layout preset %d applied", preset))
         Timer.CallAfter(function()
-            for _, s in ipairs(activeSegments) do
-                SendTextCommand(s)
+            for _, s in ipairs(segs) do
+                local _, cmd = BuildTextCommand(s)
+                SendCommand(cmd)
             end
         end, 0.35)
     end
 
-    -- ── Event handlers ────────────────────────────────────────────────────────
+    local function Initialize()
+        print("LED Matrix Complete v5.0.0 Init")
+        Controls.ip_address.String   = ip_addr
+        Controls.udp_port.String     = tostring(udp_port)
+        Controls.brightness.Value    = 128
+        Controls.last_command.String = "Ready"
+        Controls.layout.Choices = {
+            "1 - Fullscreen", "2 - Split Horizontal", "3 - Split Vertical", "4 - Quad",
+            "5 - Thirds",     "6 - Triple",
+            "11 - Fullscreen Seg1", "12 - Fullscreen Seg2",
+            "13 - Fullscreen Seg3", "14 - Fullscreen Seg4"
+        }
+        Controls.layout.String = "1 - Fullscreen"
+        local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
+                                "Orange","Purple","Pink","Gold","Silver","Grey","Black"}
+        local fontChoices   = {"Arial (Bold)","Verdana","Impact"}
+        local sizeChoices   = {"auto","8","12","16","24","32"}
+        local alignChoices  = {"Left","Center","Right"}
+        local effectChoices = {"none","scroll","blink","fade"}
+        local defaultColors = {"White","Lime","Red","Yellow"}
+        for seg = 0, 3 do
+            local s = seg + 1
+            local p = "seg"..s.."_"
+            Controls[p.."text_color"].Choices = colorChoices
+            Controls[p.."bg_color"].Choices   = colorChoices
+            Controls[p.."font"].Choices       = fontChoices
+            Controls[p.."size"].Choices       = sizeChoices
+            Controls[p.."align"].Choices      = alignChoices
+            Controls[p.."effect"].Choices     = effectChoices
+            Controls[p.."text"].String        = ""
+            Controls[p.."text_color"].String  = defaultColors[s]
+            Controls[p.."bg_color"].String    = "Black"
+            Controls[p.."intensity"].Value    = 255
+            Controls[p.."font"].String        = "Arial (Bold)"
+            Controls[p.."size"].String        = "auto"
+            Controls[p.."align"].String       = "Center"
+            Controls[p.."effect"].String      = "none"
+            Controls[p.."active"].Boolean     = (seg == 0)
+        end
+        ReopenSocket()
+    end
 
-    -- Layout combo: choice string "N – Name" → integer N
-    Controls.layout.EventHandler = function(ctl)
-        local preset = choiceToInt(ctl.String)
-        if preset and LAYOUT_ACTIVE[preset] then
-            ApplyLayout(preset)
+    -- Layout event handlers
+    Controls.layout.EventHandler       = function(ctl) ApplyLayout(ctl.String) end
+    Controls.apply_layout.EventHandler = function()    ApplyLayout(Controls.layout.String) end
+
+    -- Per-segment event handlers
+    for seg = 0, 3 do
+        local s = seg + 1
+        local p = "seg"..s.."_"
+        Controls[p.."send"].EventHandler = function()
+            local text, cmd = BuildTextCommand(seg)
+            if SendCommand(cmd) then
+                Controls[p.."active"].Boolean = true
+                activeLayoutSegments[seg] = true
+            end
+        end
+        Controls[p.."clear"].EventHandler = function()
+            if SendCommand(buildJson({cmd="clear", seg=seg})) then
+                Controls[p.."active"].Boolean = false
+                activeLayoutSegments[seg] = nil
+            end
+        end
+        Controls[p.."invert"].EventHandler = function()
+            local cc = Controls[p.."text_color"]
+            local bc = Controls[p.."bg_color"]
+            local tmp = cc.String; cc.String = bc.String; bc.String = tmp
+            if activeLayoutSegments[seg] then
+                local _, cmd = BuildTextCommand(seg); SendCommand(cmd)
+            end
+        end
+        local function AutoSend()
+            if not activeLayoutSegments[seg] then return end
+            local _, cmd = BuildTextCommand(seg); SendCommand(cmd)
+        end
+        Controls[p.."text"].EventHandler       = AutoSend
+        Controls[p.."text_color"].EventHandler = AutoSend
+        Controls[p.."bg_color"].EventHandler   = AutoSend
+        Controls[p.."font"].EventHandler       = AutoSend
+        Controls[p.."size"].EventHandler       = AutoSend
+        Controls[p.."align"].EventHandler      = AutoSend
+        Controls[p.."effect"].EventHandler     = AutoSend
+        Controls[p.."intensity"].EventHandler  = function()
+            if not activeLayoutSegments[seg] then return end
+            Debounce("intensity_"..seg, 0.5, function()
+                local _, cmd = BuildTextCommand(seg); SendCommand(cmd)
+            end)
         end
     end
 
-    -- Per-segment controls → debounced send
-    for i = 1, n do
-        local s = i - 1
-        local names = {"text", "color", "bgcolor", "font", "effect", "align"}
-        for _, ctrl in ipairs(names) do
-            Controls[string.format("%s_%d", ctrl, s)].EventHandler = function()
-                DebouncedSend(s)
-            end
-        end
-
-        -- Clear button
-        Controls[string.format("clear_%d", s)].EventHandler = function()
-            if SendCommand(string.format('{"cmd":"clear","seg":%d}', s)) then
-                Controls[string.format("active_%d", s)].Boolean = false
-                Controls[string.format("text_%d",   s)].String  = ""
-            end
-        end
-
-        -- Invert button (swap color ↔ bgcolor)
-        Controls[string.format("invert_%d", s)].EventHandler = function()
-            local cc = Controls[string.format("color_%d",  s)]
-            local bc = Controls[string.format("bgcolor_%d",s)]
-            local tmp = cc.String
-            cc.String = bc.String
-            bc.String = tmp
-            DebouncedSend(s)
-        end
-    end
-
-    -- Clear All
+    -- Global controls
     Controls.clear_all.EventHandler = function()
-        if SendCommand('{"cmd":"clear_all"}') then
-            for i = 1, n do
-                local s = i - 1
-                Controls[string.format("active_%d",s)].Boolean = false
-                Controls[string.format("text_%d",  s)].String  = ""
-            end
+        if SendCommand(buildJson({cmd="clear_all"})) then
+            for seg = 0, 3 do Controls["seg"..(seg+1).."_active"].Boolean = false end
+            activeLayoutSegments = {}
         end
     end
-
-    -- Brightness (debounced 500 ms)
     Controls.brightness.EventHandler = function(ctl)
-        pendingBrightness = math.floor(ctl.Value)
-        if brightTimer then brightTimer:Cancel() end
-        brightTimer = Timer.New()
-        brightTimer.EventHandler = function()
-            if pendingBrightness then
-                SendCommand(string.format('{"cmd":"brightness","value":%d}', pendingBrightness))
-                pendingBrightness = nil
-            end
-        end
-        brightTimer:Start(0.5)
+        local val = math.floor(ctl.Value)
+        Debounce("brightness", 0.5, function()
+            SendCommand(buildJson({cmd="brightness", value=val}))
+        end)
     end
 
-    -- IP / Port changes
+    -- Connection controls
     Controls.ip_address.EventHandler = function(ctl)
-        ip_addr = ctl.String
-        OpenSocket()
+        ip_addr = ctl.String; ReopenSocket()
     end
     Controls.udp_port.EventHandler = function(ctl)
         local v = tonumber(ctl.String)
         if v and v >= 1 and v <= 65535 then
-            udp_port = v
-            OpenSocket()
+            udp_port = v; ReopenSocket()
         else
-            Controls.last_command.String = "ERROR: invalid port"
+            Controls.last_command.String = "ERROR: Invalid port"
         end
     end
 
-    -- ── Initialize ────────────────────────────────────────────────────────────
-    local function Initialize()
-        print("=========================================")
-        print("WT32 LED Matrix Controller v4.0.0 Init")
-        print("=========================================")
-
-        Controls.ip_address.String = ip_addr
-        Controls.udp_port.String   = tostring(udp_port)
-        Controls.brightness.Value  = 128
-        Controls.last_command.String = "Ready"
-        Controls.layout.String       = "1 – Fullscreen"
-
-        for i = 1, n do
-            local s = i - 1
-            Controls[string.format("color_%d",  s)].String = "1 – White"
-            Controls[string.format("bgcolor_%d",s)].String = "14 – Black"
-            Controls[string.format("font_%d",   s)].String = "1 – Arial (Bold)"
-            Controls[string.format("effect_%d", s)].String = "0 – None"
-            Controls[string.format("align_%d",  s)].String = "C"
-            Controls[string.format("active_%d", s)].Boolean = false
-        end
-
-        OpenSocket()
-        print("=========================================")
-    end
-
-    -- Cleanup
     function Cleanup()
-        if socket then pcall(function() socket:Close() end) end
-        if brightTimer then brightTimer:Cancel() end
-        for i = 1, n do
-            local s = i - 1
-            if segTimers[s] then segTimers[s]:Cancel() end
+        for _, t in pairs(debounceTimers) do
+            if t then pcall(function() t:Stop() end) end
         end
+        if socket then pcall(function() socket:Close() end) end
     end
 
     Initialize()
 end
+
