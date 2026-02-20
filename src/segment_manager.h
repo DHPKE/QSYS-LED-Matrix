@@ -64,12 +64,14 @@ public:
     }
     
     void initDefaultLayout() {
-        // Segment 1: Left half (horizontal split 1|2)
+        // Segment 1: Default fullscreen (layout preset 1).
+        // This matches what showIPOnDisplay() + applyLayoutPreset(1) sets up,
+        // so the WebUI canvas immediately shows the correct geometry on first poll.
         segments[0].id = 0;
         segments[0].x = 0;
         segments[0].y = 0;
-        segments[0].width = LED_MATRIX_WIDTH / 2;  // 32 pixels
-        segments[0].height = LED_MATRIX_HEIGHT;     // 32 pixels
+        segments[0].width = LED_MATRIX_WIDTH;   // full width
+        segments[0].height = LED_MATRIX_HEIGHT;  // full height
         strcpy(segments[0].text, "");
         segments[0].color = 0xFFFF;
         segments[0].bgColor = 0x0000;

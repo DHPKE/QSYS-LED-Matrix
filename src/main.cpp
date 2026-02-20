@@ -562,13 +562,14 @@ const LS=9,LCOLS=64,LROWS=32,LDOT=8,LR=2;
 function drawBg(){ctx.fillStyle='#111';ctx.fillRect(0,0,576,288);ctx.fillStyle='#1a1a1a';for(let r=0;r<LROWS;r++)for(let c=0;c<LCOLS;c++){ctx.beginPath();ctx.roundRect(c*LS,r*LS,LDOT,LDOT,LR);ctx.fill();}}
 function blit(){const d=off.getImageData(0,0,LCOLS,LROWS).data;for(let r=0;r<LROWS;r++)for(let c=0;c<LCOLS;c++){const i=(r*LCOLS+c)*4,R=d[i],G=d[i+1],B=d[i+2];if(R<9&&G<9&&B<9)continue;ctx.fillStyle='rgb('+R+','+G+','+B+')';ctx.beginPath();ctx.roundRect(c*LS,r*LS,LDOT,LDOT,LR);ctx.fill();}}
 function redraw(){drawBg();blit();ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1;for(let i=0;i<4;i++){const b=sb[i];if(b&&b.w>0)ctx.strokeRect(b.x*LS-.5,b.y*LS-.5,b.w*LS,b.h*LS);}}
-function drawSeg(i,txt,fg,bg,al){const b=sb[i];if(!b||!b.w)return;off.fillStyle=bg||'#000';off.fillRect(b.x,b.y,b.w,b.h);if(txt){const fv=parseInt((document.getElementById('font'+i)||{value:'1'}).value);const ff=[,'bold Arial','Verdana','Impact'][fv]||'bold Arial';const aw=b.w-2,ah=b.h-2;let fs=6;for(const sz of[24,20,18,16,14,12,10,9,8,6]){off.font=sz+'px '+ff;const m=off.measureText(txt);if(m.width<=aw&&(m.actualBoundingBoxAscent||sz)+(m.actualBoundingBoxDescent||sz*.2)<=ah){fs=sz;break;}}off.font=fs+'px '+ff;off.fillStyle=fg||'#fff';off.textBaseline='middle';const tw=off.measureText(txt).width;const tx=al==='L'?b.x+1:al==='R'?b.x+b.w-tw-1:b.x+(b.w-tw)/2;off.fillText(txt,tx,b.y+b.h/2);}redraw();}
+function getFontFamily(i){const fv=parseInt((document.getElementById('font'+i)||{value:'1'}).value);return[,'bold Arial','Verdana','Impact'][fv]||'bold Arial';}
+function drawSeg(i,txt,fg,bg,al,fontOverride){const b=sb[i];if(!b||!b.w)return;off.fillStyle=bg||'#000';off.fillRect(b.x,b.y,b.w,b.h);if(txt){const ff=fontOverride||getFontFamily(i);const aw=b.w-2,ah=b.h-2;let fs=6;for(const sz of[24,20,18,16,14,12,10,9,8,6]){off.font=sz+'px '+ff;const m=off.measureText(txt);const th=sz*1.2;if(m.width<=aw&&th<=ah){fs=sz;break;}}off.font=fs+'px '+ff;off.fillStyle=fg||'#fff';off.textBaseline='middle';const tw=off.measureText(txt).width;const tx=al==='L'?b.x+1:al==='R'?b.x+b.w-tw-1:b.x+(b.w-tw)/2;off.fillText(txt,tx,b.y+b.h/2);}redraw();}
 function updSt(active){for(let i=0;i<4;i++){const c=document.getElementById('sc'+i);if(c)c.classList.toggle('off',!active.includes(i));}}
 function updLb(p){document.querySelectorAll('.lb').forEach(b=>b.classList.toggle('on',+b.dataset.p===p));}
 function setSt(msg,t){const e=document.getElementById('status');e.textContent=msg;e.className='st '+(t||'ok');}
 function sa(i,a,btn){sa_[i]=a;btn.parentElement.querySelectorAll('.ab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
 function sched(d){clearTimeout(pTimer);pTimer=setTimeout(poll,d);}
-function poll(){const ac=new AbortController();const tid=setTimeout(()=>ac.abort(),3000);fetch('/api/segments',{signal:ac.signal}).then(r=>{clearTimeout(tid);return r.json();}).then(data=>{if(!data||!data.segments)return;pFail=0;if(Date.now()<lockUntil){sched(2000);return;}const act=data.segments.filter(s=>s.active&&s.w>0&&s.h>0).map(s=>s.id);updSt(act);data.segments.forEach(s=>{sb[s.id]={x:s.x,y:s.y,w:s.w,h:s.h};});off.fillStyle='#000';off.fillRect(0,0,LCOLS,LROWS);data.segments.forEach(s=>{if(s.active&&s.w>0)drawSeg(s.id,s.text||'',s.color||'#fff',s.bgcolor||'#000',s.align||'C');});redraw();sched(2000);}).catch(()=>{clearTimeout(tid);pFail++;const bk=Math.min(2000*Math.pow(2,pFail),30000);if(pFail===1)setSt('Lost connection...','err');if(pFail>=MAX_FAIL)setSt('Device unreachable','err');sched(bk);});}
+function poll(){const ac=new AbortController();const tid=setTimeout(()=>ac.abort(),3000);fetch('/api/segments',{signal:ac.signal}).then(r=>{clearTimeout(tid);return r.json();}).then(data=>{if(!data||!data.segments)return;pFail=0;if(Date.now()<lockUntil){sched(2000);return;}const act=data.segments.filter(s=>s.active&&s.w>0&&s.h>0).map(s=>s.id);updSt(act);data.segments.forEach(s=>{sb[s.id]={x:s.x,y:s.y,w:s.w,h:s.h};});off.fillStyle='#000';off.fillRect(0,0,LCOLS,LROWS);data.segments.forEach(s=>{if(s.active&&s.w>0){const ff=[,'bold Arial','Verdana','Impact'][s.font||1]||'bold Arial';drawSeg(s.id,s.text||'',s.color||'#fff',s.bgcolor||'#000',s.align||'C',ff);}});redraw();sched(2000);}).catch(()=>{clearTimeout(tid);pFail++;const bk=Math.min(2000*Math.pow(2,pFail),30000);if(pFail===1)setSt('Lost connection...','err');if(pFail>=MAX_FAIL)setSt('Device unreachable','err');sched(bk);});}
 function sj(obj,r){r=r===undefined?2:r;return fetch('/api/test',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(obj)}).then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();}).catch(e=>{if(r>0)return new Promise(ok=>setTimeout(ok,300)).then(()=>sj(obj,r-1));setSt('Error: '+e.message,'err');throw e;});}
 const LAYOUTS={1:[[0,0,64,32]],2:[[0,0,64,16],[0,16,64,16]],3:[[0,0,32,32],[32,0,32,32]],4:[[0,0,32,16],[32,0,32,16],[0,16,32,16],[32,16,32,16]],5:[[0,0,21,32],[21,0,21,32],[42,0,22,32]],6:[[0,0,32,32],[32,0,32,16],[32,16,32,16]]};
 const LA={1:[0],2:[0,1],3:[0,1],4:[0,1,2,3],5:[0,1,2],6:[0,1,2]};
@@ -759,6 +760,14 @@ void handleSegments(AsyncWebServerRequest *request) {
                                (seg->effect == EFFECT_BLINK)   ? "blink"  :
                                (seg->effect == EFFECT_FADE)    ? "fade"   :
                                (seg->effect == EFFECT_RAINBOW) ? "rainbow": "none";
+            // font: map fontName to the numeric ID used by the WebUI selector
+            // 1=Arial(Bold)  2=Verdana  3=Impact  (default to 1)
+            int fontId = 1;
+            if (strstr(seg->fontName, "verdana") || strstr(seg->fontName, "roboto8"))
+                fontId = 2;
+            else if (strstr(seg->fontName, "impact"))
+                fontId = 3;
+            segObj["font"] = fontId;
 
             // Convert RGB565 colors back to hex strings for the web UI
             uint16_t c  = seg->color;
