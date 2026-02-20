@@ -24,7 +24,7 @@
 --   1=White  2=Red  3=Lime  4=Blue  5=Yellow  6=Magenta  7=Cyan
 --   8=Orange 9=Purple 10=Pink 11=Gold 12=Silver 13=Grey 14=Black
 --
--- Font IDs: 1=Arial(Bold)  2=Verdana  3=Impact
+-- Font IDs: 1=FreeSans Bold  2=FreeSans  3=FreeMono Bold
 -- Effect IDs: 0=None  1=Scroll  2=Blink  3=Fade
 -- Align: "L" | "C" | "R"
 --
@@ -184,9 +184,9 @@ if Controls then
         ["Grey"]=13,  ["Gray"]=13,  ["Black"]=14, ["Green"]=3
     }
     local FontId = {
-        ["Arial (Bold)"]=1, ["Arial"]=1,
-        ["Verdana"]=2,
-        ["Impact"]=3, ["Digital"]=3, ["Mono"]=3
+        ["FreeSans Bold"]=1,   ["Arial (Bold)"]=1, ["Arial"]=1, ["Bold"]=1,
+        ["FreeSans"]=2,        ["Verdana"]=2,       ["Sans"]=2,
+        ["FreeMono Bold"]=3,   ["Impact"]=3,        ["Mono"]=3,  ["Digital"]=3
     }
     local EffectId = {
         ["none"]=0,  ["None"]=0,
@@ -316,7 +316,7 @@ if Controls then
         Controls.layout.String = "1 - Fullscreen"
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
                                 "Orange","Purple","Pink","Gold","Silver","Grey","Black"}
-        local fontChoices   = {"Arial (Bold)","Verdana","Impact"}
+        local fontChoices   = {"FreeSans Bold","FreeSans","FreeMono Bold"}
         local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}
         local effectChoices = {"none","scroll","blink","fade"}
@@ -334,7 +334,7 @@ if Controls then
             Controls[p.."text_color"].String  = defaultColors[s]
             Controls[p.."bg_color"].String    = "Black"
             Controls[p.."intensity"].Value    = 255
-            Controls[p.."font"].String        = "Arial (Bold)"
+            Controls[p.."font"].String        = "FreeSans Bold"
             Controls[p.."size"].String        = "auto"
             Controls[p.."align"].String       = "Center"
             Controls[p.."effect"].String      = "none"

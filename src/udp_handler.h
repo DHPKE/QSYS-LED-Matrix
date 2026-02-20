@@ -99,9 +99,9 @@ static TextEffect parseEffect(JsonVariant v) {
     return EFFECT_NONE;
 }
 
-// Parse font field — accepts integer 1-3 or name string → stores as "arial"/"verdana"/"impact"
+// Parse font field — accepts integer 1-3 or name string → stores canonical name
 static void parseFontName(JsonVariant v, char* out, size_t len) {
-    const char* names[] = { "arial", "verdana", "impact" };
+    const char* names[] = { "freesansbold", "freesans", "freemonobold" };
     if (v.is<int>()) {
         int id = v.as<int>();
         if (id < 1 || id > 3) id = 1;
@@ -109,7 +109,7 @@ static void parseFontName(JsonVariant v, char* out, size_t len) {
         out[len - 1] = '\0';
         return;
     }
-    const char* s = v | "arial";
+    const char* s = v | "freesansbold";
     // Normalise to canonical name via parseFontId
     uint8_t id = parseFontId(s);
     strncpy(out, names[id - 1], len - 1);
