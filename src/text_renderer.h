@@ -11,14 +11,26 @@ private:
     MatrixPanel_I2S_DMA* dma_display;
     SegmentManager*      segmentManager;
 
-    // â”€â”€ Font selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Pick the largest GFX font whose rendered text fits within (maxW Ã— maxH).
-    // Returns the chosen font and sets outPixelH to the font's pixel height.
+    // ── Font auto-size ──────────────────────────────────────────────────────────
+    // Pick the largest GFX font whose rendered text fits within (maxW x maxH)
+    // with a guaranteed 1-pixel margin on every side around the actual glyphs.
+    // getFontById bucket thresholds: <=12->9pt  <=16->12pt  <=22->18pt  else->24pt
+    // We probe at heights that land in each distinct bucket (30, 22, 16, 12),
+    // then fall back to TomThumb if even 12pt does not fit.
     const GFXfont* fitFont(uint8_t fontId, const char* text,
                            uint16_t maxW, uint16_t maxH,
                            uint8_t& outPixelH) {
-        // Candidate pixel heights from largest to smallest
-        static const uint8_t heights[] = { 26, 22, 16, 12, 0 }; // 0 = TomThumb fallback
+        // Discrete pixel-height candidates, largest first.
+        // Each value triggers a different font file in getFontById.
+        static const uint8_t heights[] = { 30, 22, 16, 12, 0 }; // 0 = TomThumb
+
+        // Enforce 1-pixel margin on every side: subtract 2 from each dimension
+        // (getTextBounds returns the tight glyph bbox, so this guarantees no
+        // glyph pixel ever touches the segment border).
+        const uint16_t MARGIN = 2; // 1 px each side
+        if (maxW <= MARGIN || maxH <= MARGIN) { outPixelH = 0; return &TomThumb; }
+        const uint16_t fitW = maxW - MARGIN;
+        const uint16_t fitH = maxH - MARGIN;
 
         for (int i = 0; ; i++) {
             uint8_t ph = heights[i];
@@ -26,11 +38,15 @@ private:
             dma_display->setFont(f);
             int16_t x1, y1; uint16_t tw, th;
             dma_display->getTextBounds(text, 0, 0, &x1, &y1, &tw, &th);
-            if (tw <= maxW && th <= maxH) {
+            if (tw <= fitW && th <= fitH) {
                 outPixelH = ph;
                 return f;
             }
-            if (ph == 0) { outPixelH = 0; return f; } // nothing fits, use TomThumb anyway
+            if (ph == 0) {
+                // TomThumb is the absolute last resort
+                outPixelH = 0;
+                return f;
+            }
         }
     }
 
@@ -65,9 +81,11 @@ public:
             dma_display->drawRect(seg->x, seg->y, seg->width, seg->height, seg->borderColor);
 
         // â”€â”€ Font selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        const int PAD = 2;
-        uint16_t maxW = (seg->width  > PAD*2) ? seg->width  - PAD*2 : seg->width;
-        uint16_t maxH = (seg->height > PAD*2) ? seg->height - PAD*2 : seg->height;
+        // PAD = 1 used only for text cursor placement.
+        // fitFont() already subtracts its own 1-px glyph margin from maxW/maxH.
+        const int PAD = 1;
+        uint16_t maxW = seg->width;
+        uint16_t maxH = seg->height;
 
         uint8_t fontId   = parseFontId(seg->fontName);
         uint8_t pixelH   = 0;
