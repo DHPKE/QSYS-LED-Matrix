@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 3.13.0 - 7+4 preset layout system matching RPi firmware
+-- Version 3.14.0 - Visual layout thumbnails restored, clean geometry
 -- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -24,9 +24,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.13.0",
-    Id = "dhpke.olimex.led.matrix.3.13.0",
-    Description = "RPi 64x32 LED Matrix - 7 layouts + 4 single-segment presets",
+    Version = "3.14.0",
+    Id = "dhpke.olimex.led.matrix.3.14.0",
+    Description = "RPi 64x32 LED Matrix - visual layout thumbnails, 7+4 presets",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -123,7 +123,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v3.13.0",
+        Type="Text", Text="LED Matrix Controller  v3.14.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -142,29 +142,120 @@ function GetControlLayout(props)
     layout["last_command"]      = { PrettyName="Conn~LastCmd", Style="Text",      Position={278, y+18}, Size={W-284, CH} }
 
     -- ── Display Layout ──────────────────────────────────────────────
-    -- GroupBox height: 16(top pad) + 12(label) + 2(gap) + 24(combo) + 10(bottom pad) = 64
+    -- Layout:
+    --   y+6  : thumbnail row   (TH=26 px tall)
+    --   y+32 : thumbnail labels (10 px)
+    --   y+44 : "Layout Preset" label (12 px)
+    --   y+58 : ComboBox + Apply button (24 px)
+    --   Total inner height = 58+24+8 = 90  →  GBox height = 96
+    --
+    -- 7 thumbnails: TW=62, gap=6  → 7*(62+6)-6 = 470 px  (fits in W=600)
+    -- All pixel offsets are explicit integers — no division operators.
     y = y + 60
-    GBox(0, y, W, 58, "Display Layout")
-    Lbl("Layout Preset (1-7, 11-14)", 6, y+6, 210)
+    GBox(0, y, W, 96, "Display Layout")
+
+    local TW  = 62   -- thumbnail width
+    local TH  = 26   -- thumbnail height
+    local GAP = 6    -- gap between thumbnails
+    local TX  = 6    -- left start x
+
+    -- Helper: draw one coloured rectangle inside a thumbnail
+    local function TRect(col, x, gy, w, h)
+        table.insert(graphics, {
+            Type="GroupBox", Text="", Fill=col,
+            StrokeWidth=0, CornerRadius=0,
+            Position={x, gy}, Size={w, h}
+        })
+    end
+
+    -- Thumbnail outer borders + labels
+    local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
+    for i = 0, 6 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 6
+        -- dark background
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        -- label below
+        table.insert(graphics, {Type="Text", Text=thumbLabels[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+
+    -- Colour palette for segments
+    local cA = {70, 160,  80}   -- green   seg 0
+    local cB = {70,  80, 160}   -- blue    seg 1
+    local cC = {160, 70,  70}   -- red     seg 2
+    local cD = {160,160,  40}   -- yellow  seg 3
+
+    -- Precalculated halves (TW=62 → 31; TH=26 → 13; TW/3=20,20,22; TH/4 not needed)
+    local HW = 31   -- half width
+    local HH = 13   -- half height
+    local T1 = 20   -- first third width
+    local T2 = 20   -- second third width
+    local T3 = 22   -- third third width  (T1+T2+T3 = 62 ✓)
+
+    -- Preset 1 — Fullscreen (single colour fills whole thumb)
+    do local tx=TX+0*(TW+GAP); local ty=y+6
+        TRect(cA, tx, ty, TW, TH)
+    end
+    -- Preset 2 — Top/Bottom
+    do local tx=TX+1*(TW+GAP); local ty=y+6
+        TRect(cA, tx,    ty,    TW, HH)
+        TRect(cB, tx,    ty+HH, TW, HH)
+    end
+    -- Preset 3 — Left/Right
+    do local tx=TX+2*(TW+GAP); local ty=y+6
+        TRect(cA, tx,    ty, HW, TH)
+        TRect(cB, tx+HW, ty, HW, TH)
+    end
+    -- Preset 4 — Triple Left (left half | right-top | right-bottom)
+    do local tx=TX+3*(TW+GAP); local ty=y+6
+        TRect(cA, tx,    ty,    HW, TH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx+HW, ty+HH, HW, HH)
+    end
+    -- Preset 5 — Triple Right (left-top | left-bottom | right half)
+    do local tx=TX+4*(TW+GAP); local ty=y+6
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx,    ty+HH, HW, HH)
+        TRect(cC, tx+HW, ty,    HW, TH)
+    end
+    -- Preset 6 — Thirds
+    do local tx=TX+5*(TW+GAP); local ty=y+6
+        TRect(cA, tx,       ty, T1, TH)
+        TRect(cB, tx+T1,    ty, T2, TH)
+        TRect(cC, tx+T1+T2, ty, T3, TH)
+    end
+    -- Preset 7 — Quad
+    do local tx=TX+6*(TW+GAP); local ty=y+6
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx,    ty+HH, HW, HH)
+        TRect(cD, tx+HW, ty+HH, HW, HH)
+    end
+
+    -- ComboBox + Apply button
+    Lbl("Layout Preset  (1-7, 11-14)", TX, y+44, 210)
     layout["layout_preset"] = {
         PrettyName="Layout~Preset",
         Style="ComboBox", IsReadOnly=false,
-        Position={6, y+20}, Size={220, CH}
+        Position={TX, y+58}, Size={220, CH}
     }
     layout["apply_layout"] = {
         PrettyName="Layout~Apply",
         Style="Button", ButtonStyle="Trigger",
         Legend="Apply Layout", Color=C_BTN_O,
-        Position={234, y+20}, Size={160, CH}
+        Position={234, y+58}, Size={160, CH}
     }
 
     -- ── Segment rows ────────────────────────────────────────────────
     -- Each segment GroupBox contains:
-    --   Row 1 at +16: Active LED(14px) | Text field | [Display][Invert][Clear] buttons
-    --   Row 2 at +50: 6 ComboBoxes with labels above at +37
-    --   Row 3 at +84: Intensity fader with label above at +71
-    --   GroupBox total height = 84 + 22 + 8 = 114
-    y = y + 64
+    --   Row 1 at +16: Active LED | Text field | [Display][Invert][Clear] buttons
+    --   Row 2 at +50: 6 ComboBoxes with labels above
+    --   Row 3 at +84: Intensity fader
+    --   GroupBox height = 84 + 22 + 8 = 114
+    y = y + 102
     local SEG_H = 114
 
     -- 6 combo columns: widths must sum to W-12 minus 5 gaps of 6px
