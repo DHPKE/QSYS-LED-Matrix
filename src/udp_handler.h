@@ -124,6 +124,7 @@ private:
     uint8_t brightness;
     char packetBuffer[UDP_BUFFER_SIZE];
     bool _firstCommandReceived = false;
+    struct sockaddr_in lastSender{};  // remembered for ping replies
 
 public:
     UDPHandler(SegmentManager* sm) : segmentManager(sm), brightness(255) {}
@@ -269,6 +270,17 @@ public:
                 Serial.printf("[UDP] BRIGHTNESS %d\n", brightness);
             }
 
+        // ── ping ─────────────────────────────────────────────────────────────
+        } else if (strcmp(cmd, "ping") == 0) {
+            // Reply pong to sender so Q-SYS plugin can confirm connectivity
+            if (sock >= 0 && lastSender.sin_port != 0) {
+                const char* pong = "{\"cmd\":\"pong\"}\n";
+                sendto(sock, pong, strlen(pong), 0,
+                       (struct sockaddr*)&lastSender, sizeof(lastSender));
+                Serial.printf("[UDP] PONG -> %s:%d\n",
+                              inet_ntoa(lastSender.sin_addr), ntohs(lastSender.sin_port));
+            }
+
         // ── config (raw geometry override) ───────────────────────────────────
         } else if (strcmp(cmd, "config") == 0) {
             int seg = doc["seg"] | 0;
@@ -336,6 +348,7 @@ public:
         Serial.printf("[UDP] RX %d bytes from %s: %.120s\n",
                       len, inet_ntoa(sender.sin_addr), packetBuffer);
 
+        lastSender = sender;   // remember for ping replies
         dispatchCommand(packetBuffer);
     }
 

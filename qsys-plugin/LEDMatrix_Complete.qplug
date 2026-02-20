@@ -177,6 +177,10 @@ if Controls then
     local udp_port = Properties["UDP Port"].Value
     local activeLayoutSegments = { [0] = true }
     local debounceTimers = {}
+    local pingTimer    = nil
+    local pongTimer    = nil   -- watchdog: if pong not received within timeout → fault
+    local PING_INTERVAL = 5.0  -- send ping every 5 seconds
+    local PONG_TIMEOUT  = 8.0  -- fault if no pong within 8 seconds
 
     local ColorId = {
         ["White"]=1,  ["Red"]=2,    ["Lime"]=3,   ["Blue"]=4,
@@ -221,17 +225,63 @@ if Controls then
         t:Start(delay)
     end
 
+    local function StopPing()
+        if pingTimer then pingTimer:Stop() end
+        if pongTimer then pongTimer:Stop() end
+    end
+
+    local function StartPongWatchdog()
+        if not pongTimer then pongTimer = Timer.New() end
+        pongTimer:Stop()
+        pongTimer.EventHandler = function()
+            Controls.connection_status.Value = 2
+            Controls.last_command.String = "No response from device"
+            print("PING timeout — device unreachable at " .. ip_addr)
+        end
+        pongTimer:Start(PONG_TIMEOUT)
+    end
+
+    local function SendPing()
+        if not socket then return end
+        local ok = pcall(function() socket:Send(ip_addr, udp_port, '{"cmd":"ping"}\n') end)
+        if ok then
+            StartPongWatchdog()
+        end
+    end
+
+    local function StartPingTimer()
+        if not pingTimer then pingTimer = Timer.New() end
+        pingTimer:Stop()
+        pingTimer.EventHandler = function() SendPing() end
+        pingTimer:Start(PING_INTERVAL)
+        SendPing()  -- immediate first ping
+    end
+
     local function ReopenSocket()
+        StopPing()
         if socket then pcall(function() socket:Close() end) end
+        socket = nil
         local ok, err = pcall(function()
             socket = UdpSocket.New()
-            socket:Open()
+            socket:Open("0.0.0.0", 0)   -- bind to any local port for receiving pong
+            -- Receive handler: watch for pong replies
+            socket.Data = function(s, packet, ip, port)
+                local data = packet:ReadLine(false)
+                if data and data:find('"pong"') then
+                    if pongTimer then pongTimer:Stop() end
+                    Controls.connection_status.Value = 0
+                    Controls.last_command.String = "Online (" .. ip .. ")"
+                    print("PONG received from " .. ip)
+                end
+            end
         end)
         if ok then
-            Controls.connection_status.Value = 0
-            print("UDP ready -> " .. ip_addr .. ":" .. udp_port)
+            Controls.connection_status.Value = 5  -- compromised/unknown until pong
+            print("UDP socket open -> " .. ip_addr .. ":" .. udp_port)
+            StartPingTimer()
         else
             Controls.connection_status.Value = 2
+            Controls.last_command.String = "Socket error: " .. tostring(err)
             print("Socket error: " .. tostring(err))
         end
     end
@@ -257,7 +307,6 @@ if Controls then
         end
         local ok, err = pcall(function() socket:Send(ip_addr, udp_port, json.."\n") end)
         if ok then
-            Controls.connection_status.Value = 0
             Controls.last_command.String = json
             print("-> "..json)
             return true
@@ -421,6 +470,7 @@ if Controls then
     end
 
     function Cleanup()
+        StopPing()
         for _, t in pairs(debounceTimers) do
             if t then pcall(function() t:Stop() end) end
         end
