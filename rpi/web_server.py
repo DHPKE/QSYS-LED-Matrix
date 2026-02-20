@@ -145,19 +145,35 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="card" style="grid-column:1/-1;">
       <h2>Segment Layouts</h2>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-        <button class="layout-btn" onclick="applyLayout('split-vertical')">
-          <div class="layout-visual split-v"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
-          <span class="layout-label">1 | 2</span></button>
-        <button class="layout-btn" onclick="applyLayout('split-horizontal')">
-          <div class="layout-visual split-h"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
-          <span class="layout-label">1 / 2</span></button>
-        <button class="layout-btn" onclick="applyLayout('quad')">
-          <div class="layout-visual quad"><div class="layout-segment">1</div><div class="layout-segment">2</div>
-            <div class="layout-segment">3</div><div class="layout-segment">4</div></div>
-          <span class="layout-label">2×2</span></button>
-        <button class="layout-btn" onclick="applyLayout('fullscreen')">
+        <button class="layout-btn" onclick="applyLayout(1)">
           <div class="layout-visual full"><div class="layout-segment" style="width:100%;height:100%;border-radius:3px;">ALL</div></div>
-          <span class="layout-label">Full</span></button>
+          <span class="layout-label">1 — Full</span></button>
+        <button class="layout-btn" onclick="applyLayout(2)">
+          <div class="layout-visual split-h"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
+          <span class="layout-label">2 — Top/Bottom</span></button>
+        <button class="layout-btn" onclick="applyLayout(3)">
+          <div class="layout-visual split-v"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
+          <span class="layout-label">3 — Left/Right</span></button>
+        <button class="layout-btn" onclick="applyLayout(4)">
+          <div class="layout-visual" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;">
+            <div class="layout-segment" style="grid-row:1/3;">1</div>
+            <div class="layout-segment">2</div><div class="layout-segment">3</div></div>
+          <span class="layout-label">4 — Triple L</span></button>
+        <button class="layout-btn" onclick="applyLayout(5)">
+          <div class="layout-visual" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;">
+            <div class="layout-segment">1</div>
+            <div class="layout-segment" style="grid-row:1/3;grid-column:2;">3</div>
+            <div class="layout-segment">2</div></div>
+          <span class="layout-label">5 — Triple R</span></button>
+        <button class="layout-btn" onclick="applyLayout(6)">
+          <div class="layout-visual" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="layout-segment">1</div><div class="layout-segment">2</div><div class="layout-segment">3</div></div>
+          <span class="layout-label">6 — Thirds</span></button>
+        <button class="layout-btn" onclick="applyLayout(7)">
+          <div class="layout-visual quad">
+            <div class="layout-segment">1</div><div class="layout-segment">2</div>
+            <div class="layout-segment">3</div><div class="layout-segment">4</div></div>
+          <span class="layout-label">7 — Quad</span></button>
       </div>
     </div>
   </div><!-- /grid -->
@@ -343,68 +359,32 @@ function updateBrightness(v) {
   document.getElementById('brightness-value').textContent=v;
   sendJSON({cmd:'brightness',value:parseInt(v)});
 }
-function applyLayout(type) {
-  // Save current text content from input fields BEFORE reconfiguring
-  const savedText = [];
-  for(let i=0; i<4; i++) {
-    const el = document.getElementById('text'+i);
-    savedText[i] = el ? el.value : '';
+// Layout presets — mirrors config.py LAYOUT_PRESETS exactly.
+// Each entry: list of [x, y, w, h] per active segment.
+const LAYOUTS = {
+  1: [[0,0,64,32]],
+  2: [[0,0,64,16],[0,16,64,16]],
+  3: [[0,0,32,32],[32,0,32,32]],
+  4: [[0,0,32,32],[32,0,32,16],[32,16,32,16]],
+  5: [[0,0,32,16],[0,16,32,16],[32,0,32,32]],
+  6: [[0,0,21,32],[21,0,21,32],[42,0,22,32]],
+  7: [[0,0,32,16],[32,0,32,16],[0,16,32,16],[32,16,32,16]],
+};
+function applyLayout(preset) {
+  const zones = LAYOUTS[preset] || [];
+  // Update local segmentBounds for the canvas preview
+  for(let i=0;i<4;i++){
+    if(i<zones.length){
+      const [x,y,w,h]=zones[i];
+      segmentBounds[i]={x,y,width:w,height:h};
+    } else {
+      segmentBounds[i]={x:0,y:0,width:0,height:0};
+    }
   }
-  
-  let cmds=[],clr=[],activeSegs=[];
-  
-  // FIRST: Clear all segments to reset state
-  for(let i=0; i<4; i++) {
-    cmds.push({cmd:'clear',seg:i});
-  }
-  
-  if(type==='split-vertical') {
-    activeSegs=[0,1];
-    segmentBounds[0]={x:0,y:0,width:32,height:32}; segmentBounds[1]={x:32,y:0,width:32,height:32};
-    segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
-    cmds.push({cmd:'config',seg:0,x:0,y:0,w:32,h:32},{cmd:'config',seg:1,x:32,y:0,w:32,h:32});
-  } else if(type==='split-horizontal') {
-    activeSegs=[0,1];
-    segmentBounds[0]={x:0,y:0,width:64,height:16}; segmentBounds[1]={x:0,y:16,width:64,height:16};
-    segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
-    cmds.push({cmd:'config',seg:0,x:0,y:0,w:64,h:16},{cmd:'config',seg:1,x:0,y:16,w:64,h:16});
-  } else if(type==='quad') {
-    activeSegs=[0,1,2,3];
-    segmentBounds[0]={x:0,y:0,width:32,height:16}; segmentBounds[1]={x:32,y:0,width:32,height:16};
-    segmentBounds[2]={x:0,y:16,width:32,height:16}; segmentBounds[3]={x:32,y:16,width:32,height:16};
-    cmds.push({cmd:'config',seg:0,x:0,y:0,w:32,h:16},{cmd:'config',seg:1,x:32,y:0,w:32,h:16},
-              {cmd:'config',seg:2,x:0,y:16,w:32,h:16},{cmd:'config',seg:3,x:32,y:16,w:32,h:16});
-  } else if(type==='fullscreen') {
-    activeSegs=[0];
-    segmentBounds[0]={x:0,y:0,width:64,height:32};
-    segmentBounds[1]=segmentBounds[2]=segmentBounds[3]={x:0,y:0,width:0,height:0};
-    cmds.push({cmd:'config',seg:0,x:0,y:0,w:64,h:32});
-  }
-  
-  // Update UI state
+  const activeSegs = zones.map((_,i)=>i);
   updateSegmentStates(activeSegs);
-  
-  // Send all commands in sequence
-  cmds.forEach(c=>sendJSON(c));
-  
-  // Restore text content for active segments that had text
-  setTimeout(() => {
-    activeSegs.forEach(seg => {
-      const text = savedText[seg];
-      if (text && text.trim()) {
-        // Restore to input field
-        const el = document.getElementById('text'+seg);
-        if (el) el.value = text;
-        // Send to server to preserve on backend
-        const color = document.getElementById('color'+seg).value.replace('#','');
-        const bgcolor = document.getElementById('bgcolor'+seg).value.replace('#','');
-        const intensity = parseInt(document.getElementById('intensity'+seg).value);
-        const align = segmentAlign[seg];
-        sendJSON({cmd:'text',seg,text,color,bgcolor,font:'arial',size:'auto',align,effect:'none',intensity});
-      }
-    });
-  }, 200);
-  
+  // Send a single layout command — the backend applies all segment geometry
+  sendJSON({cmd:'layout',preset});
   ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
 }
 function drawSegmentOnCanvas(seg,text,color,bgcolor,align) {

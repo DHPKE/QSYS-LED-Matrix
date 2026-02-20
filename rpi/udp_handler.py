@@ -8,6 +8,7 @@ Supported JSON commands (identical protocol to the ESP32 firmware):
   {"cmd":"text",       "seg":0, "text":"Hello", "color":"FFFFFF",
    "bgcolor":"000000", "font":"arial", "size":"auto",
    "align":"C", "effect":"none", "intensity":255}
+  {"cmd":"layout",     "preset":1}          # 1-7, see config.LAYOUT_PRESETS
   {"cmd":"clear",      "seg":0}
   {"cmd":"clear_all"}
   {"cmd":"brightness", "value":200}
@@ -19,7 +20,7 @@ import json
 import threading
 import logging
 
-from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH
+from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, MAX_SEGMENTS
 from segment_manager import SegmentManager
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,9 @@ class UDPHandler:
         self._running = False
         self._thread  = None
         self._brightness_callback = brightness_callback
+        # Set to True on the first successfully dispatched command so
+        # main.py can dismiss the IP splash screen.
+        self._first_command_received = False
 
     # ─── Public API ────────────────────────────────────────────────────────
 
@@ -82,6 +86,10 @@ class UDPHandler:
         if self._sock:
             self._sock.close()
 
+    def has_received_command(self) -> bool:
+        """True once the first command has been dispatched (UDP or web)."""
+        return self._first_command_received
+
     def dispatch(self, raw: str):
         """Parse a raw JSON string and apply the command (thread-safe)."""
         try:
@@ -89,6 +97,10 @@ class UDPHandler:
         except json.JSONDecodeError as e:
             logger.error(f"[UDP] JSON parse error: {e}")
             return
+
+        # Flag raised on the very first successfully parsed command —
+        # used by main.py to dismiss the IP address splash screen.
+        self._first_command_received = True
 
         cmd = doc.get("cmd", "")
 
@@ -102,6 +114,10 @@ class UDPHandler:
             intens  = int(doc.get("intensity", 255))
             self._sm.update_text(seg, text, color=color, bgcolor=bgcolor,
                                  align=align, effect=effect, intensity=intens)
+
+        elif cmd == "layout":
+            preset = int(doc.get("preset", 1))
+            self._apply_layout(preset)
 
         elif cmd == "clear":
             seg = int(doc.get("seg", 0))
@@ -128,6 +144,23 @@ class UDPHandler:
         else:
             logger.warning(f"[UDP] Unknown cmd: {cmd}")
 
+    # ─── Layout presets ────────────────────────────────────────────────────
+
+    def _apply_layout(self, preset: int):
+        """Apply a numbered layout preset from config.LAYOUT_PRESETS."""
+        zones = LAYOUT_PRESETS.get(preset)
+        if zones is None:
+            logger.warning(f"[UDP] Unknown layout preset {preset}")
+            return
+        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s))")
+        for i in range(MAX_SEGMENTS):
+            if i < len(zones):
+                x, y, w, h = zones[i]
+                self._sm.configure(i, x, y, w, h)
+                self._sm.activate(i, True)
+            else:
+                self._sm.activate(i, False)
+
     # ─── Internal ──────────────────────────────────────────────────────────
 
     def _run(self):
@@ -135,6 +168,7 @@ class UDPHandler:
             try:
                 data, addr = self._sock.recvfrom(4096)
                 raw = data.decode("utf-8", errors="replace").strip()
+                logger.debug(f"[UDP] {addr[0]}:{addr[1]}  {raw[:120]}")
                 self.dispatch(raw)
             except socket.timeout:
                 continue

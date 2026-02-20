@@ -26,6 +26,7 @@ Run:
 
 import logging
 import signal
+import subprocess
 import sys
 import time
 
@@ -33,6 +34,8 @@ from config import (
     MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_CHAIN, MATRIX_PARALLEL,
     MATRIX_HARDWARE_MAPPING, MATRIX_GPIO_SLOWDOWN, MATRIX_BRIGHTNESS,
     MATRIX_PWM_BITS, LOG_LEVEL, UDP_PORT, WEB_PORT, EFFECT_INTERVAL,
+    FALLBACK_IP, FALLBACK_NETMASK, FALLBACK_GATEWAY, FALLBACK_IFACE,
+    DHCP_TIMEOUT_S,
 )
 from segment_manager import SegmentManager
 from udp_handler import UDPHandler
@@ -52,6 +55,94 @@ def _brightness_255_to_pct(value_255: int) -> int:
     return max(0, min(100, int(value_255 * 100 / 255)))
 
 
+# ─── Network helpers ─────────────────────────────────────────────────────────
+
+def _get_ip(iface: str = "eth0") -> str:
+    """Return the current IPv4 address of *iface*, or '' if none / not found."""
+    try:
+        import socket as _socket
+        import fcntl
+        import struct
+        SIOCGIFADDR = 0x8915
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        try:
+            packed = fcntl.ioctl(s.fileno(), SIOCGIFADDR,
+                                 struct.pack("256s", iface[:15].encode()))
+            return _socket.inet_ntoa(packed[20:24])
+        finally:
+            s.close()
+    except Exception:
+        pass
+    # Fallback: parse `ip addr show`
+    try:
+        out = subprocess.check_output(
+            ["ip", "-4", "addr", "show", iface],
+            stderr=subprocess.DEVNULL, text=True)
+        for line in out.splitlines():
+            line = line.strip()
+            if line.startswith("inet "):
+                return line.split()[1].split("/")[0]
+    except Exception:
+        pass
+    return ""
+
+
+def _apply_fallback_ip(ip: str, netmask: str, gateway: str, iface: str):
+    """Configure a static IP address via `ip` commands (requires root)."""
+    try:
+        import socket as _socket
+        import struct
+        prefix = bin(struct.unpack(">I",
+                     _socket.inet_aton(netmask))[0]).count("1")
+    except Exception:
+        prefix = 24
+    try:
+        subprocess.run(["ip", "addr", "flush", "dev", iface],
+                       check=True, stderr=subprocess.DEVNULL)
+        subprocess.run(["ip", "addr", "add", f"{ip}/{prefix}", "dev", iface],
+                       check=True, stderr=subprocess.DEVNULL)
+        subprocess.run(["ip", "link", "set", iface, "up"],
+                       check=True, stderr=subprocess.DEVNULL)
+        subprocess.run(["ip", "route", "add", "default", "via", gateway],
+                       check=False, stderr=subprocess.DEVNULL)
+        logger.info(f"✓ Fallback IP applied: {ip}/{prefix} gw {gateway} on {iface}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"⚠  Could not apply fallback IP: {e}")
+
+
+def _wait_for_dhcp(iface: str, timeout_s: float) -> str:
+    """Poll for a non-loopback IPv4 address on *iface* for up to *timeout_s* seconds."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        ip = _get_ip(iface)
+        if ip and not ip.startswith("127."):
+            return ip
+        time.sleep(1.0)
+    return ""
+
+
+def _ensure_network() -> str:
+    """
+    Wait for DHCP on FALLBACK_IFACE; apply static fallback if it times out.
+    Returns the IP address string to display on-screen.
+    """
+    logger.info(f"[NET] Waiting up to {DHCP_TIMEOUT_S}s for DHCP on {FALLBACK_IFACE}…")
+    ip = _wait_for_dhcp(FALLBACK_IFACE, DHCP_TIMEOUT_S)
+    if ip:
+        logger.info(f"[NET] ✓ DHCP address: {ip}")
+        return ip
+
+    logger.warning(f"[NET] No DHCP lease after {DHCP_TIMEOUT_S}s")
+    if FALLBACK_IP:
+        logger.info(f"[NET] Applying fallback static IP: {FALLBACK_IP}")
+        _apply_fallback_ip(FALLBACK_IP, FALLBACK_NETMASK, FALLBACK_GATEWAY,
+                           FALLBACK_IFACE)
+        return FALLBACK_IP
+
+    logger.warning("[NET] FALLBACK_IP is None — device may be unreachable")
+    return "no IP"
+
+
 def main():
     logger.info("=" * 50)
     logger.info("RPi Zero 2 W — LED Matrix Controller")
@@ -59,10 +150,13 @@ def main():
     logger.info(f"Matrix: {MATRIX_WIDTH}×{MATRIX_HEIGHT}, chain={MATRIX_CHAIN}")
     logger.info(f"UDP port: {UDP_PORT},  Web port: {WEB_PORT}")
 
-    # ── 1. Shared state ──────────────────────────────────────────────────
+    # ── 1. Network: wait for DHCP / apply fallback ────────────────────────
+    device_ip = _ensure_network()
+
+    # ── 2. Shared state ──────────────────────────────────────────────────
     sm = SegmentManager()
 
-    # ── 2. Try to initialise the real LED matrix ──────────────────────────
+    # ── 3. Try to initialise the real LED matrix ──────────────────────────
     matrix   = None
     canvas   = None
     renderer = None
@@ -80,16 +174,12 @@ def main():
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
         options.pwm_bits            = MATRIX_PWM_BITS
-        options.pwm_lsb_nanoseconds = 200  # Higher = smoother but slower (default 130)
-        # The rpi-rgb-led-matrix hardware pulse uses the same BCM PWM peripheral
-        # as the on-board sound (snd_bcm2835). If that module is loaded the
-        # library hard-exits with "fix the above first or use --led-no-hardware-pulse".
-        # Setting this True uses bit-banged OE- instead — fully functional for
-        # text display, no flicker visible at normal viewing distances.
-        # To get hardware pulsing back: blacklist snd_bcm2835 (see install.sh).
-        options.disable_hardware_pulsing = True  # Software PWM - more stable for Pi Zero 2 W
+        options.pwm_lsb_nanoseconds = 200
+        # Software PWM — avoids conflict with snd_bcm2835 BCM PWM peripheral.
+        # To use hardware pulsing: blacklist snd_bcm2835 in /etc/modprobe.d/
+        options.disable_hardware_pulsing = True
         options.show_refresh_rate   = False
-        options.limit_refresh_rate_hz = 0  # No limit - as fast as possible
+        options.limit_refresh_rate_hz = 0
 
         matrix = RGBMatrix(options=options)
         canvas = matrix.CreateFrameCanvas()
@@ -105,31 +195,32 @@ def main():
     except Exception as exc:
         logger.error(f"⚠  LED matrix init failed: {exc} — falling back to NO_DISPLAY mode")
 
-    # ── 3. Brightness callback ────────────────────────────────────────────
+    # ── 4. Brightness callback ────────────────────────────────────────────
     def on_brightness_change(value_255: int):
         if matrix:
             matrix.brightness = _brightness_255_to_pct(value_255)
             logger.info(f"[MAIN] Brightness → {matrix.brightness}%")
 
-    # ── 4. Start UDP listener ────────────────────────────────────────────
+    # ── 5. Start UDP listener ────────────────────────────────────────────
     udp = UDPHandler(sm, brightness_callback=on_brightness_change)
     udp.start()
 
-    # ── 5. Start web server ──────────────────────────────────────────────
+    # ── 6. Start web server ──────────────────────────────────────────────
     web = WebServer(sm, udp)
     web.start()
 
-    # ── 6. Display "READY" on segment 0 ─────────────────────────────────
-    sm.update_text(0, "READY", color="00FF00", align="C")
+    # ── 7. IP address splash screen ──────────────────────────────────────
+    # Display the device IP on segment 0 (full-screen, white on black) until
+    # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
+    ip_splash_active = True
+    sm.update_text(0, device_ip, color="FFFFFF", bgcolor="000000", align="C")
+    logger.info(f"[SPLASH] Showing IP address: {device_ip}")
 
     logger.info("=" * 50)
     logger.info("System ready — press Ctrl+C to stop")
     logger.info("=" * 50)
 
-    # ── 7. Main render loop ──────────────────────────────────────────────
-    last_effect = time.monotonic()
-    render_count = 0
-
+    # ── 8. Shutdown handler ──────────────────────────────────────────────
     def _shutdown(sig, frame):
         logger.info("\nShutting down…")
         udp.stop()
@@ -141,11 +232,21 @@ def main():
     signal.signal(signal.SIGINT,  _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
-    # Optimized render loop with minimal overhead
+    # ── 9. Main render loop ──────────────────────────────────────────────
+    last_effect = time.monotonic()
+
     while True:
         now = time.monotonic()
 
-        # Update effects at fixed interval
+        # Dismiss IP splash on first received command.
+        # Do NOT call sm.clear_all() here — the command has already written its
+        # content into the target segment inside dispatch().  Wiping here would
+        # race and blank the display until the next command arrives.
+        if ip_splash_active and udp.has_received_command():
+            ip_splash_active = False
+            logger.info("[SPLASH] First command received — IP splash dismissed")
+
+        # Update effects and render at fixed interval
         if now - last_effect >= EFFECT_INTERVAL:
             sm.update_effects()
             last_effect = now

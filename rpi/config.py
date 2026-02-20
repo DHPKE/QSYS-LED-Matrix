@@ -86,6 +86,14 @@ UDP_PORT       = 21324
 UDP_BIND_ADDR  = "0.0.0.0"
 WEB_PORT       = 8080      # Non-privileged port (no sudo required)
 
+# Fallback static IP applied when DHCP gives no address within DHCP_TIMEOUT_S.
+# Set FALLBACK_IP = None to disable (device stays unreachable instead).
+FALLBACK_IP      = "192.168.1.200"
+FALLBACK_NETMASK = "255.255.255.0"
+FALLBACK_GATEWAY = "192.168.1.1"
+FALLBACK_IFACE   = "eth0"      # Network interface to configure
+DHCP_TIMEOUT_S   = 15          # Seconds to wait for DHCP before applying fallback
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Text rendering
 # ──────────────────────────────────────────────────────────────────────────────
@@ -99,6 +107,44 @@ FONT_PATH_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 # ──────────────────────────────────────────────────────────────────────────────
 CONFIG_FILE  = "/var/lib/led-matrix/config.json"
 SEGMENT_FILE = "/var/lib/led-matrix/segments.json"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Layout presets  (mirrors ESP32 udp_handler.h applyLayoutPreset)
+#
+# Each entry is a list of (x, y, w, h) tuples, one per active segment.
+# Segments beyond the list length are deactivated (w=0).
+#
+#  Layout 1 — Fullscreen         [seg0: full 64×32]
+#  Layout 2 — Top/Bottom halves  [seg0: top, seg1: bottom]
+#  Layout 3 — Left/Right halves  [seg0: left, seg1: right]
+#  Layout 4 — Triple left        [seg0: left half, seg1: right-top, seg2: right-bottom]
+#  Layout 5 — Triple right       [seg0: left-top, seg1: left-bottom, seg2: right half]
+#  Layout 6 — Thirds vertical    [seg0 | seg1 | seg2]
+#  Layout 7 — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+# ──────────────────────────────────────────────────────────────────────────────
+W = MATRIX_WIDTH
+H = MATRIX_HEIGHT
+
+LAYOUT_PRESETS = {
+    1: [(0,         0,         W,     H    )],                           # fullscreen
+    2: [(0,         0,         W,     H//2 ),                            # top half
+        (0,         H//2,      W,     H//2 )],                           # bottom half
+    3: [(0,         0,         W//2,  H    ),                            # left half
+        (W//2,      0,         W//2,  H    )],                           # right half
+    4: [(0,         0,         W//2,  H    ),                            # left half
+        (W//2,      0,         W//2,  H//2 ),                            # right-top quarter
+        (W//2,      H//2,      W//2,  H//2 )],                           # right-bottom quarter
+    5: [(0,         0,         W//2,  H//2 ),                            # left-top quarter
+        (0,         H//2,      W//2,  H//2 ),                            # left-bottom quarter
+        (W//2,      0,         W//2,  H    )],                           # right half
+    6: [(0,         0,         W//3,      H    ),                        # left third  (21px)
+        (W//3,      0,         W//3,      H    ),                        # middle third (21px)
+        (2*(W//3),  0,         W-2*(W//3),H    )],                       # right third  (22px)
+    7: [(0,         0,         W//2,  H//2 ),                            # top-left
+        (W//2,      0,         W//2,  H//2 ),                            # top-right
+        (0,         H//2,      W//2,  H//2 ),                            # bottom-left
+        (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging
