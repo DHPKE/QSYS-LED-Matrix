@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WT32-ETH01 LED Matrix Controller
  * Ethernet firmware for 64x32 HUB75 LED Matrix
  * Receives UDP JSON commands from Q-SYS plugin to display dynamic text
@@ -11,14 +11,14 @@
  * Version: 2.0.0
  *
  * CHANGELOG v2.0.0:
- * - PORTED: WiFi (Olimex ESP32 Gateway) → Ethernet (WT32-ETH01)
+ * - PORTED: WiFi (Olimex ESP32 Gateway) â†’ Ethernet (WT32-ETH01)
  * - CHANGED: ETH.begin() with ETH_CLOCK_GPIO0_OUT (ESP32 drives 50 MHz to LAN8720)
  * - CHANGED: UDP protocol from pipe-delimited to JSON
  * - CHANGED: Pin assignments for WT32-ETH01 (no ETH GPIO conflicts)
  * - ADDED: Hostname wt32-led-matrix
  * - ADDED: IP address in /api/config response
- * - IMPROVED: text_renderer.h — correct x1/y1 offset handling, border support
- * - IMPROVED: segment_manager.h — clearSegment() deactivates and marks dirty
+ * - IMPROVED: text_renderer.h â€” correct x1/y1 offset handling, border support
+ * - IMPROVED: segment_manager.h â€” clearSegment() deactivates and marks dirty
  */
 
 #include <Arduino.h>
@@ -35,7 +35,7 @@
 #include "text_renderer.h"
 #include "udp_handler.h"
 
-// Watchdog timeout (30 seconds — must be longer than Ethernet init wait)
+// Watchdog timeout (30 seconds â€” must be longer than Ethernet init wait)
 #define WDT_TIMEOUT 30
 
 // Global objects
@@ -82,20 +82,20 @@ void setup() {
     Serial.println("Initializing watchdog timer...");
     esp_task_wdt_init(WDT_TIMEOUT, true);
     esp_task_wdt_add(NULL);
-    Serial.println("✓ Watchdog enabled (30s timeout)");
+    Serial.println("âœ“ Watchdog enabled (30s timeout)");
     
     // Initialize LittleFS (true = format partition if mount fails)
     if (!LittleFS.begin(true)) {
-        Serial.println("WARNING: LittleFS mount failed — config save/load disabled");
+        Serial.println("WARNING: LittleFS mount failed â€” config save/load disabled");
         Serial.println("  Check: board_build.partitions = no_ota.csv in platformio.ini");
     } else {
-        Serial.println("✓ LittleFS mounted successfully");
+        Serial.println("âœ“ LittleFS mounted successfully");
     }
     
     // Load configuration
     loadConfiguration();
     
-    // Setup Ethernet FIRST — get network up before anything else
+    // Setup Ethernet FIRST â€” get network up before anything else
     // (UDP is started from the ETH_GOT_IP event)
     setupEthernet();
     
@@ -116,7 +116,7 @@ void setup() {
     Serial.println("Web Interface: http://" + ETH.localIP().toString());
     Serial.println("==================================\n");
 
-    // Show IP address on matrix — cleared on first incoming UDP command.
+    // Show IP address on matrix â€” cleared on first incoming UDP command.
     // If Ethernet hasn't connected yet the splash will be shown from the
     // ETH_GOT_IP event or the fallback-IP assignment in setupEthernet().
     String ip = ETH.localIP().toString();
@@ -144,7 +144,7 @@ void loop() {
     if (ipSplashActive && udpHandler && udpHandler->hasReceivedCommand()) {
         ipSplashActive = false;
         segmentManager.clearAll();          // wipe the IP text
-        Serial.println("[SPLASH] First command received — IP splash cleared");
+        Serial.println("[SPLASH] First command received â€” IP splash cleared");
     }
     
     // Update brightness if changed
@@ -173,9 +173,9 @@ void loop() {
 void setupMatrix() {
 #ifdef NO_DISPLAY
     // NO_DISPLAY mode: skip HUB75 init entirely.
-    // The web UI and UDP handler still work — segments are updated in RAM
+    // The web UI and UDP handler still work â€” segments are updated in RAM
     // and the web preview reflects all changes sent from Q-SYS.
-    Serial.println("⚠ NO_DISPLAY mode: HUB75 matrix init skipped (virtual preview only)");
+    Serial.println("âš  NO_DISPLAY mode: HUB75 matrix init skipped (virtual preview only)");
     dma_display = nullptr;
     textRenderer = nullptr;
 #else
@@ -209,18 +209,18 @@ void setupMatrix() {
     // Create display object
     dma_display = new MatrixPanel_I2S_DMA(mxconfig);
     
-    // Initialize display — if no panel is connected this returns false cleanly
+    // Initialize display â€” if no panel is connected this returns false cleanly
     Serial.println("  Allocating DMA buffers...");
     if (!dma_display->begin()) {
         Serial.println("WARNING: Matrix init failed (no panel connected?)");
-        Serial.println("  Firmware continues — web UI and UDP still work");
+        Serial.println("  Firmware continues â€” web UI and UDP still work");
         delete dma_display;
         dma_display = nullptr;
         textRenderer = nullptr;
         return;
     }
     
-    Serial.println("✓ LED Matrix initialized");
+    Serial.println("âœ“ LED Matrix initialized");
     
     // Set brightness
     dma_display->setBrightness8(currentBrightness);
@@ -231,7 +231,7 @@ void setupMatrix() {
     // Create text renderer
     textRenderer = new TextRenderer(dma_display, &segmentManager);
     
-    Serial.print("✓ Matrix size: ");
+    Serial.print("âœ“ Matrix size: ");
     Serial.print(LED_MATRIX_WIDTH);
     Serial.print("x");
     Serial.println(LED_MATRIX_HEIGHT);
@@ -248,7 +248,7 @@ void WiFiEvent(WiFiEvent_t event) {
             Serial.println("ETH Connected");
             break;
         case ARDUINO_EVENT_ETH_GOT_IP:
-            Serial.println("✓ Ethernet connected");
+            Serial.println("âœ“ Ethernet connected");
             Serial.print("  IP Address: ");
             Serial.println(ETH.localIP());
             Serial.print("  Gateway: ");
@@ -266,7 +266,7 @@ void WiFiEvent(WiFiEvent_t event) {
             // Start mDNS responder so device is reachable as wt32-led-matrix.local
             if (MDNS.begin("wt32-led-matrix")) {
                 MDNS.addService("http", "tcp", 80);
-                Serial.println("✓ mDNS started: wt32-led-matrix.local");
+                Serial.println("âœ“ mDNS started: wt32-led-matrix.local");
             } else {
                 Serial.println("WARNING: mDNS failed to start");
             }
@@ -312,7 +312,7 @@ void setupEthernet() {
     Serial.println();
     
     if (!eth_connected) {
-        Serial.println("WARNING: No DHCP lease after 15 s — applying fallback static IP");
+        Serial.println("WARNING: No DHCP lease after 15 s â€” applying fallback static IP");
         Serial.println("  Fallback: " FALLBACK_IP "/24  GW: " FALLBACK_GW);
 
         IPAddress fbIP, fbGW, fbSN;
@@ -325,7 +325,7 @@ void setupEthernet() {
         delay(200);
 
         eth_connected = true;
-        Serial.print("✓ Fallback IP active: ");
+        Serial.print("âœ“ Fallback IP active: ");
         Serial.println(ETH.localIP());
 
         // Show fallback IP on matrix
@@ -339,7 +339,7 @@ void setupUDP() {
     udpHandler = new UDPHandler(&segmentManager);
     
     if (udpHandler->begin()) {
-        Serial.print("✓ UDP listening on port ");
+        Serial.print("âœ“ UDP listening on port ");
         Serial.println(UDP_PORT);
     } else {
         Serial.println("ERROR: UDP initialization failed!");
@@ -354,7 +354,7 @@ void setupWebServer() {
     server.on("/api/segments", HTTP_GET, handleSegments);
     server.on("/api/test", HTTP_POST, handleTest);
     
-    // Root handler — serves embedded HTML (no LittleFS needed)
+    // Root handler â€” serves embedded HTML (no LittleFS needed)
     server.on("/", HTTP_GET, handleRoot);
     
     // 404 handler
@@ -363,7 +363,7 @@ void setupWebServer() {
     });
     
     server.begin();
-    Serial.println("✓ Web server started on port 80");
+    Serial.println("âœ“ Web server started on port 80");
 }
 
 // Show the device IP address as a fullscreen splash on segment 0.
@@ -376,7 +376,7 @@ void showIPOnDisplay(const String& ip) {
     if (udpHandler) {
         udpHandler->applyLayoutPreset(1);
     } else {
-        // UDP handler not ready yet — configure seg0 directly
+        // UDP handler not ready yet â€” configure seg0 directly
         Segment* s = segmentManager.getSegment(0);
         if (s) {
             s->x = 0; s->y = 0;
@@ -420,7 +420,7 @@ void loadConfiguration() {
     
     currentBrightness = doc["brightness"] | DEFAULT_BRIGHTNESS;
     
-    Serial.println("✓ Configuration loaded");
+    Serial.println("âœ“ Configuration loaded");
 }
 
 void saveConfiguration() {
@@ -438,1271 +438,278 @@ void saveConfiguration() {
     serializeJson(doc, file);
     file.close();
     
-    Serial.println("✓ Configuration saved");
+    Serial.println("âœ“ Configuration saved");
 }
 
+
+// â”€â”€ WebUI HTML stored in flash (PROGMEM) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// The entire page is served from flash. Dynamic values (IP, port, matrix size)
+// are injected via a chunked-response callback that resolves %%PLACEHOLDER%%
+// tokens without ever copying the 8+ KB body into heap RAM.
+// Colour <option> lists are built once at startup into small static Strings.
+static const char WEBPAGE_HTML[] PROGMEM = R"HTMLEOF(<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LED Matrix</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#0f0f1e,#1a1a2e);color:#e0e0e0;min-height:100vh;padding:20px}
+.wrap{max-width:1200px;margin:0 auto}
+.hdr{text-align:center;margin-bottom:24px;padding:24px 16px;background:linear-gradient(135deg,#1e3c72,#2a5298);border-radius:12px}
+.hdr h1{font-size:2em;color:#fff;margin-bottom:6px}
+.hdr p{color:#a0c4ff;font-size:1em}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.segs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:768px){.grid,.segs{grid-template-columns:1fr}}
+.card{background:rgba(30,30,46,.9);border-radius:10px;padding:16px;border:1px solid rgba(255,255,255,.1)}
+.card.cp{padding:12px;transition:opacity .2s,filter .2s;position:relative}
+.card.cp.off{opacity:.4;pointer-events:none;filter:grayscale(.7)}
+.card.cp.off::after{content:'INACTIVE';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.85);color:#666;padding:6px 16px;border-radius:5px;font-weight:700;font-size:.85em;letter-spacing:2px;z-index:10}
+.card h2{font-size:1.05em;margin-bottom:12px;color:#4a9eff;border-bottom:2px solid #4a9eff;padding-bottom:6px}
+.ii{display:flex;flex-direction:column;gap:4px}
+.il{color:#888;font-weight:600;font-size:.8em;text-transform:uppercase;letter-spacing:.5px}
+.iv input{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:#e0e0e0;padding:5px 8px;font-size:.85em;font-family:monospace;min-width:120px}
+.st{padding:6px 14px;border-radius:18px;font-size:.85em;font-weight:600;display:inline-block}
+.st.ok{background:#1a472a;color:#4ade80}.st.snd{background:#1e3a8a;color:#60a5fa}.st.err{background:#7f1d1d;color:#f87171}
+.prev{grid-column:1/-1;text-align:center}
+#preview{border:2px solid #333;background:#000;border-radius:6px;image-rendering:pixelated;image-rendering:crisp-edges;width:100%;max-width:576px;height:auto}
+.fg{margin-bottom:10px}
+label{display:block;margin-bottom:4px;color:#a0a0a0;font-weight:600;font-size:.8em;text-transform:uppercase;letter-spacing:.5px}
+input[type=text],input[type=number],select{width:100%;padding:8px 10px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#e0e0e0;font-size:.9em}
+input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:#4a9eff}
+input[type=range]{width:100%;height:6px;background:rgba(255,255,255,.1);border-radius:3px;outline:none;-webkit-appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:#4a9eff;border-radius:50%;cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;background:#4a9eff;border-radius:50%;cursor:pointer;border:none}
+.bv{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.bval{background:rgba(74,158,255,.2);color:#4a9eff;padding:4px 12px;border-radius:16px;font-weight:700}
+.bg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px}
+button{padding:8px 12px;border:none;border-radius:6px;font-size:.85em;font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.5px}
+.bp{background:#2563eb;color:#fff}.bp:hover{background:#1d4ed8}
+.bd{background:#ef4444;color:#fff}.bd:hover{background:#dc2626}
+.bca{grid-column:1/-1;background:#dc2626;color:#fff;width:100%;margin-top:12px}.bca:hover{background:#b91c1c}
+.ag{display:flex;gap:6px;margin-top:4px}
+.ab{flex:1;padding:5px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);border-radius:5px;color:#888;cursor:pointer;font-size:.8em}
+.ab.on{background:#2563eb;border-color:#2563eb;color:#fff}.ab:hover{border-color:#2563eb}
+.lbs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px}
+.lb{padding:0;height:72px;background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.1);border-radius:7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.lb:hover{background:rgba(37,99,235,.2);border-color:#2563eb}.lb.on{background:rgba(37,99,235,.35);border-color:#2563eb}
+.lv{display:grid;width:44px;height:28px;gap:2px;background:#000;border-radius:3px;padding:2px}
+.lv.fu{padding:0}
+.ls{background:#2563eb;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.ll{font-size:.7em;color:#888}
+.nf{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.nt{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+</style></head><body>
+<div class="wrap">
+<div class="hdr"><h1>LED Matrix Controller</h1><p>%%SIZE%% RGB Display</p></div>
+<div class="grid">
+<div class="card" style="grid-column:1/-1">
+<div class="nt">
+<div>
+<h2 style="margin:0 0 12px">Network</h2>
+<div class="nf">
+<div class="ii"><span class="il">IP Address</span><div class="iv"><input type="text" id="ip-address" value="%%IP%%" placeholder="192.168.1.100"></div></div>
+<div class="ii"><span class="il">UDP Port</span><div class="iv"><input type="number" id="udp-port" value="%%PORT%%" placeholder="21324" min="1" max="65535" style="width:90px"></div></div>
+<div class="ii"><span class="il">Display</span><span style="padding:5px 8px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid rgba(255,255,255,.1);font-size:.85em">%%SIZE%%</span></div>
+</div>
+</div>
+<span id="status" class="st ok">Ready</span>
+</div></div>
+<div class="card prev"><h2>Live Preview</h2><canvas id="preview" width="576" height="288"></canvas></div>
+<div class="card" style="grid-column:1/-1">
+<h2>Layouts</h2>
+<div class="lbs">
+<button class="lb" data-p="1" onclick="applyLayout(1)"><div class="lv fu"><div class="ls" style="width:100%;height:100%;border-radius:3px">1</div></div><span class="ll">Full</span></button>
+<button class="lb" data-p="2" onclick="applyLayout(2)"><div class="lv" style="grid-template-rows:1fr 1fr"><div class="ls">1</div><div class="ls">2</div></div><span class="ll">1/2</span></button>
+<button class="lb" data-p="3" onclick="applyLayout(3)"><div class="lv" style="grid-template-columns:1fr 1fr"><div class="ls">1</div><div class="ls">2</div></div><span class="ll">1|2</span></button>
+<button class="lb" data-p="4" onclick="applyLayout(4)"><div class="lv" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr"><div class="ls">1</div><div class="ls">2</div><div class="ls">3</div><div class="ls">4</div></div><span class="ll">2x2</span></button>
+<button class="lb" data-p="5" onclick="applyLayout(5)"><div class="lv" style="grid-template-columns:1fr 1fr 1fr"><div class="ls">1</div><div class="ls">2</div><div class="ls">3</div></div><span class="ll">1|2|3</span></button>
+<button class="lb" data-p="6" onclick="applyLayout(6)"><div class="lv" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr"><div class="ls" style="grid-row:span 2">1</div><div class="ls">2</div><div class="ls">3</div></div><span class="ll">1/2|3</span></button>
+</div></div>
+</div>
+<div class="segs">
+<div class="card cp" id="sc0"><h2>Segment 1</h2><div class="fg"><label>Text</label><input type="text" id="text0" placeholder="Message..."></div><div class="fg"><label>Color</label><select id="color0">%%COPTS_W%%</select></div><div class="fg"><label>Background</label><select id="bgcolor0">%%COPTS_B%%</select></div><div class="fg"><label>Intensity</label><input type="range" id="int0" min="0" max="255" value="255" oninput="document.getElementById('iv0').textContent=this.value"><span id="iv0" style="color:#888;font-size:.8em">255</span></div><div class="fg"><label>Font</label><select id="font0">%%FOPTS%%</select></div><div class="fg"><label>Align</label><div class="ag"><button class="ab" onclick="sa(0,'L',this)">L</button><button class="ab on" onclick="sa(0,'C',this)">C</button><button class="ab" onclick="sa(0,'R',this)">R</button></div></div><div class="bg"><button class="bp" onclick="sendText(0)">Send</button><button class="bp" onclick="previewText(0)">Preview</button><button class="bd" onclick="clearSeg(0)">Clear</button></div></div>
+<div class="card cp off" id="sc1"><h2>Segment 2</h2><div class="fg"><label>Text</label><input type="text" id="text1" placeholder="Message..."></div><div class="fg"><label>Color</label><select id="color1">%%COPTS_G%%</select></div><div class="fg"><label>Background</label><select id="bgcolor1">%%COPTS_B%%</select></div><div class="fg"><label>Intensity</label><input type="range" id="int1" min="0" max="255" value="255" oninput="document.getElementById('iv1').textContent=this.value"><span id="iv1" style="color:#888;font-size:.8em">255</span></div><div class="fg"><label>Font</label><select id="font1">%%FOPTS%%</select></div><div class="fg"><label>Align</label><div class="ag"><button class="ab" onclick="sa(1,'L',this)">L</button><button class="ab on" onclick="sa(1,'C',this)">C</button><button class="ab" onclick="sa(1,'R',this)">R</button></div></div><div class="bg"><button class="bp" onclick="sendText(1)">Send</button><button class="bp" onclick="previewText(1)">Preview</button><button class="bd" onclick="clearSeg(1)">Clear</button></div></div>
+<div class="card cp off" id="sc2"><h2>Segment 3</h2><div class="fg"><label>Text</label><input type="text" id="text2" placeholder="Message..."></div><div class="fg"><label>Color</label><select id="color2">%%COPTS_R%%</select></div><div class="fg"><label>Background</label><select id="bgcolor2">%%COPTS_B%%</select></div><div class="fg"><label>Intensity</label><input type="range" id="int2" min="0" max="255" value="255" oninput="document.getElementById('iv2').textContent=this.value"><span id="iv2" style="color:#888;font-size:.8em">255</span></div><div class="fg"><label>Font</label><select id="font2">%%FOPTS%%</select></div><div class="fg"><label>Align</label><div class="ag"><button class="ab" onclick="sa(2,'L',this)">L</button><button class="ab on" onclick="sa(2,'C',this)">C</button><button class="ab" onclick="sa(2,'R',this)">R</button></div></div><div class="bg"><button class="bp" onclick="sendText(2)">Send</button><button class="bp" onclick="previewText(2)">Preview</button><button class="bd" onclick="clearSeg(2)">Clear</button></div></div>
+<div class="card cp off" id="sc3"><h2>Segment 4</h2><div class="fg"><label>Text</label><input type="text" id="text3" placeholder="Message..."></div><div class="fg"><label>Color</label><select id="color3">%%COPTS_Y%%</select></div><div class="fg"><label>Background</label><select id="bgcolor3">%%COPTS_B%%</select></div><div class="fg"><label>Intensity</label><input type="range" id="int3" min="0" max="255" value="255" oninput="document.getElementById('iv3').textContent=this.value"><span id="iv3" style="color:#888;font-size:.8em">255</span></div><div class="fg"><label>Font</label><select id="font3">%%FOPTS%%</select></div><div class="fg"><label>Align</label><div class="ag"><button class="ab" onclick="sa(3,'L',this)">L</button><button class="ab on" onclick="sa(3,'C',this)">C</button><button class="ab" onclick="sa(3,'R',this)">R</button></div></div><div class="bg"><button class="bp" onclick="sendText(3)">Send</button><button class="bp" onclick="previewText(3)">Preview</button><button class="bd" onclick="clearSeg(3)">Clear</button></div></div>
+</div>
+<div class="card" style="margin-bottom:16px">
+<h2>Display Settings</h2>
+<div class="fg"><label>Brightness</label><input type="range" id="brightness" min="0" max="255" value="128" oninput="updBri(this.value)"><div class="bv"><span style="color:#888">Dim</span><span class="bval" id="bv">128</span><span style="color:#888">Bright</span></div></div>
+<button class="bca" onclick="clearAll()">Clear All Segments</button>
+</div>
+</div>
+<script>
+'use strict';
+const canvas=document.getElementById('preview'),ctx=canvas.getContext('2d');
+const sa_=[...Array(4)].map(()=>'C');
+const sb=[{x:0,y:0,w:64,h:32},{x:0,y:0,w:0,h:0},{x:0,y:0,w:0,h:0},{x:0,y:0,w:0,h:0}];
+let lockUntil=0,pFail=0,pTimer=null;
+const MAX_FAIL=5;
+const offsc=document.createElement('canvas');offsc.width=64;offsc.height=32;
+const off=offsc.getContext('2d');
+const LS=9,LCOLS=64,LROWS=32,LDOT=8,LR=2;
+function drawBg(){ctx.fillStyle='#111';ctx.fillRect(0,0,576,288);ctx.fillStyle='#1a1a1a';for(let r=0;r<LROWS;r++)for(let c=0;c<LCOLS;c++){ctx.beginPath();ctx.roundRect(c*LS,r*LS,LDOT,LDOT,LR);ctx.fill();}}
+function blit(){const d=off.getImageData(0,0,LCOLS,LROWS).data;for(let r=0;r<LROWS;r++)for(let c=0;c<LCOLS;c++){const i=(r*LCOLS+c)*4,R=d[i],G=d[i+1],B=d[i+2];if(R<9&&G<9&&B<9)continue;ctx.fillStyle='rgb('+R+','+G+','+B+')';ctx.beginPath();ctx.roundRect(c*LS,r*LS,LDOT,LDOT,LR);ctx.fill();}}
+function redraw(){drawBg();blit();ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1;for(let i=0;i<4;i++){const b=sb[i];if(b&&b.w>0)ctx.strokeRect(b.x*LS-.5,b.y*LS-.5,b.w*LS,b.h*LS);}}
+function drawSeg(i,txt,fg,bg,al){const b=sb[i];if(!b||!b.w)return;off.fillStyle=bg||'#000';off.fillRect(b.x,b.y,b.w,b.h);if(txt){const fv=parseInt((document.getElementById('font'+i)||{value:'1'}).value);const ff=[,'bold Arial','Verdana','Impact'][fv]||'bold Arial';const aw=b.w-2,ah=b.h-2;let fs=6;for(const sz of[24,20,18,16,14,12,10,9,8,6]){off.font=sz+'px '+ff;const m=off.measureText(txt);if(m.width<=aw&&(m.actualBoundingBoxAscent||sz)+(m.actualBoundingBoxDescent||sz*.2)<=ah){fs=sz;break;}}off.font=fs+'px '+ff;off.fillStyle=fg||'#fff';off.textBaseline='middle';const tw=off.measureText(txt).width;const tx=al==='L'?b.x+1:al==='R'?b.x+b.w-tw-1:b.x+(b.w-tw)/2;off.fillText(txt,tx,b.y+b.h/2);}redraw();}
+function updSt(active){for(let i=0;i<4;i++){const c=document.getElementById('sc'+i);if(c)c.classList.toggle('off',!active.includes(i));}}
+function updLb(p){document.querySelectorAll('.lb').forEach(b=>b.classList.toggle('on',+b.dataset.p===p));}
+function setSt(msg,t){const e=document.getElementById('status');e.textContent=msg;e.className='st '+(t||'ok');}
+function sa(i,a,btn){sa_[i]=a;btn.parentElement.querySelectorAll('.ab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+function sched(d){clearTimeout(pTimer);pTimer=setTimeout(poll,d);}
+function poll(){const ac=new AbortController();const tid=setTimeout(()=>ac.abort(),3000);fetch('/api/segments',{signal:ac.signal}).then(r=>{clearTimeout(tid);return r.json();}).then(data=>{if(!data||!data.segments)return;pFail=0;if(Date.now()<lockUntil){sched(2000);return;}const act=data.segments.filter(s=>s.active&&s.w>0&&s.h>0).map(s=>s.id);updSt(act);data.segments.forEach(s=>{sb[s.id]={x:s.x,y:s.y,w:s.w,h:s.h};});off.fillStyle='#000';off.fillRect(0,0,LCOLS,LROWS);data.segments.forEach(s=>{if(s.active&&s.w>0)drawSeg(s.id,s.text||'',s.color||'#fff',s.bgcolor||'#000',s.align||'C');});redraw();sched(2000);}).catch(()=>{clearTimeout(tid);pFail++;const bk=Math.min(2000*Math.pow(2,pFail),30000);if(pFail===1)setSt('Lost connection...','err');if(pFail>=MAX_FAIL)setSt('Device unreachable','err');sched(bk);});}
+function sj(obj,r){r=r===undefined?2:r;return fetch('/api/test',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(obj)}).then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();}).catch(e=>{if(r>0)return new Promise(ok=>setTimeout(ok,300)).then(()=>sj(obj,r-1));setSt('Error: '+e.message,'err');throw e;});}
+const LAYOUTS={1:[[0,0,64,32]],2:[[0,0,64,16],[0,16,64,16]],3:[[0,0,32,32],[32,0,32,32]],4:[[0,0,32,16],[32,0,32,16],[0,16,32,16],[32,16,32,16]],5:[[0,0,21,32],[21,0,21,32],[42,0,22,32]],6:[[0,0,32,32],[32,0,32,16],[32,16,32,16]]};
+const LA={1:[0],2:[0,1],3:[0,1],4:[0,1,2,3],5:[0,1,2],6:[0,1,2]};
+function applyLayout(p){setSt('Applying...','snd');lockUntil=Date.now()+8000;updLb(p);const g=LAYOUTS[p]||[];for(let i=0;i<4;i++)sb[i]=g[i]?{x:g[i][0],y:g[i][1],w:g[i][2],h:g[i][3]}:{x:0,y:0,w:0,h:0};updSt(LA[p]||[]);off.fillStyle='#000';off.fillRect(0,0,LCOLS,LROWS);for(let i=0;i<4;i++)if(sb[i].w>0){const t=document.getElementById('text'+i);drawSeg(i,t?t.value:'',document.getElementById('color'+i).value,document.getElementById('bgcolor'+i).value,sa_[i]);}redraw();sj({cmd:'layout',preset:p}).then(()=>{setSt('Layout '+p+' active');sched(500);});}
+function sendText(i){const t=document.getElementById('text'+i).value,fg=document.getElementById('color'+i).value.replace('#',''),bg=document.getElementById('bgcolor'+i).value.replace('#',''),iv=parseInt(document.getElementById('int'+i).value)||255,f=document.getElementById('font'+i).value,a=sa_[i];setSt('Sending...','snd');sj({cmd:'text',seg:i,text:t,color:fg,bgcolor:bg,font:f,size:'auto',align:a,effect:'none',intensity:iv}).then(()=>{drawSeg(i,t,'#'+fg,'#'+bg,a);setSt('Seg '+(i+1)+' updated');});}
+function clearSeg(i){sj({cmd:'clear',seg:i}).then(()=>{const b=sb[i];off.fillStyle='#000';off.fillRect(b.x,b.y,b.w,b.h);redraw();setSt('Seg '+(i+1)+' cleared');});}
+function clearAll(){sj({cmd:'clear_all'}).then(()=>{off.fillStyle='#000';off.fillRect(0,0,LCOLS,LROWS);redraw();setSt('All cleared');});}
+function updBri(v){document.getElementById('bv').textContent=v;sj({cmd:'brightness',value:+v});}
+function previewText(i){drawSeg(i,document.getElementById('text'+i).value,document.getElementById('color'+i).value,document.getElementById('bgcolor'+i).value,sa_[i]);setSt('Preview seg '+(i+1));}
+off.fillStyle='#000';off.fillRect(0,0,LCOLS,LROWS);drawBg();
+window.addEventListener('load',()=>{updSt([0]);updLb(1);sched(500);});
+</script></body></html>)HTMLEOF";
+
+// Colour <option> lists and font options â€” built once at startup, reused on
+// every request.  Stored as static Strings (permanent small heap allocation,
+// ~2 KB total) so we never rebuild them per-request.
+static String _coW, _coG, _coR, _coY, _coB, _fopts;
+static bool   _uiSnippetsReady = false;
+
+static void buildUISnippets() {
+    if (_uiSnippetsReady) return;
+    struct ColEntry { const char* name; const char* hex; };
+    static const ColEntry cols[] = {
+        {"White",  "#FFFFFF"}, {"Red",    "#FF0000"}, {"Lime",   "#00FF00"},
+        {"Blue",   "#0000FF"}, {"Yellow", "#FFFF00"}, {"Magenta","#FF00FF"},
+        {"Cyan",   "#00FFFF"}, {"Orange", "#FFA500"}, {"Purple", "#800080"},
+        {"Green",  "#008000"}, {"Pink",   "#FFC0CB"}, {"Gold",   "#FFD700"},
+        {"Silver", "#C0C0C0"}, {"Gray",   "#808080"}, {"Black",  "#000000"}
+    };
+    const int N = 15;
+    auto makeOpts = [&](int defIdx) -> String {
+        String s; s.reserve(500);
+        for (int i = 0; i < N; i++) {
+            s += F("<option value=\""); s += cols[i].hex; s += '"';
+            if (i == defIdx) s += F(" selected");
+            s += '>'; s += cols[i].name; s += F("</option>");
+        }
+        return s;
+    };
+    _coW = makeOpts(0);   // White  (seg 1 default text colour)
+    _coG = makeOpts(2);   // Lime   (seg 2)
+    _coR = makeOpts(1);   // Red    (seg 3)
+    _coY = makeOpts(4);   // Yellow (seg 4)
+    _coB = makeOpts(14);  // Black  (all backgrounds)
+    _fopts = F("<option value=\"1\" selected>Arial (Bold)</option>"
+               "<option value=\"2\">Verdana</option>"
+               "<option value=\"3\">Impact</option>");
+    _uiSnippetsReady = true;
+}
+
+// handleRoot â€” streams the PROGMEM page via a chunked response.
+// Peak RAM use â‰ˆ 1 TCP MSS (1460 bytes) stack buffer inside ESPAsyncWebServer.
+// Zero heap allocation for the HTML body.
 void handleRoot(AsyncWebServerRequest *request) {
-    // Build dynamic values
-    String ipAddress = ETH.localIP().toString();
-    String udpPort = String(UDP_PORT);
-    String matrixSize = String(LED_MATRIX_WIDTH) + "x" + String(LED_MATRIX_HEIGHT);
-    
-    String html = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-    <title>LED Matrix Controller</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta charset="UTF-8">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 30px 20px;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header .subtitle {
-            color: #a0c4ff;
-            font-size: 1.1em;
-        }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .segments-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-            .segments-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        .card {
-            background: rgba(30, 30, 46, 0.9);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-        }
-        
-        .card.compact {
-            padding: 15px;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .card.compact.inactive {
-            opacity: 0.4;
-            pointer-events: none;
-            filter: grayscale(0.7);
-        }
-        
-        .card.compact.inactive::after {
-            content: 'INACTIVE';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: #666;
-            padding: 8px 20px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 0.9em;
-            letter-spacing: 2px;
-            z-index: 10;
-            border: 2px solid rgba(255, 255, 255, 0.15);
-        }
-        
-        .card h2 {
-            font-size: 1.2em;
-            margin-bottom: 15px;
-            color: #4a9eff;
-            border-bottom: 2px solid #4a9eff;
-            padding-bottom: 8px;
-        }
-        
-        .card.compact h2 {
-            font-size: 1em;
-            margin-bottom: 12px;
-            padding-bottom: 6px;
-        }
-        
-        .info-grid {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        
-        .info-item {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            align-items: flex-start;
-        }
-        
-        .info-label {
-            color: #888;
-            font-weight: 600;
-            font-size: 0.85em;
-            white-space: nowrap;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .info-value {
-            color: #e0e0e0;
-            font-weight: 500;
-            font-size: 0.9em;
-        }
-        
-        .info-value input {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            color: #e0e0e0;
-            padding: 6px 10px;
-            font-size: 0.9em;
-            font-family: 'Courier New', monospace;
-            width: 100%;
-            min-width: 140px;
-        }
-        
-        .info-value input:focus {
-            outline: none;
-            border-color: #2563eb;
-            background: rgba(37, 99, 235, 0.1);
-        }
-        
-        .status {
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: 600;
-            display: inline-block;
-        }
-        
-        .status.ready { background: #1a472a; color: #4ade80; }
-        .status.sending { background: #1e3a8a; color: #60a5fa; }
-        .status.error { background: #7f1d1d; color: #f87171; }
-        
-        .preview-section {
-            grid-column: 1 / -1;
-            text-align: center;
-        }
-        
-        #preview {
-            border: 2px solid #333;
-            background: #000;
-            border-radius: 8px;
-            image-rendering: pixelated;
-            image-rendering: -moz-crisp-edges;
-            image-rendering: crisp-edges;
-            box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
-        }
-        
-        .form-group {
-            margin-bottom: 12px;
-        }
-        
-        .form-group.compact {
-            margin-bottom: 8px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 6px;
-            color: #a0a0a0;
-            font-weight: 600;
-            font-size: 0.85em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        input[type="text"],
-        input[type="color"],
-        select {
-            width: 100%;
-            padding: 10px 12px;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            color: #e0e0e0;
-            font-size: 0.95em;
-            transition: all 0.3s ease;
-        }
-        
-        .compact input[type="text"],
-        .compact select {
-            padding: 8px 10px;
-            font-size: 0.9em;
-        }
-        
-        input[type="text"]:focus,
-        select:focus {
-            outline: none;
-            border-color: #4a9eff;
-            box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
-        }
-        
-        input[type="color"] {
-            height: 40px;
-            cursor: pointer;
-            padding: 3px;
-        }
-        
-        .compact input[type="color"] {
-            height: 36px;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            outline: none;
-            -webkit-appearance: none;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
-            background: #4a9eff;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.5);
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            background: #4a9eff;
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-        }
-        
-        .button-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
-            margin-top: 12px;
-        }
-        
-        .button-group.compact {
-            gap: 6px;
-            margin-top: 10px;
-        }
-        
-        button {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.9em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .compact button {
-            padding: 8px 12px;
-            font-size: 0.85em;
-        }
-        
-        .btn-primary {
-            background: #2563eb;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #1d4ed8;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
-        }
-        
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-        }
-        
-        .btn-clear-all {
-            grid-column: 1 / -1;
-            background: #dc2626;
-            color: white;
-        }
-        
-        .btn-clear-all:hover {
-            background: #b91c1c;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
-        }
-        
-        .align-group {
-            display: flex;
-            gap: 8px;
-            margin-top: 5px;
-        }
-        
-        .compact .align-group {
-            gap: 6px;
-        }
-        
-        .align-btn {
-            flex: 1;
-            padding: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            color: #888;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.85em;
-        }
-        
-        .compact .align-btn {
-            padding: 5px;
-            font-size: 0.8em;
-        }
-        
-        .align-btn.active {
-            background: #2563eb;
-            border-color: #2563eb;
-            color: white;
-        }
-        
-        .align-btn:hover {
-            border-color: #2563eb;
-        }
-        
-        .brightness-display {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 5px;
-        }
-        
-        .brightness-value {
-            background: rgba(74, 158, 255, 0.2);
-            color: #4a9eff;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 1.1em;
-        }
-        
-        .layout-btn {
-            padding: 0;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .layout-btn:hover {
-            background: rgba(37, 99, 235, 0.2);
-            border-color: #2563eb;
-            transform: translateY(-2px);
-        }
-        
-        .layout-btn.active {
-            background: rgba(37, 99, 235, 0.35);
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37,99,235,0.4);
-        }
-        
-        .layout-visual {
-            display: grid;
-            width: 48px;
-            height: 32px;
-            gap: 2px;
-            background: #000;
-            border-radius: 3px;
-            padding: 2px;
-        }
-        
-        .layout-visual.split-v {
-            grid-template-columns: 1fr 1fr;
-        }
-        
-        .layout-visual.split-h {
-            grid-template-rows: 1fr 1fr;
-        }
-        
-        .layout-visual.quad {
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-        }
-        
-        .layout-visual.full {
-            padding: 0;
-        }
-        
-        .layout-segment {
-            background: #2563eb;
-            border-radius: 2px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            font-weight: 700;
-            color: white;
-        }
-        
-        .layout-label {
-            font-size: 0.75em;
-            color: #888;
-            font-weight: 500;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>LED Matrix Controller</h1>
-            <div class="subtitle">64x32 RGB Display Management</div>
-        </div>
-        
-        <div class="grid">
-            <div class="card" style="grid-column: 1 / -1;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
-                    <div>
-                        <h2 style="margin: 0 0 15px 0;">Network Information</h2>
-                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                            <div class="info-item">
-                                <span class="info-label">IP Address</span>
-                                <div class="info-value"><input type="text" id="ip-address" value="{{IP_ADDRESS}}" placeholder="192.168.1.100"></div>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">UDP Port</span>
-                                <div class="info-value"><input type="number" id="udp-port" value="{{UDP_PORT}}" placeholder="21324" min="1" max="65535" style="width: 100px;"></div>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Hostname</span>
-                                <div class="info-value"><input type="text" id="hostname" value="led-matrix" placeholder="led-matrix"></div>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Display Size</span>
-                                <span class="info-value" style="padding: 6px 10px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">{{MATRIX_SIZE}}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="align-self: center;">
-                        <span id="status" class="status ready">Ready</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card preview-section">
-                <h2>Live Preview</h2>
-                <canvas id="preview" width="576" height="288" style="width: 100%; max-width: 576px; height: auto; image-rendering: pixelated;"></canvas>
-            </div>
-            
-            <div class="card" style="grid-column: 1 / -1;">
-                <h2>Segment Layouts</h2>
-                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 10px;">
-                    <button class="layout-btn" data-preset="1" onclick="applyLayout(1)">
-                        <div class="layout-visual full"><div class="layout-segment" style="width:100%;height:100%;border-radius:3px;">1</div></div>
-                        <span class="layout-label">Fullscreen</span>
-                    </button>
-                    <button class="layout-btn" data-preset="2" onclick="applyLayout(2)">
-                        <div class="layout-visual split-h"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
-                        <span class="layout-label">1 / 2</span>
-                    </button>
-                    <button class="layout-btn" data-preset="3" onclick="applyLayout(3)">
-                        <div class="layout-visual split-v"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
-                        <span class="layout-label">1 | 2</span>
-                    </button>
-                    <button class="layout-btn" data-preset="4" onclick="applyLayout(4)">
-                        <div class="layout-visual quad"><div class="layout-segment">1</div><div class="layout-segment">2</div><div class="layout-segment">3</div><div class="layout-segment">4</div></div>
-                        <span class="layout-label">2×2</span>
-                    </button>
-                    <button class="layout-btn" data-preset="5" onclick="applyLayout(5)">
-                        <div class="layout-visual" style="display:grid;grid-template-columns:1fr 1fr 1fr;"><div class="layout-segment">1</div><div class="layout-segment">2</div><div class="layout-segment">3</div></div>
-                        <span class="layout-label">1|2|3</span>
-                    </button>
-                    <button class="layout-btn" data-preset="6" onclick="applyLayout(6)">
-                        <div class="layout-visual" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;">
-                            <div class="layout-segment" style="grid-row:span 2;">1</div>
-                            <div class="layout-segment">2</div>
-                            <div class="layout-segment">3</div>
-                        </div>
-                        <span class="layout-label">½|¼¼</span>
-                    </button>
-                </div>
-            </div>
-            </div>
-            
-            <div class="segments-grid">
-            <div class="card compact" id="segment-card-0">
-                <h2>Segment 1</h2>
-                <div class="form-group">
-                    <label>Text Message</label>
-                    <input type="text" id="text0" placeholder="Enter your message...">
-                </div>
-                <div class="form-group">
-                    <label>Text Color</label>
-                    <select id="color0">
-                        <option value="#FFFFFF" selected>White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                        <option value="#000000">Black</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Background Color</label>
-                    <select id="bgcolor0">
-                        <option value="#000000" selected>Black</option>
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Intensity</label>
-                    <input type="range" id="intensity0" min="0" max="255" value="255" oninput="document.getElementById('intensity-val0').textContent=this.value">
-                    <span id="intensity-val0" style="color: #888; font-size: 0.85em;">255</span>
-                </div>
-                <div class="form-group">
-                    <label>Font Style</label>
-                    <select id="font0">
-                        <option value="1" selected>Arial (Bold)</option>
-                        <option value="2">Verdana</option>
-                        <option value="3">Impact</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Text Alignment</label>
-                    <div class="align-group">
-                        <button class="align-btn" onclick="setAlign(0, 'L', this)">Left</button>
-                        <button class="align-btn active" onclick="setAlign(0, 'C', this)">Center</button>
-                        <button class="align-btn" onclick="setAlign(0, 'R', this)">Right</button>
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button class="btn-primary" onclick="sendText(0)">Display</button>
-                    <button class="btn-primary" onclick="previewText(0)">Preview</button>
-                    <button class="btn-danger" onclick="clearSegment(0)">Clear</button>
-                </div>
-            </div>
-            
-            <div class="card compact" id="segment-card-1">
-                <h2>Segment 2</h2>
-                <div class="form-group">
-                    <label>Text Message</label>
-                    <input type="text" id="text1" placeholder="Enter your message...">
-                </div>
-                <div class="form-group">
-                    <label>Text Color</label>
-                    <select id="color1">
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00" selected>Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                        <option value="#000000">Black</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Background Color</label>
-                    <select id="bgcolor1">
-                        <option value="#000000" selected>Black</option>
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Intensity</label>
-                    <input type="range" id="intensity1" min="0" max="255" value="255" oninput="document.getElementById('intensity-val1').textContent=this.value">
-                    <span id="intensity-val1" style="color: #888; font-size: 0.85em;">255</span>
-                </div>
-                <div class="form-group">
-                    <label>Font Style</label>
-                    <select id="font1">
-                        <option value="1" selected>Arial (Bold)</option>
-                        <option value="2">Verdana</option>
-                        <option value="3">Impact</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Text Alignment</label>
-                    <div class="align-group">
-                        <button class="align-btn" onclick="setAlign(1, 'L', this)">Left</button>
-                        <button class="align-btn active" onclick="setAlign(1, 'C', this)">Center</button>
-                        <button class="align-btn" onclick="setAlign(1, 'R', this)">Right</button>
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button class="btn-primary" onclick="sendText(1)">Display</button>
-                    <button class="btn-primary" onclick="previewText(1)">Preview</button>
-                    <button class="btn-danger" onclick="clearSegment(1)">Clear</button>
-                </div>
-            </div>
-            
-            <div class="card compact" id="segment-card-2">
-                <h2>Segment 3</h2>
-                <div class="form-group">
-                    <label>Text Message</label>
-                    <input type="text" id="text2" placeholder="Enter your message...">
-                </div>
-                <div class="form-group">
-                    <label>Text Color</label>
-                    <select id="color2">
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000" selected>Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                        <option value="#000000">Black</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Background Color</label>
-                    <select id="bgcolor2">
-                        <option value="#000000" selected>Black</option>
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Intensity</label>
-                    <input type="range" id="intensity2" min="0" max="255" value="255" oninput="document.getElementById('intensity-val2').textContent=this.value">
-                    <span id="intensity-val2" style="color: #888; font-size: 0.85em;">255</span>
-                </div>
-                <div class="form-group">
-                    <label>Font Style</label>
-                    <select id="font2">
-                        <option value="1" selected>Arial (Bold)</option>
-                        <option value="2">Verdana</option>
-                        <option value="3">Impact</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Text Alignment</label>
-                    <div class="align-group">
-                        <button class="align-btn" onclick="setAlign(2, 'L', this)">Left</button>
-                        <button class="align-btn active" onclick="setAlign(2, 'C', this)">Center</button>
-                        <button class="align-btn" onclick="setAlign(2, 'R', this)">Right</button>
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button class="btn-primary" onclick="sendText(2)">Display</button>
-                    <button class="btn-primary" onclick="previewText(2)">Preview</button>
-                    <button class="btn-danger" onclick="clearSegment(2)">Clear</button>
-                </div>
-            </div>
-            
-            <div class="card compact" id="segment-card-3">
-                <h2>Segment 4</h2>
-                <div class="form-group">
-                    <label>Text Message</label>
-                    <input type="text" id="text3" placeholder="Enter your message...">
-                </div>
-                <div class="form-group">
-                    <label>Text Color</label>
-                    <select id="color3">
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00" selected>Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                        <option value="#000000">Black</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Background Color</label>
-                    <select id="bgcolor3">
-                        <option value="#000000" selected>Black</option>
-                        <option value="#FFFFFF">White</option>
-                        <option value="#FF0000">Red</option>
-                        <option value="#00FF00">Lime</option>
-                        <option value="#0000FF">Blue</option>
-                        <option value="#FFFF00">Yellow</option>
-                        <option value="#FF00FF">Magenta</option>
-                        <option value="#00FFFF">Cyan</option>
-                        <option value="#FFA500">Orange</option>
-                        <option value="#800080">Purple</option>
-                        <option value="#008000">Green</option>
-                        <option value="#FFC0CB">Pink</option>
-                        <option value="#FFD700">Gold</option>
-                        <option value="#C0C0C0">Silver</option>
-                        <option value="#808080">Gray</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Intensity</label>
-                    <input type="range" id="intensity3" min="0" max="255" value="255" oninput="document.getElementById('intensity-val3').textContent=this.value">
-                    <span id="intensity-val3" style="color: #888; font-size: 0.85em;">255</span>
-                </div>
-                <div class="form-group">
-                    <label>Font Style</label>
-                    <select id="font3">
-                        <option value="1" selected>Arial (Bold)</option>
-                        <option value="2">Verdana</option>
-                        <option value="3">Impact</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Text Alignment</label>
-                    <div class="align-group">
-                        <button class="align-btn" onclick="setAlign(3, 'L', this)">Left</button>
-                        <button class="align-btn active" onclick="setAlign(3, 'C', this)">Center</button>
-                        <button class="align-btn" onclick="setAlign(3, 'R', this)">Right</button>
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button class="btn-primary" onclick="sendText(3)">Display</button>
-                    <button class="btn-primary" onclick="previewText(3)">Preview</button>
-                    <button class="btn-danger" onclick="clearSegment(3)">Clear</button>
-                </div>
-            </div>
-            </div>
-            
-            <div class="card" style="grid-column: 1 / -1;">
-                <h2>Display Settings</h2>
-                <div class="form-group">
-                    <label>Brightness Control</label>
-                    <input type="range" id="brightness" min="0" max="255" value="128" oninput="updateBrightness(this.value)">
-                    <div class="brightness-display">
-                        <span style="color: #888;">Dim</span>
-                        <span class="brightness-value" id="brightness-value">128</span>
-                        <span style="color: #888;">Bright</span>
-                    </div>
-                </div>
-                <button class="btn-clear-all" onclick="clearAll()">Clear All Segments</button>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        'use strict';
+    buildUISnippets();
 
-        // ── Canvas ────────────────────────────────────────────────────────────
-        const canvas = document.getElementById('preview');
-        const ctx    = canvas.getContext('2d');
+    // Small per-request state â€” lives only for the duration of the stream.
+    struct CState {
+        const char* src;       // current read position inside WEBPAGE_HTML (flash)
+        size_t      rem;       // bytes remaining
+        char        ip[20];
+        char        port[8];
+        char        size[10];
+    };
+    auto* st = new CState();
+    st->src = WEBPAGE_HTML;
+    st->rem = strlen_P(WEBPAGE_HTML);
+    snprintf(st->ip,   sizeof(st->ip),   "%s", ETH.localIP().toString().c_str());
+    snprintf(st->port, sizeof(st->port),  "%u", (unsigned)UDP_PORT);
+    snprintf(st->size, sizeof(st->size),  "%dx%d", LED_MATRIX_WIDTH, LED_MATRIX_HEIGHT);
 
-        // ── State ─────────────────────────────────────────────────────────────
-        // Per-segment text alignment (L / C / R)
-        const segmentAlign = ['C', 'C', 'C', 'C'];
+    AsyncWebServerResponse* resp = request->beginChunkedResponse(
+        "text/html",
+        [st](uint8_t* buf, size_t maxLen, size_t /*idx*/) -> size_t {
 
-        // Canonical segment geometry — source of truth for the canvas renderer.
-        // Updated by applyLayout() immediately; only updated from the server when
-        // no layout change is in-flight (layoutLockUntil).
-        const segmentBounds = [
-            { x: 0, y: 0, width: 64, height: 32 },
-            { x: 0, y: 0, width:  0, height:  0 },
-            { x: 0, y: 0, width:  0, height:  0 },
-            { x: 0, y: 0, width:  0, height:  0 }
-        ];
+            size_t out = 0;
 
-        // Freeze polling from overwriting layout for N ms after applyLayout().
-        let layoutLockUntil = 0;
+            while (out < maxLen && st->rem > 0) {
+                char c = (char)pgm_read_byte(st->src);
 
-        // Active layout preset — integer 1-14 matching applyLayoutPreset() on device.
-        let currentLayout = 1;
+                // â”€â”€ Placeholder detection: %%NAME%% â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                if (c == '%' && st->rem >= 4 &&
+                    (char)pgm_read_byte(st->src + 1) == '%') {
 
-        // Retry / debounce helpers
-        let pollFailCount  = 0;
-        const MAX_POLL_FAIL = 5;
-        let pollTimer = null;
-
-        // ── Init ──────────────────────────────────────────────────────────────
-        off.fillStyle = '#000000';
-        off.fillRect(0, 0, LED_COLS, LED_ROWS);
-        drawGridBackground();
-
-        window.addEventListener('load', function () {
-            updateSegmentStates([0]);
-            updateLayoutButtons(1);
-            schedulePoll(500);   // first poll quickly
-        });
-
-        // ── Polling ───────────────────────────────────────────────────────────
-        function schedulePoll(delay) {
-            clearTimeout(pollTimer);
-            pollTimer = setTimeout(pollSegments, delay);
-        }
-
-        function pollSegments() {
-            const ctrl = new AbortController();
-            const tid  = setTimeout(() => ctrl.abort(), 3000); // 3s timeout
-
-            fetch('/api/segments', { signal: ctrl.signal })
-                .then(r => { clearTimeout(tid); return r.json(); })
-                .then(data => {
-                    if (!data || !data.segments) return;
-                    pollFailCount = 0;
-
-                    const locked = Date.now() < layoutLockUntil;
-
-                    if (!locked) {
-                        // ── Update geometry & card states from server ──
-                        const active = data.segments
-                            .filter(s => s.active && s.w > 0 && s.h > 0)
-                            .map(s => s.id);
-                        updateSegmentStates(active);
-
-                        data.segments.forEach(s => {
-                            segmentBounds[s.id] = { x: s.x, y: s.y, width: s.w, height: s.h };
-                        });
-
-                        // ── Repaint canvas ──
-                        off.fillStyle = '#000000';
-                        off.fillRect(0, 0, LED_COLS, LED_ROWS);
-                        data.segments.forEach(s => {
-                            if (s.active && s.w > 0 && s.h > 0) {
-                                drawSegmentOnCanvas(s.id, s.text || '',
-                                    s.color   || '#FFFFFF',
-                                    s.bgcolor || '#000000',
-                                    s.align   || 'C');
-                            }
-                        });
-                        redrawCanvas();
+                    // Scan for closing %%
+                    const char* p   = st->src + 2;
+                    size_t      rem2 = st->rem - 2;
+                    while (rem2 > 1 &&
+                           !((char)pgm_read_byte(p)   == '%' &&
+                             (char)pgm_read_byte(p+1) == '%')) {
+                        ++p; --rem2;
                     }
 
-                    // NOTE: We intentionally do NOT overwrite text input fields from
-                    // the server. The browser is the source of truth for what the user
-                    // typed. Server text is only authoritative when Q-SYS sends it via
-                    // UDP — at that point the user should reload to see it.
+                    if (rem2 < 2) {
+                        // No closing %% â€” emit the '%' literally and move on
+                        if (out + 1 > maxLen) break;
+                        buf[out++] = '%';
+                        ++st->src; --st->rem;
+                        continue;
+                    }
 
-                    schedulePoll(2000);
-                })
-                .catch(() => {
-                    clearTimeout(tid);
-                    pollFailCount++;
-                    const backoff = Math.min(2000 * Math.pow(2, pollFailCount), 30000);
-                    if (pollFailCount === 1) updateStatus('Connection lost – retrying…', 'error');
-                    if (pollFailCount >= MAX_POLL_FAIL) updateStatus('Device unreachable', 'error');
-                    schedulePoll(backoff);
-                });
-        }
-        
-        function updateStatus(message, type) {
-            type = type || 'ready';
-            const el = document.getElementById('status');
-            el.textContent = message;
-            el.className   = 'status ' + type;
-        }
+                    // Extract name into a small stack buffer
+                    char name[12] = {};
+                    size_t nlen = (size_t)(p - (st->src + 2));
+                    if (nlen < sizeof(name)) {
+                        for (size_t k = 0; k < nlen; k++)
+                            name[k] = (char)pgm_read_byte(st->src + 2 + k);
+                    }
 
-        function setAlign(segment, align, btn) {
-            segmentAlign[segment] = align;
-            btn.parentElement.querySelectorAll('.align-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        }
+                    // Resolve placeholder â†’ replacement string
+                    const char* repl = nullptr;
+                    const String* replS = nullptr;
+                    if      (strcmp(name, "IP"      ) == 0) repl  = st->ip;
+                    else if (strcmp(name, "PORT"    ) == 0) repl  = st->port;
+                    else if (strcmp(name, "SIZE"    ) == 0) repl  = st->size;
+                    else if (strcmp(name, "COPTS_W" ) == 0) replS = &_coW;
+                    else if (strcmp(name, "COPTS_G" ) == 0) replS = &_coG;
+                    else if (strcmp(name, "COPTS_R" ) == 0) replS = &_coR;
+                    else if (strcmp(name, "COPTS_Y" ) == 0) replS = &_coY;
+                    else if (strcmp(name, "COPTS_B" ) == 0) replS = &_coB;
+                    else if (strcmp(name, "FOPTS"   ) == 0) replS = &_fopts;
 
-        function updateSegmentStates(activeSegments) {
-            for (let i = 0; i < 4; i++) {
-                const card = document.getElementById('segment-card-' + i);
-                if (!card) continue;
-                if (activeSegments.includes(i)) card.classList.remove('inactive');
-                else                            card.classList.add('inactive');
-            }
-        }
+                    const char* rp  = repl ? repl : (replS ? replS->c_str() : "");
+                    size_t      rlen = strlen(rp);
 
-        function updateLayoutButtons(preset) {
-            document.querySelectorAll('.layout-btn').forEach(btn => {
-                btn.classList.toggle('active', parseInt(btn.dataset.preset) === preset);
-            });
-        }
+                    if (out + rlen > maxLen) break; // defer to next chunk
 
-        // ── JSON command sender (with retry) ──────────────────────────────────
-        function sendJSON(obj, retries) {
-            retries = (retries === undefined) ? 2 : retries;
-            const body = JSON.stringify(obj);
-            return fetch('/api/test', {
-                method:  'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body:    body,
-                signal:  AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
-            })
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.text();
-            })
-            .catch(err => {
-                if (retries > 0) {
-                    return new Promise(res => setTimeout(res, 300))
-                        .then(() => sendJSON(obj, retries - 1));
-                }
-                updateStatus('Send error: ' + err.message, 'error');
-                throw err;
-            });
-        }
+                    memcpy(buf + out, rp, rlen);
+                    out += rlen;
 
-        // Send a sequence of commands one-by-one (await each before next)
-        function sendSequence(cmds) {
-            return cmds.reduce(
-                (p, cmd) => p.then(() => sendJSON(cmd)),
-                Promise.resolve()
-            );
-        }
-
-        // ── Layout ────────────────────────────────────────────────────────────
-        // Preset geometry mirrors applyLayoutPreset() in udp_handler.h
-        const LAYOUTS = {
-            1:  [ [0,0,64,32] ],
-            2:  [ [0,0,64,16], [0,16,64,16] ],
-            3:  [ [0,0,32,32], [32,0,32,32] ],
-            4:  [ [0,0,32,16],[32,0,32,16],[0,16,32,16],[32,16,32,16] ],
-            5:  [ [0,0,21,32],[21,0,21,32],[42,0,22,32] ],
-            6:  [ [0,0,32,32],[32,0,32,16],[32,16,32,16] ],
-            11: [ null,[0,0,64,32],null,null ],
-            12: [ null,null,[0,0,64,32],null ],
-            13: [ null,null,null,[0,0,64,32] ],
-            14: [ null,null,null,null,[0,0,64,32] ]
-        };
-        // Which segment indices are active per preset
-        const LAYOUT_ACTIVE = {
-            1:[0], 2:[0,1], 3:[0,1], 4:[0,1,2,3],
-            5:[0,1,2], 6:[0,1,2],
-            11:[0], 12:[1], 13:[2], 14:[3]
-        };
-
-        function applyLayout(preset) {
-            updateStatus('Applying layout…', 'sending');
-            layoutLockUntil = Date.now() + 8000;
-            currentLayout   = preset;
-            updateLayoutButtons(preset);
-
-            // Update local segmentBounds and card states immediately
-            const geo    = LAYOUTS[preset] || [];
-            const active = LAYOUT_ACTIVE[preset] || [];
-            for (let i = 0; i < 4; i++) {
-                if (geo[i]) {
-                    segmentBounds[i] = { x:geo[i][0], y:geo[i][1], width:geo[i][2], height:geo[i][3] };
-                } else {
-                    segmentBounds[i] = { x:0, y:0, width:0, height:0 };
-                }
-            }
-            updateSegmentStates(active);
-
-            // Repaint canvas with new geometry
-            off.fillStyle = '#000000';
-            off.fillRect(0, 0, LED_COLS, LED_ROWS);
-            for (let i = 0; i < 4; i++) {
-                if (segmentBounds[i].width > 0) {
-                    const txt = document.getElementById('text' + i);
-                    drawSegmentOnCanvas(i, txt ? txt.value : '',
-                        document.getElementById('color'   + i).value,
-                        document.getElementById('bgcolor' + i).value,
-                        segmentAlign[i]);
-                }
-            }
-            redrawCanvas();
-
-            // Send single layout command — device handles all geometry internally
-            sendJSON({ cmd: 'layout', preset: preset })
-                .then(() => {
-                    updateStatus('Layout ' + preset + ' active', 'ready');
-                    schedulePoll(500); // confirm server state shortly after
-                });
-        }
-
-        // ── Segment actions ───────────────────────────────────────────────────
-        function sendText(segment) {
-            const text      = document.getElementById('text'      + segment).value;
-            const color     = document.getElementById('color'     + segment).value.replace('#','');
-            const bgcolor   = document.getElementById('bgcolor'   + segment).value.replace('#','');
-            const intensity = parseInt(document.getElementById('intensity' + segment).value) || 255;
-            const font      = document.getElementById('font'      + segment).value;
-            const align     = segmentAlign[segment];
-
-            updateStatus('Sending…', 'sending');
-            sendJSON({
-                cmd: 'text', seg: segment,
-                text: text, color: color, bgcolor: bgcolor,
-                font: font, size: 'auto', align: align,
-                effect: 'none', intensity: intensity
-            }).then(() => {
-                drawSegmentOnCanvas(segment, text, '#' + color, '#' + bgcolor, align);
-                updateStatus('Segment ' + (segment + 1) + ' updated', 'ready');
-            });
-        }
-
-        function clearSegment(segment) {
-            sendJSON({ cmd: 'clear', seg: segment })
-                .then(() => {
-                    const b = segmentBounds[segment];
-                    off.fillStyle = '#000000';
-                    off.fillRect(b.x, b.y, b.width, b.height);
-                    redrawCanvas();
-                    updateStatus('Segment ' + (segment + 1) + ' cleared', 'ready');
-                });
-        }
-
-        function clearAll() {
-            sendJSON({ cmd: 'clear_all' })
-                .then(() => {
-                    off.fillStyle = '#000000';
-                    off.fillRect(0, 0, LED_COLS, LED_ROWS);
-                    drawGridBackground();
-                    updateStatus('All segments cleared', 'ready');
-                });
-        }
-
-        function updateBrightness(value) {
-            document.getElementById('brightness-value').textContent = value;
-            sendJSON({ cmd: 'brightness', value: parseInt(value) });
-        }
-
-        function previewText(segment) {
-            const text    = document.getElementById('text'    + segment).value;
-            const color   = document.getElementById('color'   + segment).value;
-            const bgcolor = document.getElementById('bgcolor' + segment).value;
-            drawSegmentOnCanvas(segment, text, color, bgcolor, segmentAlign[segment]);
-            updateStatus('Preview: Segment ' + (segment + 1), 'ready');
-        }
-
-        // ── Canvas renderer ───────────────────────────────────────────────────
-        // LED grid constants
-        const LED_COLS = 64, LED_ROWS = 32;
-        const LED_S    = 9;   // total cell size (px per LED on canvas)
-        const LED_PAD  = 1;   // gap between LEDs
-        const LED_DOT  = LED_S - LED_PAD;  // drawn square size
-        const LED_R    = 2;   // corner radius for rounded squares
-
-        // Off-screen 64×32 pixel buffer — text is drawn here at 1:1 scale
-        const offscreen = document.createElement('canvas');
-        offscreen.width  = LED_COLS;
-        offscreen.height = LED_ROWS;
-        const off = offscreen.getContext('2d');
-
-        // Draw the full LED grid background (all LEDs dark/off)
-        function drawGridBackground() {
-            ctx.fillStyle = '#111111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#1a1a1a';
-            for (let row = 0; row < LED_ROWS; row++) {
-                for (let col = 0; col < LED_COLS; col++) {
-                    const px = col * LED_S, py = row * LED_S;
-                    ctx.beginPath();
-                    ctx.roundRect(px, py, LED_DOT, LED_DOT, LED_R);
-                    ctx.fill();
-                }
-            }
-        }
-
-        // Blit the offscreen pixel buffer onto the LED grid canvas.
-        // Each pixel in the offscreen becomes one lit/dim LED square.
-        function blitToGrid() {
-            const imgData = off.getImageData(0, 0, LED_COLS, LED_ROWS).data;
-            for (let row = 0; row < LED_ROWS; row++) {
-                for (let col = 0; col < LED_COLS; col++) {
-                    const i  = (row * LED_COLS + col) * 4;
-                    const r  = imgData[i], g = imgData[i+1], b = imgData[i+2];
-                    // Dim non-black pixels slightly to simulate LED bloom
-                    const bright = (r > 8 || g > 8 || b > 8);
-                    if (!bright) continue;  // leave as dark grid dot
-                    const px = col * LED_S, py = row * LED_S;
-                    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
-                    ctx.beginPath();
-                    ctx.roundRect(px, py, LED_DOT, LED_DOT, LED_R);
-                    ctx.fill();
-                }
-            }
-        }
-
-        function drawSegmentOnCanvas(segment, text, color, bgcolor, align) {
-            const b = segmentBounds[segment];
-            if (!b || b.width === 0 || b.height === 0) return;
-
-            // 1. Paint segment background into offscreen buffer
-            off.fillStyle = bgcolor || '#000000';
-            off.fillRect(b.x, b.y, b.width, b.height);
-
-            if (text) {
-                // 2. Pick font family from selector
-                const fontEl  = document.getElementById('font' + segment);
-                const fontVal = fontEl ? parseInt(fontEl.value) : 1;
-                const fontFamilies = { 1: 'bold Arial', 2: 'Verdana', 3: 'Impact' };
-                const fontFamily   = fontFamilies[fontVal] || 'bold Arial';
-
-                // 3. Auto-size: find largest font that fits in the segment
-                const availW = b.width  - 2;
-                const availH = b.height - 2;
-                const sizes  = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
-                let fontSize = 6;
-                for (const sz of sizes) {
-                    off.font = sz + 'px ' + fontFamily;
-                    const m = off.measureText(text);
-                    const textH = (m.actualBoundingBoxAscent || sz) + (m.actualBoundingBoxDescent || sz * 0.2);
-                    if (m.width <= availW && textH <= availH) { fontSize = sz; break; }
+                    // Advance past %%NAME%%
+                    st->src = p + 2;
+                    st->rem = rem2 - 2;
+                    continue;
                 }
 
-                // 4. Draw text into offscreen
-                off.font         = fontSize + 'px ' + fontFamily;
-                off.fillStyle    = color || '#FFFFFF';
-                off.textBaseline = 'middle';
-                const mx = off.measureText(text);
-                const tw = mx.width;
-                let tx;
-                if (align === 'L')      tx = b.x + 1;
-                else if (align === 'R') tx = b.x + b.width - tw - 1;
-                else                    tx = b.x + (b.width - tw) / 2;
-                off.fillText(text, tx, b.y + b.height / 2);
+                buf[out++] = (uint8_t)c;
+                ++st->src; --st->rem;
             }
 
-            // 5. Redraw the full grid then blit all segments
-            redrawCanvas();
-        }
-
-        function redrawCanvas() {
-            drawGridBackground();
-            blitToGrid();
-            // Draw faint segment dividers on the grid
-            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-            ctx.lineWidth   = 1;
-            for (let i = 0; i < 4; i++) {
-                const b = segmentBounds[i];
-                if (!b || b.width === 0) continue;
-                ctx.strokeRect(b.x * LED_S - 0.5, b.y * LED_S - 0.5,
-                               b.width * LED_S, b.height * LED_S);
+            if (st->rem == 0 && out == 0) {
+                delete st;
+                return 0; // signal end-of-stream to ESPAsyncWebServer
             }
+            return out;
         }
-    </script>
-</body>
-</html>
-    )rawliteral";
-    
-    // Replace placeholders with actual values
-    html.replace("{{IP_ADDRESS}}", ipAddress);
-    html.replace("{{UDP_PORT}}", udpPort);
-    html.replace("{{MATRIX_SIZE}}", matrixSize);
-    
-    request->send(200, "text/html", html);
+    );
+
+    resp->addHeader("Cache-Control", "no-cache");
+    request->send(resp);
 }
+
+
 
 void handleConfig(AsyncWebServerRequest *request) {
     StaticJsonDocument<512> doc;
