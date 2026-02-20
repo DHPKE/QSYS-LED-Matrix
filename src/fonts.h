@@ -2,50 +2,78 @@
 #define FONTS_H
 
 #include <Adafruit_GFX.h>
+
+// ── Arial  → FreeSansBold  (bold strokes = sharp, high contrast on LED matrix)
+#include <Fonts/FreeSansBold9pt7b.h>
+#include <Fonts/FreeSansBold12pt7b.h>
+#include <Fonts/FreeSansBold18pt7b.h>
+#include <Fonts/FreeSansBold24pt7b.h>
+
+// ── Verdana → FreeSans (regular, wider letterforms)
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <Fonts/FreeSans18pt7b.h>
 #include <Fonts/FreeSans24pt7b.h>
+
+// ── Impact  → FreeMonoBold (condensed bold — closest available)
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
 
-// Font mapping structure
-struct FontInfo {
-    const char* name;
-    const GFXfont* font;
-    uint8_t height;
-};
+// ── Tiny fallback for very small segments
+#include <Fonts/TomThumb.h>
 
-// Available fonts
-const FontInfo FONTS[] = {
-    {"arial", &FreeSans12pt7b, 12},        // Arial sans-serif (auto-sized)
-    {"verdana", &FreeSans12pt7b, 12},      // Verdana sans-serif (auto-sized)
-    {"digital12", &FreeMonoBold12pt7b, 12},
-    {"digital24", &FreeSans24pt7b, 24},
-    {"mono9", &FreeMonoBold9pt7b, 9},
-    {"mono12", &FreeMonoBold12pt7b, 12},
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Font ID integer mapping (matches Q-SYS protocol)
+// 1 = Arial (FreeSansBold)
+// 2 = Verdana (FreeSans)
+// 3 = Impact (FreeMonoBold)
+// ─────────────────────────────────────────────────────────────────────────────
 
-const int FONT_COUNT = sizeof(FONTS) / sizeof(FontInfo);
+// Returns the best GFX font for a given font-id (1-3) and pixel-height budget.
+// All returned fonts are bold or bold-weight to ensure sharp edges on LED matrix.
+inline const GFXfont* getFontById(uint8_t fontId, uint8_t pixelHeight) {
+    switch (fontId) {
+        case 2: // Verdana — regular sans
+            if (pixelHeight <= 12) return &FreeSans9pt7b;
+            if (pixelHeight <= 16) return &FreeSans12pt7b;
+            if (pixelHeight <= 22) return &FreeSans18pt7b;
+            return &FreeSans24pt7b;
 
-// Get font by name
-const GFXfont* getFontByName(const char* name) {
-    for (int i = 0; i < FONT_COUNT; i++) {
-        if (strcmp(FONTS[i].name, name) == 0) {
-            return FONTS[i].font;
-        }
+        case 3: // Impact — condensed mono bold
+            if (pixelHeight <= 12) return &FreeMonoBold9pt7b;
+            if (pixelHeight <= 16) return &FreeMonoBold12pt7b;
+            if (pixelHeight <= 22) return &FreeMonoBold18pt7b;
+            return &FreeMonoBold24pt7b;
+
+        default: // 1 = Arial — bold sans (default)
+            if (pixelHeight <= 12) return &FreeSansBold9pt7b;
+            if (pixelHeight <= 16) return &FreeSansBold12pt7b;
+            if (pixelHeight <= 22) return &FreeSansBold18pt7b;
+            return &FreeSansBold24pt7b;
     }
-    return &FreeSans9pt7b; // Default font
 }
 
-// Get font height by name
-uint8_t getFontHeight(const char* name) {
-    for (int i = 0; i < FONT_COUNT; i++) {
-        if (strcmp(FONTS[i].name, name) == 0) {
-            return FONTS[i].height;
-        }
-    }
-    return 9; // Default height
+// Parse a font name string OR integer string → font id (1/2/3)
+inline uint8_t parseFontId(const char* name) {
+    if (!name || name[0] == '\0') return 1;
+    // Integer form: "1", "2", "3"
+    if (name[0] >= '1' && name[0] <= '3' && name[1] == '\0') return (uint8_t)(name[0] - '0');
+    // Name form (case-insensitive prefix match)
+    if (strncasecmp(name, "arial",   5) == 0) return 1;
+    if (strncasecmp(name, "verdana", 7) == 0) return 2;
+    if (strncasecmp(name, "impact",  6) == 0) return 3;
+    // Legacy names
+    if (strncasecmp(name, "roboto",  6) == 0) return 1;
+    if (strncasecmp(name, "mono",    4) == 0) return 3;
+    if (strncasecmp(name, "digital", 7) == 0) return 3;
+    return 1; // default = Arial
+}
+
+// Convenience: get font by name + pixel height
+inline const GFXfont* getFontByName(const char* name, uint8_t pixelHeight = 12) {
+    return getFontById(parseFontId(name), pixelHeight);
 }
 
 #endif // FONTS_H

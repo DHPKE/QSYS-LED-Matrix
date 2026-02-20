@@ -1,4 +1,4 @@
-#ifndef TEXT_RENDERER_H
+﻿#ifndef TEXT_RENDERER_H
 #define TEXT_RENDERER_H
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
@@ -9,177 +9,127 @@
 class TextRenderer {
 private:
     MatrixPanel_I2S_DMA* dma_display;
-    SegmentManager* segmentManager;
-    
-    // Convert RGB888 to RGB565
-    uint16_t color888to565(uint32_t color888) {
-        uint8_t r = (color888 >> 16) & 0xFF;
-        uint8_t g = (color888 >> 8) & 0xFF;
-        uint8_t b = color888 & 0xFF;
-        return dma_display->color565(r, g, b);
-    }
-    
-    // Parse hex color string (RRGGBB)
-    uint16_t parseColor(const char* colorStr) {
-        if (colorStr[0] == '#') colorStr++; // Skip # if present
-        
-        uint32_t color = strtoul(colorStr, nullptr, 16);
-        return color888to565(color);
-    }
-    
-    // Calculate optimal font size for text to fit in segment
-    uint8_t calculateAutoSize(Segment* seg, const char* text) {
-        int textLen = strlen(text);
-        if (textLen == 0) return 12;
-        
-        // Available space with padding
-        int availWidth = seg->width - 4; // 2px padding each side
-        int availHeight = seg->height - 4;
-        
-        // Try fonts from largest to smallest
-        const uint8_t sizes[] = {24, 18, 12, 9, 6};
-        
-        for (int i = 0; i < 5; i++) {
-            // Get the actual font for this size
-            const GFXfont* testFont = selectFont(sizes[i], seg->fontName);
-            dma_display->setFont(testFont);
-            
-            // Get actual text bounds
-            int16_t x1, y1;
-            uint16_t w, h;
-            dma_display->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
-            
-            // Check if text fits in available space
-            if (w <= availWidth && h <= availHeight) {
-                return sizes[i];
+    SegmentManager*      segmentManager;
+
+    // â”€â”€ Font selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Pick the largest GFX font whose rendered text fits within (maxW Ã— maxH).
+    // Returns the chosen font and sets outPixelH to the font's pixel height.
+    const GFXfont* fitFont(uint8_t fontId, const char* text,
+                           uint16_t maxW, uint16_t maxH,
+                           uint8_t& outPixelH) {
+        // Candidate pixel heights from largest to smallest
+        static const uint8_t heights[] = { 26, 22, 16, 12, 0 }; // 0 = TomThumb fallback
+
+        for (int i = 0; ; i++) {
+            uint8_t ph = heights[i];
+            const GFXfont* f = (ph == 0) ? &TomThumb : getFontById(fontId, ph);
+            dma_display->setFont(f);
+            int16_t x1, y1; uint16_t tw, th;
+            dma_display->getTextBounds(text, 0, 0, &x1, &y1, &tw, &th);
+            if (tw <= maxW && th <= maxH) {
+                outPixelH = ph;
+                return f;
             }
+            if (ph == 0) { outPixelH = 0; return f; } // nothing fits, use TomThumb anyway
         }
-        
-        return 6; // Minimum size if nothing fits
     }
-    
-    // Get appropriate font for size
-    const GFXfont* selectFont(uint8_t size, const char* fontName) {
-        // Handle auto-sizing for Arial and Verdana fonts
-        if (fontName && (strcmp(fontName, "arial") == 0 || strcmp(fontName, "verdana") == 0)) {
-            // Select size based on segment height
-            if (size <= 9) {
-                return &FreeSans9pt7b;
-            } else if (size <= 12) {
-                return &FreeSans12pt7b;
-            } else if (size <= 18) {
-                return &FreeSans18pt7b;
-            } else {
-                return &FreeSans24pt7b;
-            }
-        }
-        
-        // Otherwise use the font name directly
-        return getFontByName(fontName);
-    }
-    
+
 public:
-    TextRenderer(MatrixPanel_I2S_DMA* display, SegmentManager* manager) 
+    TextRenderer(MatrixPanel_I2S_DMA* display, SegmentManager* manager)
         : dma_display(display), segmentManager(manager) {}
-    
+
     void renderSegment(Segment* seg) {
-        // Always clear dirty flag first — no matter what path we take
         seg->isDirty = false;
 
         if (!seg->isActive) {
-            // Segment was deactivated (layout change / clear command) — erase it to black
             dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, 0x0000);
             return;
         }
 
         if (strlen(seg->text) == 0) {
-            // Active segment with no text — fill with its background colour
             dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
             return;
         }
 
-        // Apply blink effect — skip drawing but don't re-dirty
-        if (seg->effect == EFFECT_BLINK && !seg->blinkState) {
-            return;
-        }
+        if (seg->effect == EFFECT_BLINK && !seg->blinkState) return;
 
-        // Only log on first render or non-scroll effects (suppress scroll noise)
         if (seg->effect != EFFECT_SCROLL || seg->scrollOffset == 0) {
             Serial.printf("RENDER seg%d: '%s' x=%d y=%d w=%d h=%d fx=%d\n",
                           seg->id, seg->text, seg->x, seg->y, seg->width, seg->height, seg->effect);
         }
 
-        // Clear segment background
+        // â”€â”€ Clear background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         dma_display->fillRect(seg->x, seg->y, seg->width, seg->height, seg->bgColor);
 
-        // Draw border if enabled
-        if (seg->hasBorder) {
+        if (seg->hasBorder)
             dma_display->drawRect(seg->x, seg->y, seg->width, seg->height, seg->borderColor);
+
+        // â”€â”€ Font selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        const int PAD = 2;
+        uint16_t maxW = (seg->width  > PAD*2) ? seg->width  - PAD*2 : seg->width;
+        uint16_t maxH = (seg->height > PAD*2) ? seg->height - PAD*2 : seg->height;
+
+        uint8_t fontId   = parseFontId(seg->fontName);
+        uint8_t pixelH   = 0;
+        const GFXfont* font;
+
+        if (seg->autoSize) {
+            font = fitFont(fontId, seg->text, maxW, maxH, pixelH);
+        } else {
+            pixelH = seg->fontSize;
+            font   = getFontById(fontId, pixelH);
+            dma_display->setFont(font);
         }
 
-        // Select and set font
-        uint8_t fontSize = seg->autoSize ? calculateAutoSize(seg, seg->text) : seg->fontSize;
-        const GFXfont* font = selectFont(fontSize, seg->fontName);
         dma_display->setFont(font);
 
-        // Calculate text bounds relative to cursor at (0,0)
-        int16_t x1, y1;
-        uint16_t w, h;
-        dma_display->getTextBounds(seg->text, 0, 0, &x1, &y1, &w, &h);
+        // â”€â”€ Measure exact text bounds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        int16_t x1, y1; uint16_t tw, th;
+        dma_display->getTextBounds(seg->text, 0, 0, &x1, &y1, &tw, &th);
 
-        if (seg->effect != EFFECT_SCROLL || seg->scrollOffset == 0) {
-            Serial.printf("  bounds: x1=%d y1=%d w=%u h=%u fontSize=%d\n", x1, y1, w, h, fontSize);
-        }
+        if (seg->effect != EFFECT_SCROLL || seg->scrollOffset == 0)
+            Serial.printf("  font=%s(%d) tw=%u th=%u\n", seg->fontName, pixelH, tw, th);
 
-        // Calculate position based on alignment
-        int16_t textX, textY;
-        int padding = 2;
-
+        // â”€â”€ Horizontal position (alignment) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        int16_t textX;
         switch (seg->align) {
             case ALIGN_LEFT:
-                textX = seg->x + padding - x1;
-                break;
-            case ALIGN_CENTER:
-                textX = seg->x + (seg->width - (int16_t)w) / 2 - x1;
+                textX = seg->x + PAD - x1;
                 break;
             case ALIGN_RIGHT:
-                textX = seg->x + seg->width - (int16_t)w - padding - x1;
+                textX = seg->x + seg->width - (int16_t)tw - PAD - x1;
                 break;
-            default:
-                textX = seg->x + padding - x1;
+            default: // CENTER
+                textX = seg->x + ((int16_t)seg->width - (int16_t)tw) / 2 - x1;
                 break;
         }
 
-        // Vertical centering
-        int16_t boxTop = seg->y + ((int16_t)seg->height - (int16_t)h) / 2;
-        textY = boxTop - y1;
+        // â”€â”€ Vertical centering (baseline correction) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // y1 from getTextBounds is negative (offset from cursor to top of glyph).
+        // We want the glyph block centred in the segment.
+        int16_t textY = seg->y + ((int16_t)seg->height - (int16_t)th) / 2 - y1;
 
-        // Apply scrolling offset
+        // â”€â”€ Scroll offset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (seg->effect == EFFECT_SCROLL) {
             textX -= seg->scrollOffset;
-            if (textX + (int16_t)w < seg->x) {
-                seg->scrollOffset = 0;
-            }
+            if (textX + (int16_t)tw < seg->x) seg->scrollOffset = 0;
         }
 
-        // Draw text
+        // â”€â”€ Draw â€” single-pixel sharp text (no anti-aliasing on HUB75) â”€â”€â”€â”€â”€â”€â”€
+        dma_display->setTextWrap(false);
         dma_display->setTextColor(seg->color);
         dma_display->setCursor(textX, textY);
         dma_display->print(seg->text);
     }
-    
+
     void renderAll() {
         for (int i = 0; i < MAX_SEGMENTS; i++) {
             Segment* seg = segmentManager->getSegment(i);
-            if (seg && seg->isDirty) {
-                renderSegment(seg);
-            }
+            if (seg && seg->isDirty) renderSegment(seg);
         }
     }
-    
-    void clearDisplay() {
-        dma_display->fillScreen(0);
-    }
+
+    void clearDisplay() { dma_display->fillScreen(0); }
 };
 
 #endif // TEXT_RENDERER_H

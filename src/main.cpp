@@ -35,8 +35,8 @@
 #include "text_renderer.h"
 #include "udp_handler.h"
 
-// Watchdog timeout (10 seconds)
-#define WDT_TIMEOUT 10
+// Watchdog timeout (30 seconds — must be longer than Ethernet init wait)
+#define WDT_TIMEOUT 30
 
 // Global objects
 MatrixPanel_I2S_DMA *dma_display = nullptr;
@@ -47,6 +47,10 @@ AsyncWebServer server(WEB_SERVER_PORT);
 
 // Ethernet connection flag
 static bool eth_connected = false;
+
+// True while the IP-address splash is being shown on the matrix.
+// Cleared the first time a UDP command arrives.
+static bool ipSplashActive = false;
 
 // Configuration variables
 uint8_t currentBrightness = DEFAULT_BRIGHTNESS;
@@ -61,6 +65,7 @@ void setupWebServer();
 void setupUDP();
 void loadConfiguration();
 void saveConfiguration();
+void showIPOnDisplay(const String& ip);
 void handleRoot(AsyncWebServerRequest *request);
 void handleConfig(AsyncWebServerRequest *request);
 void handleSegments(AsyncWebServerRequest *request);
@@ -77,11 +82,12 @@ void setup() {
     Serial.println("Initializing watchdog timer...");
     esp_task_wdt_init(WDT_TIMEOUT, true);
     esp_task_wdt_add(NULL);
-    Serial.println("✓ Watchdog enabled (10s timeout)");
+    Serial.println("✓ Watchdog enabled (30s timeout)");
     
-    // Initialize LittleFS
+    // Initialize LittleFS (true = format partition if mount fails)
     if (!LittleFS.begin(true)) {
-        Serial.println("ERROR: LittleFS Mount Failed");
+        Serial.println("WARNING: LittleFS mount failed — config save/load disabled");
+        Serial.println("  Check: board_build.partitions = no_ota.csv in platformio.ini");
     } else {
         Serial.println("✓ LittleFS mounted successfully");
     }
@@ -89,14 +95,16 @@ void setup() {
     // Load configuration
     loadConfiguration();
     
-    // Setup LED Matrix
-    setupMatrix();
-    
-    // Setup Ethernet (UDP will be started from the ETH_GOT_IP event)
+    // Setup Ethernet FIRST — get network up before anything else
+    // (UDP is started from the ETH_GOT_IP event)
     setupEthernet();
     
     // Setup web server
     setupWebServer();
+    
+    // Setup LED Matrix AFTER network is up
+    // (matrix DMA init is deferred so a missing/unconnected panel can't block boot)
+    setupMatrix();
     
     Serial.println("\n==================================");
     Serial.println("System Ready!");
@@ -107,16 +115,15 @@ void setup() {
     Serial.println(UDP_PORT);
     Serial.println("Web Interface: http://" + ETH.localIP().toString());
     Serial.println("==================================\n");
-    
-    // Display welcome message
-    Segment* seg = segmentManager.getSegment(0);
-    if (seg) {
-        segmentManager.updateSegmentText(0, "READY");
-        seg->color = 0x07E0; // Green
-        seg->autoSize = true;
-        seg->align = ALIGN_CENTER;
-        segmentManager.activateSegment(0, true);
+
+    // Show IP address on matrix — cleared on first incoming UDP command.
+    // If Ethernet hasn't connected yet the splash will be shown from the
+    // ETH_GOT_IP event or the fallback-IP assignment in setupEthernet().
+    String ip = ETH.localIP().toString();
+    if (ip != "0.0.0.0") {
+        showIPOnDisplay(ip);
     }
+    // (If still "0.0.0.0" here, WiFiEvent / setupEthernet will call showIPOnDisplay)
 }
 
 void loop() {
@@ -131,6 +138,13 @@ void loop() {
     // Process UDP packets
     if (udpHandler) {
         udpHandler->process();
+    }
+
+    // Clear IP splash on first received command
+    if (ipSplashActive && udpHandler && udpHandler->hasReceivedCommand()) {
+        ipSplashActive = false;
+        segmentManager.clearAll();          // wipe the IP text
+        Serial.println("[SPLASH] First command received — IP splash cleared");
     }
     
     // Update brightness if changed
@@ -195,9 +209,11 @@ void setupMatrix() {
     // Create display object
     dma_display = new MatrixPanel_I2S_DMA(mxconfig);
     
-    // Initialize display
+    // Initialize display — if no panel is connected this returns false cleanly
+    Serial.println("  Allocating DMA buffers...");
     if (!dma_display->begin()) {
-        Serial.println("ERROR: Matrix initialization failed!");
+        Serial.println("WARNING: Matrix init failed (no panel connected?)");
+        Serial.println("  Firmware continues — web UI and UDP still work");
         delete dma_display;
         dma_display = nullptr;
         textRenderer = nullptr;
@@ -254,6 +270,8 @@ void WiFiEvent(WiFiEvent_t event) {
             } else {
                 Serial.println("WARNING: mDNS failed to start");
             }
+            // Show IP on the matrix (DHCP address)
+            showIPOnDisplay(ETH.localIP().toString());
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             Serial.println("ETH Disconnected");
@@ -274,27 +292,19 @@ void setupEthernet() {
     // Register event handler
     WiFi.onEvent(WiFiEvent);
     
-    // WT32-ETH01 Ethernet configuration
-    // PHY Type    : LAN8720A
-    // PHY Address : 1
-    // Power Pin   : -1 (no dedicated enable pin; PHY is always powered)
-    // MDC Pin     : 23
-    // MDIO Pin    : 18
-    // Clock Mode  : ETH_CLOCK_GPIO0_OUT
-    //               The ESP32 outputs a 50 MHz ref clock on GPIO0 to drive
-    //               the LAN8720A. The WT32-ETH01 has no standalone oscillator.
-    //               GPIO0_IN would listen for an external clock — wrong here.
-    
-    if (!ETH.begin(1, -1, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_OUT)) {
+    // WT32-ETH01 board package pre-defines all ETH parameters:
+    // PHY=LAN8720, addr=1, power=-1, MDC=23, MDIO=18, CLK=ETH_CLOCK_GPIO0_OUT
+    if (!ETH.begin()) {
         Serial.println("ERROR: Ethernet initialization failed!");
         return;
     }
     
     Serial.println("Waiting for Ethernet connection...");
     
-    // Wait up to 10 seconds for connection
+    // Wait up to 15 seconds for connection; feed watchdog each iteration
     int attempts = 0;
-    while (!eth_connected && attempts < 20) {
+    while (!eth_connected && attempts < 30) {
+        esp_task_wdt_reset();
         delay(500);
         Serial.print(".");
         attempts++;
@@ -302,7 +312,24 @@ void setupEthernet() {
     Serial.println();
     
     if (!eth_connected) {
-        Serial.println("WARNING: Ethernet not connected yet (will continue trying)");
+        Serial.println("WARNING: No DHCP lease after 15 s — applying fallback static IP");
+        Serial.println("  Fallback: " FALLBACK_IP "/24  GW: " FALLBACK_GW);
+
+        IPAddress fbIP, fbGW, fbSN;
+        fbIP.fromString(FALLBACK_IP);
+        fbGW.fromString(FALLBACK_GW);
+        fbSN.fromString(FALLBACK_SUBNET);
+        ETH.config(fbIP, fbGW, fbSN);
+
+        // Give the stack a moment to apply the address
+        delay(200);
+
+        eth_connected = true;
+        Serial.print("✓ Fallback IP active: ");
+        Serial.println(ETH.localIP());
+
+        // Show fallback IP on matrix
+        showIPOnDisplay(ETH.localIP().toString());
     }
 }
 
@@ -322,15 +349,12 @@ void setupUDP() {
 void setupWebServer() {
     Serial.println("Starting web server...");
     
-    // Serve static files from LittleFS
-    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
-    
     // API endpoints
     server.on("/api/config", HTTP_GET, handleConfig);
     server.on("/api/segments", HTTP_GET, handleSegments);
     server.on("/api/test", HTTP_POST, handleTest);
     
-    // Root handler
+    // Root handler — serves embedded HTML (no LittleFS needed)
     server.on("/", HTTP_GET, handleRoot);
     
     // 404 handler
@@ -342,8 +366,41 @@ void setupWebServer() {
     Serial.println("✓ Web server started on port 80");
 }
 
+// Show the device IP address as a fullscreen splash on segment 0.
+// Remains visible until the first UDP command is received.
+void showIPOnDisplay(const String& ip) {
+    Serial.println("[SPLASH] Showing IP: " + ip);
+    ipSplashActive = true;
+
+    // Reset to fullscreen layout (preset 1 = seg0 covers whole panel)
+    if (udpHandler) {
+        udpHandler->applyLayoutPreset(1);
+    } else {
+        // UDP handler not ready yet — configure seg0 directly
+        Segment* s = segmentManager.getSegment(0);
+        if (s) {
+            s->x = 0; s->y = 0;
+            s->width = LED_MATRIX_WIDTH; s->height = LED_MATRIX_HEIGHT;
+            s->isActive = true;
+        }
+    }
+
+    Segment* seg = segmentManager.getSegment(0);
+    if (!seg) return;
+
+    strncpy(seg->text, ip.c_str(), MAX_TEXT_LENGTH - 1);
+    seg->text[MAX_TEXT_LENGTH - 1] = '\0';
+    seg->color    = 0xFFFF;   // white text
+    seg->bgColor  = 0x0000;   // black background
+    strncpy(seg->fontName, "arial", 15);
+    seg->autoSize = true;
+    seg->align    = ALIGN_CENTER;
+    seg->effect   = EFFECT_NONE;
+    seg->isActive = true;
+    seg->isDirty  = true;
+}
+
 void loadConfiguration() {
-    Serial.println("Loading configuration...");
     
     File file = LittleFS.open(CONFIG_FILE, "r");
     if (!file) {
@@ -807,6 +864,12 @@ void handleRoot(AsyncWebServerRequest *request) {
             transform: translateY(-2px);
         }
         
+        .layout-btn.active {
+            background: rgba(37, 99, 235, 0.35);
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.4);
+        }
+        
         .layout-visual {
             display: grid;
             width: 48px;
@@ -896,35 +959,34 @@ void handleRoot(AsyncWebServerRequest *request) {
             
             <div class="card" style="grid-column: 1 / -1;">
                 <h2>Segment Layouts</h2>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-                    <button class="layout-btn" onclick="applyLayout('split-vertical')">
-                        <div class="layout-visual split-v">
-                            <div class="layout-segment">1</div>
-                            <div class="layout-segment">2</div>
-                        </div>
-                        <span class="layout-label">1 | 2</span>
+                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 10px;">
+                    <button class="layout-btn" data-preset="1" onclick="applyLayout(1)">
+                        <div class="layout-visual full"><div class="layout-segment" style="width:100%;height:100%;border-radius:3px;">1</div></div>
+                        <span class="layout-label">Fullscreen</span>
                     </button>
-                    <button class="layout-btn" onclick="applyLayout('split-horizontal')">
-                        <div class="layout-visual split-h">
-                            <div class="layout-segment">1</div>
-                            <div class="layout-segment">2</div>
-                        </div>
+                    <button class="layout-btn" data-preset="2" onclick="applyLayout(2)">
+                        <div class="layout-visual split-h"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
                         <span class="layout-label">1 / 2</span>
                     </button>
-                    <button class="layout-btn" onclick="applyLayout('quad')">
-                        <div class="layout-visual quad">
-                            <div class="layout-segment">1</div>
+                    <button class="layout-btn" data-preset="3" onclick="applyLayout(3)">
+                        <div class="layout-visual split-v"><div class="layout-segment">1</div><div class="layout-segment">2</div></div>
+                        <span class="layout-label">1 | 2</span>
+                    </button>
+                    <button class="layout-btn" data-preset="4" onclick="applyLayout(4)">
+                        <div class="layout-visual quad"><div class="layout-segment">1</div><div class="layout-segment">2</div><div class="layout-segment">3</div><div class="layout-segment">4</div></div>
+                        <span class="layout-label">2×2</span>
+                    </button>
+                    <button class="layout-btn" data-preset="5" onclick="applyLayout(5)">
+                        <div class="layout-visual" style="display:grid;grid-template-columns:1fr 1fr 1fr;"><div class="layout-segment">1</div><div class="layout-segment">2</div><div class="layout-segment">3</div></div>
+                        <span class="layout-label">1|2|3</span>
+                    </button>
+                    <button class="layout-btn" data-preset="6" onclick="applyLayout(6)">
+                        <div class="layout-visual" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;">
+                            <div class="layout-segment" style="grid-row:span 2;">1</div>
                             <div class="layout-segment">2</div>
                             <div class="layout-segment">3</div>
-                            <div class="layout-segment">4</div>
                         </div>
-                        <span class="layout-label">2x2</span>
-                    </button>
-                    <button class="layout-btn" onclick="applyLayout('fullscreen')">
-                        <div class="layout-visual full">
-                            <div class="layout-segment" style="width: 100%; height: 100%; border-radius: 3px;">ALL</div>
-                        </div>
-                        <span class="layout-label">Full</span>
+                        <span class="layout-label">½|¼¼</span>
                     </button>
                 </div>
             </div>
@@ -985,10 +1047,9 @@ void handleRoot(AsyncWebServerRequest *request) {
                 <div class="form-group">
                     <label>Font Style</label>
                     <select id="font0">
-                        <option value="arial">Arial (Sans-Serif)</option>
-                        <option value="verdana">Verdana (Sans-Serif)</option>
-                        <option value="digital12">Digital 12pt</option>
-                        <option value="mono9">Mono 9pt</option>
+                        <option value="1" selected>Arial (Bold)</option>
+                        <option value="2">Verdana</option>
+                        <option value="3">Impact</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1060,10 +1121,9 @@ void handleRoot(AsyncWebServerRequest *request) {
                 <div class="form-group">
                     <label>Font Style</label>
                     <select id="font1">
-                        <option value="arial">Arial (Sans-Serif)</option>
-                        <option value="verdana">Verdana (Sans-Serif)</option>
-                        <option value="digital12">Digital 12pt</option>
-                        <option value="mono9">Mono 9pt</option>
+                        <option value="1" selected>Arial (Bold)</option>
+                        <option value="2">Verdana</option>
+                        <option value="3">Impact</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1135,10 +1195,9 @@ void handleRoot(AsyncWebServerRequest *request) {
                 <div class="form-group">
                     <label>Font Style</label>
                     <select id="font2">
-                        <option value="arial">Arial (Sans-Serif)</option>
-                        <option value="verdana">Verdana (Sans-Serif)</option>
-                        <option value="digital12">Digital 12pt</option>
-                        <option value="mono9">Mono 9pt</option>
+                        <option value="1" selected>Arial (Bold)</option>
+                        <option value="2">Verdana</option>
+                        <option value="3">Impact</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1210,10 +1269,9 @@ void handleRoot(AsyncWebServerRequest *request) {
                 <div class="form-group">
                     <label>Font Style</label>
                     <select id="font3">
-                        <option value="arial">Arial (Sans-Serif)</option>
-                        <option value="verdana">Verdana (Sans-Serif)</option>
-                        <option value="digital12">Digital 12pt</option>
-                        <option value="mono9">Mono 9pt</option>
+                        <option value="1" selected>Arial (Bold)</option>
+                        <option value="2">Verdana</option>
+                        <option value="3">Impact</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1249,263 +1307,313 @@ void handleRoot(AsyncWebServerRequest *request) {
     </div>
     
     <script>
+        'use strict';
+
+        // ── Canvas ────────────────────────────────────────────────────────────
         const canvas = document.getElementById('preview');
-        const ctx = canvas.getContext('2d');
-        
-        // Store alignment for each segment
+        const ctx    = canvas.getContext('2d');
+
+        // ── State ─────────────────────────────────────────────────────────────
+        // Per-segment text alignment (L / C / R)
         const segmentAlign = ['C', 'C', 'C', 'C'];
-        
-        // Store segment bounds (x, y, width, height) — updated by layout commands and /api/segments polling
+
+        // Canonical segment geometry — source of truth for the canvas renderer.
+        // Updated by applyLayout() immediately; only updated from the server when
+        // no layout change is in-flight (layoutLockUntil).
         const segmentBounds = [
-            { x: 0, y: 0, width: 32, height: 32 },
-            { x: 32, y: 0, width: 32, height: 32 },
-            { x: 0, y: 16, width: 32, height: 16 },
-            { x: 32, y: 16, width: 32, height: 16 }
+            { x: 0, y: 0, width: 64, height: 32 },
+            { x: 0, y: 0, width:  0, height:  0 },
+            { x: 0, y: 0, width:  0, height:  0 },
+            { x: 0, y: 0, width:  0, height:  0 }
         ];
-        
-        // Initialize black canvas
+
+        // Freeze polling from overwriting layout for N ms after applyLayout().
+        let layoutLockUntil = 0;
+
+        // Active layout preset — integer 1-14 matching applyLayoutPreset() on device.
+        let currentLayout = 1;
+
+        // Retry / debounce helpers
+        let pollFailCount  = 0;
+        const MAX_POLL_FAIL = 5;
+        let pollTimer = null;
+
+        // ── Init ──────────────────────────────────────────────────────────────
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 64, 32);
-        
-        // Poll /api/segments every second to reflect Q-SYS changes
-        window.addEventListener('load', function() {
-            updateSegmentStates([0, 1]);
-            pollSegments();
-            setInterval(pollSegments, 1000);
+
+        window.addEventListener('load', function () {
+            updateSegmentStates([0]);
+            updateLayoutButtons(1);
+            schedulePoll(500);   // first poll quickly
         });
-        
+
+        // ── Polling ───────────────────────────────────────────────────────────
+        function schedulePoll(delay) {
+            clearTimeout(pollTimer);
+            pollTimer = setTimeout(pollSegments, delay);
+        }
+
         function pollSegments() {
-            fetch('/api/segments')
-                .then(r => r.json())
+            const ctrl = new AbortController();
+            const tid  = setTimeout(() => ctrl.abort(), 3000); // 3s timeout
+
+            fetch('/api/segments', { signal: ctrl.signal })
+                .then(r => { clearTimeout(tid); return r.json(); })
                 .then(data => {
-                    if (!data.segments) return;
-                    // Determine which segments are active
-                    const active = data.segments
-                        .filter(s => s.active && s.w > 0 && s.h > 0)
-                        .map(s => s.id);
-                    updateSegmentStates(active);
-                    
-                    // Update bounds from server state
-                    data.segments.forEach(s => {
-                        segmentBounds[s.id] = { x: s.x, y: s.y, width: s.w, height: s.h };
-                        // Update text fields with current server values
-                        const textEl = document.getElementById('text' + s.id);
-                        if (textEl && document.activeElement !== textEl) {
-                            textEl.value = s.text || '';
-                        }
-                    });
-                    
-                    // Redraw all active segments on the canvas
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(0, 0, 64, 32);
-                    data.segments.forEach(s => {
-                        if (s.active && s.w > 0 && s.h > 0 && s.text) {
-                            drawSegmentOnCanvas(s.id, s.text,
-                                s.color   || '#FFFFFF',
-                                s.bgcolor || '#000000',
-                                s.align   || 'C');
-                        }
-                    });
+                    if (!data || !data.segments) return;
+                    pollFailCount = 0;
+
+                    const locked = Date.now() < layoutLockUntil;
+
+                    if (!locked) {
+                        // ── Update geometry & card states from server ──
+                        const active = data.segments
+                            .filter(s => s.active && s.w > 0 && s.h > 0)
+                            .map(s => s.id);
+                        updateSegmentStates(active);
+
+                        data.segments.forEach(s => {
+                            segmentBounds[s.id] = { x: s.x, y: s.y, width: s.w, height: s.h };
+                        });
+
+                        // ── Repaint canvas ──
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(0, 0, 64, 32);
+                        data.segments.forEach(s => {
+                            if (s.active && s.w > 0 && s.h > 0) {
+                                drawSegmentOnCanvas(s.id, s.text || '',
+                                    s.color   || '#FFFFFF',
+                                    s.bgcolor || '#000000',
+                                    s.align   || 'C');
+                            }
+                        });
+                    }
+
+                    // NOTE: We intentionally do NOT overwrite text input fields from
+                    // the server. The browser is the source of truth for what the user
+                    // typed. Server text is only authoritative when Q-SYS sends it via
+                    // UDP — at that point the user should reload to see it.
+
+                    schedulePoll(2000);
                 })
-                .catch(() => {}); // Silently ignore network errors
+                .catch(() => {
+                    clearTimeout(tid);
+                    pollFailCount++;
+                    const backoff = Math.min(2000 * Math.pow(2, pollFailCount), 30000);
+                    if (pollFailCount === 1) updateStatus('Connection lost – retrying…', 'error');
+                    if (pollFailCount >= MAX_POLL_FAIL) updateStatus('Device unreachable', 'error');
+                    schedulePoll(backoff);
+                });
         }
         
-        function updateStatus(message, type = 'ready') {
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.className = 'status ' + type;
+        function updateStatus(message, type) {
+            type = type || 'ready';
+            const el = document.getElementById('status');
+            el.textContent = message;
+            el.className   = 'status ' + type;
         }
-        
+
         function setAlign(segment, align, btn) {
             segmentAlign[segment] = align;
-            const parent = btn.parentElement;
-            parent.querySelectorAll('.align-btn').forEach(b => b.classList.remove('active'));
+            btn.parentElement.querySelectorAll('.align-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            updateStatus('Alignment set to ' + (align === 'L' ? 'Left' : align === 'C' ? 'Center' : 'Right'), 'ready');
         }
-        
+
         function updateSegmentStates(activeSegments) {
             for (let i = 0; i < 4; i++) {
                 const card = document.getElementById('segment-card-' + i);
-                if (card) {
-                    if (activeSegments.includes(i)) {
-                        card.classList.remove('inactive');
-                    } else {
-                        card.classList.add('inactive');
-                    }
-                }
+                if (!card) continue;
+                if (activeSegments.includes(i)) card.classList.remove('inactive');
+                else                            card.classList.add('inactive');
             }
         }
-        
-        // ── JSON command senders ──────────────────────────────────────────────
-        
-        function sendJSON(obj) {
-            updateStatus('Sending...', 'sending');
-            fetch('/api/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(obj)
-            })
-            .then(r => r.text())
-            .then(() => updateStatus('OK', 'ready'))
-            .catch(e => updateStatus('Error: ' + e, 'error'));
+
+        function updateLayoutButtons(preset) {
+            document.querySelectorAll('.layout-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.preset) === preset);
+            });
         }
-        
+
+        // ── JSON command sender (with retry) ──────────────────────────────────
+        function sendJSON(obj, retries) {
+            retries = (retries === undefined) ? 2 : retries;
+            const body = JSON.stringify(obj);
+            return fetch('/api/test', {
+                method:  'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body:    body,
+                signal:  AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+            })
+            .then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            })
+            .catch(err => {
+                if (retries > 0) {
+                    return new Promise(res => setTimeout(res, 300))
+                        .then(() => sendJSON(obj, retries - 1));
+                }
+                updateStatus('Send error: ' + err.message, 'error');
+                throw err;
+            });
+        }
+
+        // Send a sequence of commands one-by-one (await each before next)
+        function sendSequence(cmds) {
+            return cmds.reduce(
+                (p, cmd) => p.then(() => sendJSON(cmd)),
+                Promise.resolve()
+            );
+        }
+
+        // ── Layout ────────────────────────────────────────────────────────────
+        // Preset geometry mirrors applyLayoutPreset() in udp_handler.h
+        const LAYOUTS = {
+            1:  [ [0,0,64,32] ],
+            2:  [ [0,0,64,16], [0,16,64,16] ],
+            3:  [ [0,0,32,32], [32,0,32,32] ],
+            4:  [ [0,0,32,16],[32,0,32,16],[0,16,32,16],[32,16,32,16] ],
+            5:  [ [0,0,21,32],[21,0,21,32],[42,0,22,32] ],
+            6:  [ [0,0,32,32],[32,0,32,16],[32,16,32,16] ],
+            11: [ null,[0,0,64,32],null,null ],
+            12: [ null,null,[0,0,64,32],null ],
+            13: [ null,null,null,[0,0,64,32] ],
+            14: [ null,null,null,null,[0,0,64,32] ]
+        };
+        // Which segment indices are active per preset
+        const LAYOUT_ACTIVE = {
+            1:[0], 2:[0,1], 3:[0,1], 4:[0,1,2,3],
+            5:[0,1,2], 6:[0,1,2],
+            11:[0], 12:[1], 13:[2], 14:[3]
+        };
+
+        function applyLayout(preset) {
+            updateStatus('Applying layout…', 'sending');
+            layoutLockUntil = Date.now() + 8000;
+            currentLayout   = preset;
+            updateLayoutButtons(preset);
+
+            // Update local segmentBounds and card states immediately
+            const geo    = LAYOUTS[preset] || [];
+            const active = LAYOUT_ACTIVE[preset] || [];
+            for (let i = 0; i < 4; i++) {
+                if (geo[i]) {
+                    segmentBounds[i] = { x:geo[i][0], y:geo[i][1], width:geo[i][2], height:geo[i][3] };
+                } else {
+                    segmentBounds[i] = { x:0, y:0, width:0, height:0 };
+                }
+            }
+            updateSegmentStates(active);
+
+            // Repaint canvas with new geometry
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 64, 32);
+            for (let i = 0; i < 4; i++) {
+                if (segmentBounds[i].width > 0) {
+                    const txt = document.getElementById('text' + i);
+                    drawSegmentOnCanvas(i, txt ? txt.value : '',
+                        document.getElementById('color'   + i).value,
+                        document.getElementById('bgcolor' + i).value,
+                        segmentAlign[i]);
+                }
+            }
+
+            // Send single layout command — device handles all geometry internally
+            sendJSON({ cmd: 'layout', preset: preset })
+                .then(() => {
+                    updateStatus('Layout ' + preset + ' active', 'ready');
+                    schedulePoll(500); // confirm server state shortly after
+                });
+        }
+
+        // ── Segment actions ───────────────────────────────────────────────────
         function sendText(segment) {
             const text      = document.getElementById('text'      + segment).value;
             const color     = document.getElementById('color'     + segment).value.replace('#','');
             const bgcolor   = document.getElementById('bgcolor'   + segment).value.replace('#','');
-            const intensity = parseInt(document.getElementById('intensity' + segment).value);
+            const intensity = parseInt(document.getElementById('intensity' + segment).value) || 255;
             const font      = document.getElementById('font'      + segment).value;
             const align     = segmentAlign[segment];
-            
+
+            updateStatus('Sending…', 'sending');
             sendJSON({
                 cmd: 'text', seg: segment,
                 text: text, color: color, bgcolor: bgcolor,
                 font: font, size: 'auto', align: align,
                 effect: 'none', intensity: intensity
+            }).then(() => {
+                drawSegmentOnCanvas(segment, text, '#' + color, '#' + bgcolor, align);
+                updateStatus('Segment ' + (segment + 1) + ' updated', 'ready');
             });
-            drawSegmentOnCanvas(segment, text,
-                '#' + color, '#' + bgcolor, align);
         }
-        
+
         function clearSegment(segment) {
-            sendJSON({ cmd: 'clear', seg: segment });
-            ctx.fillStyle = '#000000';
-            const b = segmentBounds[segment];
-            ctx.fillRect(b.x, b.y, b.width, b.height);
-            updateStatus('Segment ' + (segment + 1) + ' cleared', 'ready');
+            sendJSON({ cmd: 'clear', seg: segment })
+                .then(() => {
+                    const b = segmentBounds[segment];
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(b.x, b.y, b.width, b.height);
+                    updateStatus('Segment ' + (segment + 1) + ' cleared', 'ready');
+                });
         }
-        
+
         function clearAll() {
-            sendJSON({ cmd: 'clear_all' });
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 64, 32);
-            updateStatus('All segments cleared', 'ready');
+            sendJSON({ cmd: 'clear_all' })
+                .then(() => {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, 64, 32);
+                    updateStatus('All segments cleared', 'ready');
+                });
         }
-        
+
         function updateBrightness(value) {
             document.getElementById('brightness-value').textContent = value;
             sendJSON({ cmd: 'brightness', value: parseInt(value) });
         }
-        
-        function applyLayout(layoutType) {
-            updateStatus('Applying ' + layoutType + ' layout...', 'sending');
-            
-            let configCmds = [];
-            let clearSegs  = [];
-            
-            if (layoutType === 'split-vertical') {
-                updateSegmentStates([0, 1]);
-                segmentBounds[0] = { x: 0,  y: 0, width: 32, height: 32 };
-                segmentBounds[1] = { x: 32, y: 0, width: 32, height: 32 };
-                segmentBounds[2] = segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
-                configCmds = [
-                    { cmd:'config', seg:0, x:0,  y:0, w:32, h:32 },
-                    { cmd:'config', seg:1, x:32, y:0, w:32, h:32 }
-                ];
-                clearSegs = [2, 3];
-            } else if (layoutType === 'split-horizontal') {
-                updateSegmentStates([0, 1]);
-                segmentBounds[0] = { x: 0, y: 0,  width: 64, height: 16 };
-                segmentBounds[1] = { x: 0, y: 16, width: 64, height: 16 };
-                segmentBounds[2] = segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
-                configCmds = [
-                    { cmd:'config', seg:0, x:0, y:0,  w:64, h:16 },
-                    { cmd:'config', seg:1, x:0, y:16, w:64, h:16 }
-                ];
-                clearSegs = [2, 3];
-            } else if (layoutType === 'quad') {
-                updateSegmentStates([0, 1, 2, 3]);
-                segmentBounds[0] = { x: 0,  y: 0,  width: 32, height: 16 };
-                segmentBounds[1] = { x: 32, y: 0,  width: 32, height: 16 };
-                segmentBounds[2] = { x: 0,  y: 16, width: 32, height: 16 };
-                segmentBounds[3] = { x: 32, y: 16, width: 32, height: 16 };
-                configCmds = [
-                    { cmd:'config', seg:0, x:0,  y:0,  w:32, h:16 },
-                    { cmd:'config', seg:1, x:32, y:0,  w:32, h:16 },
-                    { cmd:'config', seg:2, x:0,  y:16, w:32, h:16 },
-                    { cmd:'config', seg:3, x:32, y:16, w:32, h:16 }
-                ];
-            } else if (layoutType === 'fullscreen') {
-                updateSegmentStates([0]);
-                segmentBounds[0] = { x: 0, y: 0, width: 64, height: 32 };
-                segmentBounds[1] = segmentBounds[2] = segmentBounds[3] = { x: 0, y: 0, width: 0, height: 0 };
-                configCmds = [
-                    { cmd:'config', seg:0, x:0, y:0, w:64, h:32 }
-                ];
-                clearSegs = [1, 2, 3];
-            }
-            
-            // Send config commands sequentially then clear unused segments
-            configCmds.forEach(c => sendJSON(c));
-            clearSegs.forEach(s => sendJSON({ cmd: 'clear', seg: s }));
-            
-            // Redraw canvas with new bounds
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 64, 32);
-            for (let seg = 0; seg < 4; seg++) {
-                const text = document.getElementById('text' + seg).value;
-                if (text && segmentBounds[seg].width > 0) {
-                    const color   = document.getElementById('color'   + seg).value;
-                    const bgcolor = document.getElementById('bgcolor' + seg).value;
-                    drawSegmentOnCanvas(seg, text, color, bgcolor, segmentAlign[seg]);
-                }
-            }
-            
-            setTimeout(() => updateStatus('Layout applied: ' + layoutType, 'ready'), 300);
-        }
-        
-        // ── Canvas preview renderer ───────────────────────────────────────────
-        
-        function drawSegmentOnCanvas(segment, text, color, bgcolor, align) {
-            const bounds = segmentBounds[segment];
-            if (!bounds || bounds.width === 0 || bounds.height === 0) return;
-            
-            // Background fill
-            ctx.fillStyle = bgcolor;
-            ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
-            
-            if (!text) return;
-            
-            const availW = bounds.width  - 4;
-            const availH = bounds.height - 2;
-            
-            // Find the largest font that fits
-            const sizes = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
-            let fontSize = 6;
-            for (let size of sizes) {
-                ctx.font = size + 'px Arial, sans-serif';
-                if (ctx.measureText(text).width <= availW && size * 1.2 <= availH) {
-                    fontSize = size;
-                    break;
-                }
-            }
-            ctx.font = fontSize + 'px Arial, sans-serif';
-            ctx.fillStyle = color;
-            ctx.textBaseline = 'middle';
-            
-            let x;
-            if (align === 'L') {
-                ctx.textAlign = 'left';
-                x = bounds.x + 2;
-            } else if (align === 'R') {
-                ctx.textAlign = 'right';
-                x = bounds.x + bounds.width - 2;
-            } else {
-                ctx.textAlign = 'center';
-                x = bounds.x + bounds.width / 2;
-            }
-            ctx.fillText(text, x, bounds.y + bounds.height / 2);
-        }
-        
+
         function previewText(segment) {
             const text    = document.getElementById('text'    + segment).value;
             const color   = document.getElementById('color'   + segment).value;
             const bgcolor = document.getElementById('bgcolor' + segment).value;
-            const align   = segmentAlign[segment];
-            drawSegmentOnCanvas(segment, text, color, bgcolor, align);
-            updateStatus('Preview updated for Segment ' + (segment + 1), 'ready');
+            drawSegmentOnCanvas(segment, text, color, bgcolor, segmentAlign[segment]);
+            updateStatus('Preview: Segment ' + (segment + 1), 'ready');
+        }
+
+        // ── Canvas renderer ───────────────────────────────────────────────────
+        function drawSegmentOnCanvas(segment, text, color, bgcolor, align) {
+            const b = segmentBounds[segment];
+            if (!b || b.width === 0 || b.height === 0) return;
+
+            ctx.fillStyle = bgcolor || '#000000';
+            ctx.fillRect(b.x, b.y, b.width, b.height);
+            if (!text) return;
+
+            const availW = b.width  - 4;
+            const availH = b.height - 2;
+            const sizes  = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
+            let fontSize = 6;
+            for (const sz of sizes) {
+                ctx.font = sz + 'px monospace';
+                if (ctx.measureText(text).width <= availW && sz * 1.2 <= availH) {
+                    fontSize = sz;
+                    break;
+                }
+            }
+            ctx.font         = fontSize + 'px monospace';
+            ctx.fillStyle    = color || '#FFFFFF';
+            ctx.textBaseline = 'middle';
+
+            if (align === 'L') {
+                ctx.textAlign = 'left';
+                ctx.fillText(text, b.x + 2,              b.y + b.height / 2);
+            } else if (align === 'R') {
+                ctx.textAlign = 'right';
+                ctx.fillText(text, b.x + b.width - 2,   b.y + b.height / 2);
+            } else {
+                ctx.textAlign = 'center';
+                ctx.fillText(text, b.x + b.width / 2,   b.y + b.height / 2);
+            }
         }
     </script>
 </body>
@@ -1561,15 +1669,10 @@ void handleSegments(AsyncWebServerRequest *request) {
             uint16_t c  = seg->color;
             uint16_t bg = seg->bgColor;
             char colorHex[8], bgHex[8];
-            // RGB565 → RGB888 approximate
             snprintf(colorHex, sizeof(colorHex), "#%02X%02X%02X",
-                     ((c >> 8) & 0xF8),
-                     ((c >> 3) & 0xFC),
-                     ((c << 3) & 0xF8));
+                     ((c >> 8) & 0xF8), ((c >> 3) & 0xFC), ((c << 3) & 0xF8));
             snprintf(bgHex, sizeof(bgHex), "#%02X%02X%02X",
-                     ((bg >> 8) & 0xF8),
-                     ((bg >> 3) & 0xFC),
-                     ((bg << 3) & 0xF8));
+                     ((bg >> 8) & 0xF8), ((bg >> 3) & 0xFC), ((bg << 3) & 0xF8));
             segObj["color"]   = colorHex;
             segObj["bgcolor"] = bgHex;
         }
@@ -1587,11 +1690,10 @@ void handleTest(AsyncWebServerRequest *request) {
         Serial.print("Web test command: ");
         Serial.println(command);
 
-        // Pass JSON directly to dispatchCommand
         char buffer[UDP_BUFFER_SIZE];
         command.toCharArray(buffer, UDP_BUFFER_SIZE);
         udpHandler->dispatchCommand(buffer);
-        request->send(200, "text/plain", "Command dispatched: " + command);
+        request->send(200, "text/plain", "OK");
     } else {
         request->send(400, "text/plain", "No command provided");
     }

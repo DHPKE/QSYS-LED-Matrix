@@ -2,7 +2,8 @@
 #define CONFIG_H
 
 // Hardware: WT32-ETH01 + 64x32 HUB75 LED Matrix
-// WT32-ETH01 ETH reserved GPIO (DO NOT USE): 0,16,18,19,21,22,23,25,26,27
+// WT32-ETH01 ETH reserved GPIO (DO NOT USE): 0,18,19,21,22,23,25,26,27
+// GPIO0 = RMII REF_CLK output (ESP32 drives 50 MHz to LAN8720, ETH_CLOCK_GPIO0_OUT)
 // Free output GPIOs: 2,4,5,12,13,14,15,17,32,33 + IO16(CLK) + IO1(LAT)
 // Pin assignment: R1=2 G1=15 B1=4  R2=5 G2=17 B2=12
 //                 A=33 B=32  C=13  D=14  E=-1
@@ -51,5 +52,10 @@
 #define WEB_SERVER_PORT   80
 #define CONFIG_FILE         "/config.json"
 #define SEGMENT_CONFIG_FILE "/segments.json"
+
+// ── Fallback static IP (used when no DHCP lease is obtained within 15 s) ────
+#define FALLBACK_IP      "10.10.10.99"
+#define FALLBACK_GW      "10.10.10.1"
+#define FALLBACK_SUBNET  "255.255.255.0"
 
 #endif // CONFIG_H
