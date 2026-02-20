@@ -144,7 +144,15 @@ LAYOUT_PRESETS = {
         (W//2,      0,         W//2,  H//2 ),                            # top-right
         (0,         H//2,      W//2,  H//2 ),                            # bottom-left
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
+    # 11-14: single-segment fullscreen — only the named segment is active
+    11: [(0, 0, W, H)],                                                  # seg 0 fullscreen
+    12: [(0, 0, W, H)],                                                  # seg 1 fullscreen
+    13: [(0, 0, W, H)],                                                  # seg 2 fullscreen
+    14: [(0, 0, W, H)],                                                  # seg 3 fullscreen
 }
+
+# Map preset numbers 11-14 to the segment index that should be active
+LAYOUT_SINGLE_SEG = {11: 0, 12: 1, 13: 2, 14: 3}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging
