@@ -2,48 +2,6 @@
 -- Version 3.11.0 - Indexed layouts with integer control
 -- Controls Olimex ESP32 Gateway 64x32 LED Matrix via UDP (JSON format)
 --
--- v3.11.0 Changes:
---   - Added indexed layout system: send integer 1-4, 11-14 to layout pin for instant switching
---   - Layout indices: 1=Fullscreen, 2=Vertical Split, 3=Horizontal Split, 4=QuadView
---   - Added fullscreen modes: 11=Seg1, 12=Seg2, 13=Seg3, 14=Seg4
---   - Dropdown shows numbered options for clarity
---
--- v3.10.2 Changes:
---   - Reduced plugin width from 1400px to 600px (minimum for UI elements)
---
--- v3.10.1 Changes:
---   - Shortened all PrettyName strings to fit in Q-SYS Control Pins window
---
--- v3.10.0 Changes:
---   - Increased plugin width from 1200px to 1400px for optimal pin visibility
---   - Verified PrettyName grouping follows official Q-SYS plugin guide standards
---
--- v3.9.1 Changes:
---   - Increased plugin width from 900px to 1200px for better pin label visibility
---
--- v3.9.0 Changes:
---   - Changed all segment pins from UserPin=true to UserPin=false
---   - All 52 control pins now always visible (not optional)
---
--- v3.8.0 Changes:
---   - FIXED: PrettyName grouping now set in GetControlLayout() (not GetControls())
---   - This is where Q-SYS reads grouped pin names for Control Pins window
---
--- v3.7.0 Changes:
---   - Removed PrettyName grouping approach (not working in Q-SYS Designer)
---   - Renamed all controls with clear segment prefixes: seg1_text, seg2_text, etc.
---
--- v3.6.0 Changes:
---   - Fixed pin grouping in Q-SYS Designer Control Pins window
---   - Now uses PrettyName with tilde separator (e.g., "Segment 1~Text") for proper grouping
---   - Removed ControlGroup/Legend properties in favor of PrettyName standard
---
--- v3.5.0 Changes:
---   - Text input now auto-sends immediately when changed (no need for Display button)
---   - Inactive segments are never rendered (prevents editing inactive segments from
---     affecting the display when in Fullscreen or other layouts)
---   - All segment properties (text, colors, fonts, etc.) respect active/inactive state
---
 -- FIRMWARE PROTOCOL (JSON over UDP):
 --   {"cmd":"text","seg":0,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
 --    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
@@ -89,7 +47,7 @@ function GetControls(props)
         Name = "ip_address",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
@@ -97,7 +55,7 @@ function GetControls(props)
         Name = "udp_port",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
@@ -106,7 +64,7 @@ function GetControls(props)
         ControlType = "Indicator",
         IndicatorType = "Status",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Output"
     })
     
@@ -114,7 +72,7 @@ function GetControls(props)
         Name = "last_command",
         ControlType = "Text",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Output"
     })
     
@@ -132,7 +90,7 @@ function GetControls(props)
         ControlType = "Button",
         ButtonType = "Trigger",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
@@ -154,7 +112,7 @@ function GetControls(props)
             Name = string.format("seg%d_text_color", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -163,7 +121,7 @@ function GetControls(props)
             Name = string.format("seg%d_bg_color", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -172,7 +130,7 @@ function GetControls(props)
             Name = string.format("seg%d_align", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
 
@@ -181,7 +139,7 @@ function GetControls(props)
             Name = string.format("seg%d_effect", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -190,7 +148,7 @@ function GetControls(props)
             Name = string.format("seg%d_font", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
 
@@ -199,7 +157,7 @@ function GetControls(props)
             Name = string.format("seg%d_size", segNum),
             ControlType = "Text",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
         
@@ -211,7 +169,7 @@ function GetControls(props)
             Min = 0,
             Max = 255,
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Both"
         })
 
@@ -221,7 +179,7 @@ function GetControls(props)
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Input"
         })
         
@@ -231,7 +189,7 @@ function GetControls(props)
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Input"
         })
         
@@ -241,7 +199,7 @@ function GetControls(props)
             ControlType = "Button",
             ButtonType = "Trigger",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Input"
         })
         
@@ -251,7 +209,7 @@ function GetControls(props)
             ControlType = "Indicator",
             IndicatorType = "LED",
             Count = 1,
-            UserPin = false,
+            UserPin = true,
             PinStyle = "Output"
         })
     end
@@ -264,7 +222,7 @@ function GetControls(props)
         Min = 0,
         Max = 255,
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Both"
     })
     
@@ -273,7 +231,7 @@ function GetControls(props)
         ControlType = "Button",
         ButtonType = "Trigger",
         Count = 1,
-        UserPin = false,
+        UserPin = true,
         PinStyle = "Input"
     })
     
