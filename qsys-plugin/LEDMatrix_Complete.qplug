@@ -50,30 +50,30 @@ end
 
 function GetControls(props)
     local controls = {}
-    table.insert(controls, { Name="ip_address",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Input"  })
-    table.insert(controls, { Name="udp_port",          ControlType="Text",      Count=1, UserPin=false, PinStyle="Input"  })
-    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=false, PinStyle="Output" })
+    table.insert(controls, { Name="ip_address",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="udp_port",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
     table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=false, PinStyle="Output" })
     table.insert(controls, { Name="layout",       ControlType="Text",   Count=1, UserPin=false, PinStyle="Both"  })
-    table.insert(controls, { Name="apply_layout", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+    table.insert(controls, { Name="apply_layout", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     for seg = 0, 3 do
         local s = seg + 1
         local p = "seg"..s.."_"
         table.insert(controls, { Name=p.."text",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
-        table.insert(controls, { Name=p.."text_color", ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
-        table.insert(controls, { Name=p.."bg_color",   ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
-        table.insert(controls, { Name=p.."font",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
-        table.insert(controls, { Name=p.."size",       ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
-        table.insert(controls, { Name=p.."align",      ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
-        table.insert(controls, { Name=p.."effect",     ControlType="Text",      Count=1, UserPin=false, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."text_color", ControlType="Text",      Count=1, UserPin=true, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."bg_color",   ControlType="Text",      Count=1, UserPin=true, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."font",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."size",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."align",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Both"  })
+        table.insert(controls, { Name=p.."effect",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both"  })
         table.insert(controls, { Name=p.."intensity",  ControlType="Knob", ControlUnit="Integer", Min=0, Max=255, Count=1, UserPin=false, PinStyle="Both" })
-        table.insert(controls, { Name=p.."send",   ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
-        table.insert(controls, { Name=p.."clear",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
-        table.insert(controls, { Name=p.."invert", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
-        table.insert(controls, { Name=p.."active", ControlType="Indicator", IndicatorType="LED", Count=1, UserPin=false, PinStyle="Output" })
+        table.insert(controls, { Name=p.."send",   ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=p.."clear",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=p.."invert", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=p.."active", ControlType="Indicator", IndicatorType="LED", Count=1, UserPin=true, PinStyle="Output" })
     end
-    table.insert(controls, { Name="brightness", ControlType="Knob",   ControlUnit="Integer", Min=0, Max=255, Count=1, UserPin=false, PinStyle="Both"  })
-    table.insert(controls, { Name="clear_all",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=false, PinStyle="Input" })
+    table.insert(controls, { Name="brightness", ControlType="Knob",   ControlUnit="Integer", Min=0, Max=255, Count=1, UserPin=true, PinStyle="Both"  })
+    table.insert(controls, { Name="clear_all",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     return controls
 end
 
