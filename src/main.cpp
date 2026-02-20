@@ -1589,18 +1589,25 @@ void handleRoot(AsyncWebServerRequest *request) {
             ctx.fillRect(b.x, b.y, b.width, b.height);
             if (!text) return;
 
+            // Map font selector value → CSS font-family approximation
+            // 1=Arial(Bold) → Arial bold   2=Verdana → Verdana   3=Impact → Impact
+            const fontEl = document.getElementById('font' + segment);
+            const fontVal = fontEl ? parseInt(fontEl.value) : 1;
+            const fontFamilies = { 1: 'bold Arial', 2: 'Verdana', 3: 'Impact' };
+            const fontFamily = fontFamilies[fontVal] || 'bold Arial';
+
             const availW = b.width  - 4;
             const availH = b.height - 2;
             const sizes  = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
             let fontSize = 6;
             for (const sz of sizes) {
-                ctx.font = sz + 'px monospace';
+                ctx.font = sz + 'px ' + fontFamily;
                 if (ctx.measureText(text).width <= availW && sz * 1.2 <= availH) {
                     fontSize = sz;
                     break;
                 }
             }
-            ctx.font         = fontSize + 'px monospace';
+            ctx.font         = fontSize + 'px ' + fontFamily;
             ctx.fillStyle    = color || '#FFFFFF';
             ctx.textBaseline = 'middle';
 
