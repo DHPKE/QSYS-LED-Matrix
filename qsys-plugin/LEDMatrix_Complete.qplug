@@ -278,8 +278,9 @@ if Controls then
         local fxId    = EffectId[Controls[p.."effect"].String]    or 0
         local align   = AlignLetter[Controls[p.."align"].String]  or "C"
         local intens  = math.floor(Controls[p.."intensity"].Value)
+        local size    = Controls[p.."size"].String  -- "auto" or "8","12","16","24","32"
         local json = buildJson({cmd="text", seg=seg, text=text, color=colorId,
-            bgcolor=bgId, font=fontId, effect=fxId, align=align, intensity=intens})
+            bgcolor=bgId, font=fontId, size=size, effect=fxId, align=align, intensity=intens})
         return text, json
     end
 
