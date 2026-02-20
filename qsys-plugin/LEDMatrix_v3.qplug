@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 3.14.0 - Visual layout thumbnails restored, clean geometry
+-- Version 3.15.0 - Parameter persistence: no resets on Edit→Run transitions
 -- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -24,9 +24,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "3.14.0",
-    Id = "dhpke.olimex.led.matrix.3.14.0",
-    Description = "RPi 64x32 LED Matrix - visual layout thumbnails, 7+4 presets",
+    Version = "3.15.0",
+    Id = "dhpke.olimex.led.matrix.3.15.0",
+    Description = "RPi 64x32 LED Matrix - visual thumbnails, persistent params",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -468,16 +468,39 @@ if Controls then
     end
 
     -- ── Initialize ──────────────────────────────────────────────────
+    -- Called every time the plugin starts (including after Edit→Run transitions).
+    -- IMPORTANT: only write a control value when it is genuinely unset / empty
+    -- so that user-configured values survive the round-trip through Edit mode.
     local function Initialize()
-        print("=== LED Matrix v3.13.0 Initializing ===")
-        Controls.ip_address.String   = ip_addr
-        Controls.udp_port.String     = tostring(udp_port)
-        Controls.brightness.Value    = 128
+        print("=== LED Matrix v3.14.0 Initializing ===")
+
+        -- Connection: seed from Properties only if the text field is still blank
+        if Controls.ip_address.String == "" then
+            Controls.ip_address.String = ip_addr
+        else
+            ip_addr = Controls.ip_address.String   -- restore runtime var from saved value
+        end
+        if Controls.udp_port.String == "" then
+            Controls.udp_port.String = tostring(udp_port)
+        else
+            local v = ValidatePort(Controls.udp_port.String)
+            if v then udp_port = v end
+        end
+
+        -- Brightness: only seed if it is still at 0 (unset)
+        if Controls.brightness.Value == 0 then
+            Controls.brightness.Value = 128
+        end
+
         Controls.last_command.String = "Ready"
 
-        -- Populate layout ComboBox
+        -- Choices MUST always be re-populated (Q-SYS clears them on Edit→Run)
         Controls.layout_preset.Choices = LayoutChoices
-        Controls.layout_preset.String  = LayoutChoices[1]
+
+        -- Layout preset: restore saved string; fall back to first entry
+        if Controls.layout_preset.String == "" then
+            Controls.layout_preset.String = LayoutChoices[1]
+        end
 
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
                                "Orange","Purple","Green","Pink","Gold","Silver","Gray","Black"}
@@ -491,26 +514,55 @@ if Controls then
 
         for seg = 0, 3 do
             local s = "seg" .. (seg+1) .. "_"
+            -- Choices must always be re-set
             Controls[s.."text_color"].Choices = colorChoices
             Controls[s.."bg_color"].Choices   = bgChoices
             Controls[s.."font"].Choices       = fontChoices
             Controls[s.."size"].Choices       = sizeChoices
             Controls[s.."align"].Choices      = alignChoices
             Controls[s.."effect"].Choices     = effectChoices
-            Controls[s.."text"].String        = ""
-            Controls[s.."text_color"].String  = defaultColors[seg+1]
-            Controls[s.."bg_color"].String    = "Black"
-            Controls[s.."intensity"].Value    = 255
-            Controls[s.."font"].String        = "Arial"
-            Controls[s.."size"].String        = "auto"
-            Controls[s.."align"].String       = "Center"
-            Controls[s.."effect"].String      = "none"
-            Controls[s.."active"].Boolean     = false
+
+            -- Only write defaults when the field has never been set
+            if Controls[s.."text_color"].String == "" then
+                Controls[s.."text_color"].String = defaultColors[seg+1]
+            end
+            if Controls[s.."bg_color"].String == "" then
+                Controls[s.."bg_color"].String = "Black"
+            end
+            if Controls[s.."font"].String == "" then
+                Controls[s.."font"].String = "Arial"
+            end
+            if Controls[s.."size"].String == "" then
+                Controls[s.."size"].String = "auto"
+            end
+            if Controls[s.."align"].String == "" then
+                Controls[s.."align"].String = "Center"
+            end
+            if Controls[s.."effect"].String == "" then
+                Controls[s.."effect"].String = "none"
+            end
+            -- Intensity: 0 is a valid value so treat it as unset only when exactly 0
+            -- and no text has ever been written (fresh plugin instance)
+            if Controls[s.."intensity"].Value == 0 and Controls[s.."text"].String == "" then
+                Controls[s.."intensity"].Value = 255
+            end
         end
 
-        -- Default: Layout 1 Fullscreen — seg 0 active
-        activeLayoutSegments = {[0]=true}
-        Controls["seg1_active"].Boolean = true
+        -- Restore activeLayoutSegments from the saved LED indicator states
+        -- so auto-send guards survive Edit→Run without re-applying the layout.
+        activeLayoutSegments = {}
+        for seg = 0, 3 do
+            if Controls["seg"..(seg+1).."_active"].Boolean then
+                activeLayoutSegments[seg] = true
+            end
+        end
+        -- If nothing was active (truly first run), default to seg 0
+        local anyActive = false
+        for _ in pairs(activeLayoutSegments) do anyActive = true; break end
+        if not anyActive then
+            activeLayoutSegments = {[0]=true}
+            Controls["seg1_active"].Boolean = true
+        end
 
         ReopenSocket()
         print("=== Ready ===")
