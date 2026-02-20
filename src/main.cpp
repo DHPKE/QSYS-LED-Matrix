@@ -954,7 +954,7 @@ void handleRoot(AsyncWebServerRequest *request) {
             
             <div class="card preview-section">
                 <h2>Live Preview</h2>
-                <canvas id="preview" width="64" height="32" style="width: 100%; max-width: 640px; height: auto;"></canvas>
+                <canvas id="preview" width="576" height="288" style="width: 100%; max-width: 576px; height: auto; image-rendering: pixelated;"></canvas>
             </div>
             
             <div class="card" style="grid-column: 1 / -1;">
@@ -1339,8 +1339,9 @@ void handleRoot(AsyncWebServerRequest *request) {
         let pollTimer = null;
 
         // ── Init ──────────────────────────────────────────────────────────────
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, 64, 32);
+        off.fillStyle = '#000000';
+        off.fillRect(0, 0, LED_COLS, LED_ROWS);
+        drawGridBackground();
 
         window.addEventListener('load', function () {
             updateSegmentStates([0]);
@@ -1378,8 +1379,8 @@ void handleRoot(AsyncWebServerRequest *request) {
                         });
 
                         // ── Repaint canvas ──
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, 64, 32);
+                        off.fillStyle = '#000000';
+                        off.fillRect(0, 0, LED_COLS, LED_ROWS);
                         data.segments.forEach(s => {
                             if (s.active && s.w > 0 && s.h > 0) {
                                 drawSegmentOnCanvas(s.id, s.text || '',
@@ -1388,6 +1389,7 @@ void handleRoot(AsyncWebServerRequest *request) {
                                     s.align   || 'C');
                             }
                         });
+                        redrawCanvas();
                     }
 
                     // NOTE: We intentionally do NOT overwrite text input fields from
@@ -1507,8 +1509,8 @@ void handleRoot(AsyncWebServerRequest *request) {
             updateSegmentStates(active);
 
             // Repaint canvas with new geometry
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 64, 32);
+            off.fillStyle = '#000000';
+            off.fillRect(0, 0, LED_COLS, LED_ROWS);
             for (let i = 0; i < 4; i++) {
                 if (segmentBounds[i].width > 0) {
                     const txt = document.getElementById('text' + i);
@@ -1518,6 +1520,7 @@ void handleRoot(AsyncWebServerRequest *request) {
                         segmentAlign[i]);
                 }
             }
+            redrawCanvas();
 
             // Send single layout command — device handles all geometry internally
             sendJSON({ cmd: 'layout', preset: preset })
@@ -1552,8 +1555,9 @@ void handleRoot(AsyncWebServerRequest *request) {
             sendJSON({ cmd: 'clear', seg: segment })
                 .then(() => {
                     const b = segmentBounds[segment];
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(b.x, b.y, b.width, b.height);
+                    off.fillStyle = '#000000';
+                    off.fillRect(b.x, b.y, b.width, b.height);
+                    redrawCanvas();
                     updateStatus('Segment ' + (segment + 1) + ' cleared', 'ready');
                 });
         }
@@ -1561,8 +1565,9 @@ void handleRoot(AsyncWebServerRequest *request) {
         function clearAll() {
             sendJSON({ cmd: 'clear_all' })
                 .then(() => {
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(0, 0, 64, 32);
+                    off.fillStyle = '#000000';
+                    off.fillRect(0, 0, LED_COLS, LED_ROWS);
+                    drawGridBackground();
                     updateStatus('All segments cleared', 'ready');
                 });
         }
@@ -1581,45 +1586,109 @@ void handleRoot(AsyncWebServerRequest *request) {
         }
 
         // ── Canvas renderer ───────────────────────────────────────────────────
+        // LED grid constants
+        const LED_COLS = 64, LED_ROWS = 32;
+        const LED_S    = 9;   // total cell size (px per LED on canvas)
+        const LED_PAD  = 1;   // gap between LEDs
+        const LED_DOT  = LED_S - LED_PAD;  // drawn square size
+        const LED_R    = 2;   // corner radius for rounded squares
+
+        // Off-screen 64×32 pixel buffer — text is drawn here at 1:1 scale
+        const offscreen = document.createElement('canvas');
+        offscreen.width  = LED_COLS;
+        offscreen.height = LED_ROWS;
+        const off = offscreen.getContext('2d');
+
+        // Draw the full LED grid background (all LEDs dark/off)
+        function drawGridBackground() {
+            ctx.fillStyle = '#111111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1a1a1a';
+            for (let row = 0; row < LED_ROWS; row++) {
+                for (let col = 0; col < LED_COLS; col++) {
+                    const px = col * LED_S, py = row * LED_S;
+                    ctx.beginPath();
+                    ctx.roundRect(px, py, LED_DOT, LED_DOT, LED_R);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Blit the offscreen pixel buffer onto the LED grid canvas.
+        // Each pixel in the offscreen becomes one lit/dim LED square.
+        function blitToGrid() {
+            const imgData = off.getImageData(0, 0, LED_COLS, LED_ROWS).data;
+            for (let row = 0; row < LED_ROWS; row++) {
+                for (let col = 0; col < LED_COLS; col++) {
+                    const i  = (row * LED_COLS + col) * 4;
+                    const r  = imgData[i], g = imgData[i+1], b = imgData[i+2];
+                    // Dim non-black pixels slightly to simulate LED bloom
+                    const bright = (r > 8 || g > 8 || b > 8);
+                    if (!bright) continue;  // leave as dark grid dot
+                    const px = col * LED_S, py = row * LED_S;
+                    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+                    ctx.beginPath();
+                    ctx.roundRect(px, py, LED_DOT, LED_DOT, LED_R);
+                    ctx.fill();
+                }
+            }
+        }
+
         function drawSegmentOnCanvas(segment, text, color, bgcolor, align) {
             const b = segmentBounds[segment];
             if (!b || b.width === 0 || b.height === 0) return;
 
-            ctx.fillStyle = bgcolor || '#000000';
-            ctx.fillRect(b.x, b.y, b.width, b.height);
-            if (!text) return;
+            // 1. Paint segment background into offscreen buffer
+            off.fillStyle = bgcolor || '#000000';
+            off.fillRect(b.x, b.y, b.width, b.height);
 
-            // Map font selector value → CSS font-family approximation
-            // 1=Arial(Bold) → Arial bold   2=Verdana → Verdana   3=Impact → Impact
-            const fontEl = document.getElementById('font' + segment);
-            const fontVal = fontEl ? parseInt(fontEl.value) : 1;
-            const fontFamilies = { 1: 'bold Arial', 2: 'Verdana', 3: 'Impact' };
-            const fontFamily = fontFamilies[fontVal] || 'bold Arial';
+            if (text) {
+                // 2. Pick font family from selector
+                const fontEl  = document.getElementById('font' + segment);
+                const fontVal = fontEl ? parseInt(fontEl.value) : 1;
+                const fontFamilies = { 1: 'bold Arial', 2: 'Verdana', 3: 'Impact' };
+                const fontFamily   = fontFamilies[fontVal] || 'bold Arial';
 
-            const availW = b.width  - 4;
-            const availH = b.height - 2;
-            const sizes  = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
-            let fontSize = 6;
-            for (const sz of sizes) {
-                ctx.font = sz + 'px ' + fontFamily;
-                if (ctx.measureText(text).width <= availW && sz * 1.2 <= availH) {
-                    fontSize = sz;
-                    break;
+                // 3. Auto-size: find largest font that fits in the segment
+                const availW = b.width  - 2;
+                const availH = b.height - 2;
+                const sizes  = [24, 20, 18, 16, 14, 12, 10, 9, 8, 6];
+                let fontSize = 6;
+                for (const sz of sizes) {
+                    off.font = sz + 'px ' + fontFamily;
+                    const m = off.measureText(text);
+                    const textH = (m.actualBoundingBoxAscent || sz) + (m.actualBoundingBoxDescent || sz * 0.2);
+                    if (m.width <= availW && textH <= availH) { fontSize = sz; break; }
                 }
-            }
-            ctx.font         = fontSize + 'px ' + fontFamily;
-            ctx.fillStyle    = color || '#FFFFFF';
-            ctx.textBaseline = 'middle';
 
-            if (align === 'L') {
-                ctx.textAlign = 'left';
-                ctx.fillText(text, b.x + 2,              b.y + b.height / 2);
-            } else if (align === 'R') {
-                ctx.textAlign = 'right';
-                ctx.fillText(text, b.x + b.width - 2,   b.y + b.height / 2);
-            } else {
-                ctx.textAlign = 'center';
-                ctx.fillText(text, b.x + b.width / 2,   b.y + b.height / 2);
+                // 4. Draw text into offscreen
+                off.font         = fontSize + 'px ' + fontFamily;
+                off.fillStyle    = color || '#FFFFFF';
+                off.textBaseline = 'middle';
+                const mx = off.measureText(text);
+                const tw = mx.width;
+                let tx;
+                if (align === 'L')      tx = b.x + 1;
+                else if (align === 'R') tx = b.x + b.width - tw - 1;
+                else                    tx = b.x + (b.width - tw) / 2;
+                off.fillText(text, tx, b.y + b.height / 2);
+            }
+
+            // 5. Redraw the full grid then blit all segments
+            redrawCanvas();
+        }
+
+        function redrawCanvas() {
+            drawGridBackground();
+            blitToGrid();
+            // Draw faint segment dividers on the grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            ctx.lineWidth   = 1;
+            for (let i = 0; i < 4; i++) {
+                const b = segmentBounds[i];
+                if (!b || b.width === 0) continue;
+                ctx.strokeRect(b.x * LED_S - 0.5, b.y * LED_S - 0.5,
+                               b.width * LED_S, b.height * LED_S);
             }
         }
     </script>
