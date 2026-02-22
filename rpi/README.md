@@ -42,6 +42,32 @@ Solder/jumper your HUB75 cable accordingly:
 > `MATRIX_HARDWARE_MAPPING` / the library's `--led-gpio-mapping` accordingly,
 > OR disable the fan in the HAT firmware.
 
+## Features
+
+### Display Performance
+- **Optimized refresh rate**: Configurable GPIO slowdown (default: 1 for ~500Hz)
+- **Minimal flickering**: Reduced to near-zero with proper timing
+- **Hardware PWM support**: Full color depth with smooth brightness control
+
+### Orientation Support
+- **Landscape mode**: Native 64×32 (default)
+- **Portrait mode**: Rotated 32×64 with automatic layout adjustment
+- **Dynamic switching**: Change orientation via WebUI or UDP command
+- **Auto-layout**: Segments automatically resize when orientation changes
+
+### WebUI Improvements
+- **Orientation-aware preview**: Canvas automatically resizes (64×32 ↔ 32×64)
+- **Real IP display**: Shows actual network IP (fixes 127.0.1.1 issue)
+- **Editable network settings**: IP address and UDP port with Apply button
+- **Layout presets**: Separate presets for landscape and portrait modes
+- **Live updates**: 1-second polling with dirty-state optimization
+
+### Segment Management
+- **4 independent segments** with individual text, color, alignment, effects
+- **Smart clearing**: Clear text without deactivating segments
+- **Layout presets**: 7 pre-configured layouts for both orientations
+- **Thread-safe**: Concurrent access from UDP, web, and render threads
+
 ---
 
 ## Installation
@@ -102,9 +128,12 @@ Send JSON to `<pi-ip>:21324` via UDP.  The Q-SYS plugin (`LEDMatrix_Complete.qpl
 {"cmd":"text",  "seg":0, "text":"Hello", "color":"FFFFFF", "bgcolor":"000000",
  "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
 
+{"cmd":"layout",     "preset":1}
 {"cmd":"clear",      "seg":0}
 {"cmd":"clear_all"}
 {"cmd":"brightness", "value":200}
+{"cmd":"orientation", "value":"portrait"}
+{"cmd":"orientation", "value":"landscape"}
 {"cmd":"config",     "seg":0, "x":0, "y":0, "w":64, "h":32}
 ```
 
@@ -112,13 +141,16 @@ Send JSON to `<pi-ip>:21324` via UDP.  The Q-SYS plugin (`LEDMatrix_Complete.qpl
 
 ## Web UI
 
-Open `http://<pi-ip>/` — identical to the ESP32 web interface:
-- Live canvas preview (1-second polling)
-- Per-segment text, colour, alignment, effect
-- Brightness slider
-- Layout presets (split vertical / horizontal / quad / fullscreen)
+Open `http://<pi-ip>:8080` — enhanced web interface with:
+- **Live canvas preview**: Orientation-aware (automatically switches 64×32 ↔ 32×64)
+- **Network settings**: Editable IP address and UDP port
+- **Per-segment controls**: Text, color, alignment, effects, intensity
+- **Brightness slider**: Real-time brightness adjustment (0-100%)
+- **Layout presets**: 7 presets each for landscape and portrait modes
+- **Orientation toggle**: Switch between landscape/portrait modes
+- **Real-time updates**: 1-second polling with visual feedback
 
-> If you set `WEB_PORT = 8080` in `config.py` you can run without `sudo`.
+> Default port is 8080 (no sudo required). Change `WEB_PORT` in `config.py` if needed.
 
 ---
 
