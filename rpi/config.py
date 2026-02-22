@@ -45,12 +45,13 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 3           # 0–4; Controls LED refresh rate
-                                      # 0 = Fastest (~1000Hz+) - high CPU, can cause line flicker
-                                      # 1 = Fast (~500Hz) - moderate CPU
-                                      # 2 = Balanced (~250-300Hz) - good for most Pi Zero 2 W
-                                      # 3 = Slower (~200Hz) - BEST stability, minimal flicker
-                                      # 4 = Slowest (~150Hz) - most stable but may appear dim
+MATRIX_GPIO_SLOWDOWN    = 1           # 0–4; Controls LED refresh rate
+                                      # RPi 4: Use 1 or 2 (very powerful CPU)
+                                      # RPi Zero 2 W: Use 2 or 3 (lower power)
+                                      # 0 = Fastest (~1000Hz+) - RPi 4 only
+                                      # 1 = Fast (~500Hz) - BEST for RPi 4
+                                      # 2 = Balanced (~250-300Hz) - RPi Zero 2 W
+                                      # 3 = Slower (~200Hz) - Pi Zero 2 W with flicker issues
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
 MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 levels, default)
                                       # Lower values = faster refresh but less color accuracy

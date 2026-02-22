@@ -1,6 +1,6 @@
 #!/usr/bin/expect -f
 set timeout 10
 set password "node"
-spawn ssh node@10.1.1.22 "echo '=== CPU and Memory ===' && grep 'cpu ' /proc/stat && free -h && echo '' && echo '=== Top Processes ===' && ps aux --sort=-%cpu | head -10 && echo '' && echo '=== Temperature ===' && vcgencmd measure_temp && echo '' && echo '=== Service Status ===' && systemctl status led-matrix --no-pager | grep -E 'Active|CPU|Memory'"
+spawn ssh node@10.1.1.25 "echo '=== CPU and Memory ===' && grep 'cpu ' /proc/stat && free -h && echo '' && echo '=== Top Processes ===' && ps aux --sort=-%cpu | head -10 && echo '' && echo '=== Temperature ===' && vcgencmd measure_temp && echo '' && echo '=== Service Status ===' && systemctl status led-matrix --no-pager | grep -E 'Active|CPU|Memory'"
 expect "password:" { send "${password}\r" }
 expect eof
