@@ -70,7 +70,8 @@ MATRIX_MULTIPLEXING     = 0           # 0-18; Panel multiplexing mode
                                       # 0 = default (best for most panels)
                                       # Try 1,2,3,4 if lines flicker
                                       # Different panels use different modes
-MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother color
+MATRIX_PWM_DITHER_BITS  = 1           # 0 = off; 1-2 = dithering for smoother color
+                                      # 1 = Enables temporal dithering to reduce flicker
                                       # Can reduce color banding with lower PWM bits
 MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
                                       # Try if colors look wrong
