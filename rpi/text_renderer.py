@@ -129,15 +129,10 @@ class TextRenderer:
     def render_all(self):
         """Composite all active segments and push to the matrix canvas."""
         
-        # Check if any segments are dirty before rendering
-        needs_render = False
-        with self._sm._lock:
-            for seg in self._sm._segments:
-                if seg.is_dirty:
-                    needs_render = True
-                    break
+        # Fast dirty check without lock for initial test
+        needs_render = any(seg.is_dirty for seg in self._sm._segments)
         
-        # Skip rendering if nothing changed
+        # Skip rendering entirely if nothing changed
         if not needs_render:
             return
         
@@ -183,9 +178,9 @@ class TextRenderer:
                 seg.is_dirty = False
                 rendered_count += 1
         
-        # Reduce logging frequency
+        # Reduce logging frequency to every 500 renders (minimize overhead)
         self._render_count += 1
-        if self._render_count % 50 == 0:
+        if self._render_count % 500 == 0:
             logger.debug(f"[RENDER] Rendered {rendered_count} segments (count: {self._render_count})")
 
         # Apply rotation if in portrait mode to convert virtual 32×64 to physical 64×32
@@ -254,52 +249,49 @@ class TextRenderer:
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 
-        # Optimized rendering using NumPy for threshold operations
+        # AGGRESSIVE BINARY RENDERING: High threshold eliminates all anti-aliasing artifacts
         if seg.effect == TextEffect.SCROLL:
-            # Create temporary grayscale image for scrolling text
+            # Render on grayscale then apply aggressive threshold
             tmp_gray = Image.new("L", (MATRIX_WIDTH + tw, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
                           text, font=font, fill=255)
             
-            # Fast threshold using point() with lookup table
-            tmp_gray = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+            # AGGRESSIVE THRESHOLD: Only bright pixels > 200 become white (eliminates AA artifacts)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 200 else 0, mode='L')
             
             # Crop to segment width
-            tmp_crop = tmp_gray.crop((0, 0, seg.width, seg.height))
+            tmp_crop = tmp_binary.crop((0, 0, seg.width, seg.height))
             
-            # Use NumPy for fast pixel operations
+            # Convert to pure RGB colors
             mask_array = np.array(tmp_crop, dtype=np.uint8)
-            mask_bool = mask_array > 128
+            mask_bool = mask_array == 255
             
-            # Create RGB region
-            region_array = np.zeros((seg.height, seg.width, 3), dtype=np.uint8)
+            # Create RGB region with pure colors only
+            region_array = np.full((seg.height, seg.width, 3), bg, dtype=np.uint8)
             region_array[mask_bool] = fg
-            region_array[~mask_bool] = bg
             
             # Paste back to main image
             region = Image.fromarray(region_array, 'RGB')
             self._image.paste(region, (seg.x, seg.y))
         else:
-            # Optimized non-scrolling text with NumPy threshold
-            # Create temporary segment-sized grayscale image
+            # Render on grayscale then apply aggressive threshold
             tmp_gray = Image.new("L", (seg.width, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
             
-            # Fast threshold
-            tmp_gray = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+            # AGGRESSIVE THRESHOLD: Only bright pixels > 200 become white (eliminates AA artifacts)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 200 else 0, mode='L')
             
-            # Use NumPy for fast colorization
-            mask_array = np.array(tmp_gray, dtype=np.uint8)
-            mask_bool = mask_array > 128
+            # Convert to pure RGB colors
+            mask_array = np.array(tmp_binary, dtype=np.uint8)
+            mask_bool = mask_array == 255
             
-            # Create RGB segment
-            segment_array = np.zeros((seg.height, seg.width, 3), dtype=np.uint8)
+            # Create RGB segment with pure colors only
+            segment_array = np.full((seg.height, seg.width, 3), bg, dtype=np.uint8)
             segment_array[mask_bool] = fg
-            segment_array[~mask_bool] = bg
             
-            # Paste to main image (fast C operation)
+            # Paste to main image
             segment_img = Image.fromarray(segment_array, 'RGB')
             self._image.paste(segment_img, (seg.x, seg.y))
 
