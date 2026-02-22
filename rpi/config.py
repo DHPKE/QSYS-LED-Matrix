@@ -53,11 +53,11 @@ MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
                                       # 2 = Balanced (~250-300Hz) - BEST for RPi 4
                                       # 3 = Slower (~200Hz) - maximum stability
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
-MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 levels, default)
+MATRIX_PWM_BITS        = 6           # 1-11; PWM bits for color depth (11=2048 levels, default)
                                       # Lower values = faster refresh but less color accuracy
                                       # 11 = Best color (slower refresh)
                                       # 7-9 = Good compromise
-                                      # 6 = Faster, less glitches, still good colors
+                                      # 6 = Faster, less glitches, still good colors (64 levels)
                                       # 5 = Fast refresh, minimal glitches, acceptable colors
                                       # 1-4 = Very fast but visibly reduced colors
 MATRIX_SCAN_MODE        = 0           # 0 = progressive (default), 1 = interlaced
@@ -74,9 +74,8 @@ MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother co
                                       # Can reduce color banding with lower PWM bits
 MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
                                       # Try if colors look wrong
-MATRIX_REFRESH_LIMIT    = 200         # Hz; 0 = no limit, 120-200 = limit refresh rate
-                                      # Limiting to 200Hz provides stable, consistent refresh
-                                      # Helps eliminate flickering by preventing over-refresh
+MATRIX_REFRESH_LIMIT    = 0           # Hz; 0 = no limit, 120-200 = limit refresh rate
+                                      # Use if display looks oversaturated or unstable
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display Orientation
