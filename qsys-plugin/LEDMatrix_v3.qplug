@@ -498,9 +498,8 @@ if Controls then
         if Controls.last_command.String == "" then
             Controls.last_command.String = "Ready"
         end
-        if Controls.layout_preset.String == "" then
-            Controls.layout_preset.String = LayoutChoices[1]
-        end
+        -- Always reset layout preset to default (don't persist layout selection)
+        Controls.layout_preset.String = LayoutChoices[1]
 
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
                                "Orange","Purple","Green","Gold","Gray","Black"}
