@@ -249,16 +249,16 @@ class TextRenderer:
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 
-        # THICK FONT RENDERING: Low threshold for bold, thick fonts
+        # BALANCED FONT RENDERING: Moderate threshold for good weight without being too bold
         if seg.effect == TextEffect.SCROLL:
-            # Render on grayscale then apply low threshold for thick fonts
+            # Render on grayscale then apply moderate threshold
             tmp_gray = Image.new("L", (MATRIX_WIDTH + tw, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
                           text, font=font, fill=255)
             
-            # LOW THRESHOLD: Pixels > 80 become white (thick, bold fonts)
-            tmp_binary = tmp_gray.point(lambda p: 255 if p > 80 else 0, mode='L')
+            # MODERATE THRESHOLD: Pixels > 110 become white (balanced weight)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 110 else 0, mode='L')
             
             # Crop to segment width
             tmp_crop = tmp_binary.crop((0, 0, seg.width, seg.height))
@@ -275,13 +275,13 @@ class TextRenderer:
             region = Image.fromarray(region_array, 'RGB')
             self._image.paste(region, (seg.x, seg.y))
         else:
-            # Render on grayscale then apply low threshold for thick fonts
+            # Render on grayscale then apply moderate threshold
             tmp_gray = Image.new("L", (seg.width, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
             
-            # LOW THRESHOLD: Pixels > 80 become white (thick, bold fonts)
-            tmp_binary = tmp_gray.point(lambda p: 255 if p > 80 else 0, mode='L')
+            # MODERATE THRESHOLD: Pixels > 110 become white (balanced weight)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 110 else 0, mode='L')
             
             # Convert to pure RGB colors
             mask_array = np.array(tmp_binary, dtype=np.uint8)
