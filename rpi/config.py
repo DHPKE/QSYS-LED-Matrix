@@ -177,10 +177,17 @@ LAYOUT_PRESETS = {
         (0,         H//2,      W//2,  H//2 ),                            # bottom-left
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
-    11: [(0,        0,         W,     H    )],                           # segment 0 fullscreen
-    12: [(0,        0,         W,     H    )],                           # segment 1 fullscreen
-    13: [(0,        0,         W,     H    )],                           # segment 2 fullscreen
-    14: [(0,        0,         W,     H    )],                           # segment 3 fullscreen
+    # Other segments set to 1x1 to hide them (segment index matches tuple position)
+    11: [(0,        0,         W,     H    )],                           # segment 0 fullscreen only
+    12: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         W,     H    )],                           # segment 1 fullscreen
+    13: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
+         (0,        0,         W,     H    )],                           # segment 2 fullscreen
+    14: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
+         (0,        0,         W,     H    )],                           # segment 3 fullscreen
 }
 
 # Portrait layout presets (32×64 virtual canvas)
@@ -215,10 +222,17 @@ LAYOUT_PRESETS_PORTRAIT = {
         (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left
         (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
-    11: [(0,         0,         PW,     PH    )],                        # segment 0 fullscreen
-    12: [(0,         0,         PW,     PH    )],                        # segment 1 fullscreen
-    13: [(0,         0,         PW,     PH    )],                        # segment 2 fullscreen
-    14: [(0,         0,         PW,     PH    )],                        # segment 3 fullscreen
+    # Other segments set to 1x1 to hide them (segment index matches tuple position)
+    11: [(0,         0,         PW,     PH    )],                        # segment 0 fullscreen only
+    12: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         PW,     PH    )],                        # segment 1 fullscreen
+    13: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
+         (0,         0,         PW,     PH    )],                        # segment 2 fullscreen
+    14: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
+         (0,         0,         PW,     PH    )],                        # segment 3 fullscreen
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
