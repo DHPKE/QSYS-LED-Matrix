@@ -45,11 +45,11 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 1           # 0–4; Controls LED refresh rate
-                                      # 0 = Fastest (~1000Hz+) - BEST for reducing flicker
-                                      # 1 = Fast (~500Hz) - Good balance for Pi Zero 2 W
-                                      # 2 = Good balance (~250-300Hz)
-                                      # 3 = Slower (~200Hz) - very stable
+MATRIX_GPIO_SLOWDOWN    = 3           # 0–4; Controls LED refresh rate
+                                      # 0 = Fastest (~1000Hz+) - high CPU, can cause line flicker
+                                      # 1 = Fast (~500Hz) - moderate CPU
+                                      # 2 = Balanced (~250-300Hz) - good for most Pi Zero 2 W
+                                      # 3 = Slower (~200Hz) - BEST stability, minimal flicker
                                       # 4 = Slowest (~150Hz) - most stable but may appear dim
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
 MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 levels, default)
@@ -57,6 +57,22 @@ MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 l
                                       # 11 = Best color (slower refresh)
                                       # 7-9 = Good compromise
                                       # 1-6 = Faster but reduced colors
+MATRIX_SCAN_MODE        = 0           # 0 = progressive (default), 1 = interlaced
+                                      # Try 1 if you see line flickering
+MATRIX_ROW_ADDRESS_TYPE = 0           # 0-4; Different panels use different addressing
+                                      # 0 = default (direct), 1 = AB-address panels
+                                      # 2 = direct row select, 3 = ABC-addressed
+                                      # Try different values if flickering persists
+MATRIX_MULTIPLEXING     = 0           # 0-18; Panel multiplexing mode
+                                      # 0 = default (best for most panels)
+                                      # Try 1,2,3,4 if lines flicker
+                                      # Different panels use different modes
+MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother color
+                                      # Can reduce color banding with lower PWM bits
+MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
+                                      # Try if colors look wrong
+MATRIX_REFRESH_LIMIT    = 0           # Hz; 0 = no limit, 120-200 = limit refresh rate
+                                      # Use if display looks oversaturated or unstable
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display Orientation
@@ -195,11 +211,13 @@ LAYOUT_PRESETS_PORTRAIT = {
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────────────────────────────────────
-LOG_LEVEL = "INFO"   # DEBUG | INFO | WARNING | ERROR
+LOG_LEVEL = "WARNING"   # DEBUG | INFO | WARNING | ERROR
+                        # Use WARNING or ERROR to reduce CPU overhead from logging
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display refresh rate
 # ──────────────────────────────────────────────────────────────────────────────
-EFFECT_INTERVAL = 0.05   # seconds (≈ 20 fps; matrix library itself runs at ~120Hz)
+EFFECT_INTERVAL = 0.1   # seconds (10 fps for reduced CPU load)
                         # Increase to reduce CPU usage, decrease for smoother animations
-                        # Recommended: 0.05 (20fps) to 0.1 (10fps)
+                        # Recommended: 0.05 (20fps) to 0.15 (7fps)
+                        # Lower = less flicker from CPU interruptions

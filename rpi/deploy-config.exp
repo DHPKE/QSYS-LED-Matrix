@@ -1,0 +1,33 @@
+#!/usr/bin/expect -f
+set timeout 30
+set password "node"
+set user "node"
+set host "10.1.1.22"
+set remote_dir "/opt/led-matrix"
+
+# Copy config.py to temp location
+spawn scp config.py ${user}@${host}:/tmp/config.py
+expect {
+    "password:" { send "${password}\r"; exp_continue }
+    "100%" { puts "✓ config.py uploaded to /tmp" }
+    timeout { puts "ERROR: Timeout copying config.py"; exit 1 }
+}
+expect eof
+
+# Move file to /opt/led-matrix with sudo
+spawn ssh ${user}@${host} "sudo mv /tmp/config.py ${remote_dir}/ && sudo chown root:root ${remote_dir}/config.py"
+expect {
+    "password:" { send "${password}\r"; exp_continue }
+    eof { puts "✓ config.py moved to ${remote_dir}" }
+    timeout { puts "ERROR: Timeout moving file"; exit 1 }
+}
+
+# Restart service
+spawn ssh ${user}@${host} "sudo systemctl restart led-matrix.service && sleep 2"
+expect {
+    "password:" { send "${password}\r"; exp_continue }
+    eof { puts "✓ Service restarted" }
+    timeout { puts "ERROR: Timeout restarting service"; exit 1 }
+}
+
+puts "\n✓ config.py deployed successfully"
