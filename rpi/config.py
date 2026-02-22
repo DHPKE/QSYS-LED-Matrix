@@ -45,19 +45,20 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 1           # 0–4; Controls LED refresh rate
-                                      # RPi 4: Use 1 or 2 (very powerful CPU)
+MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
+                                      # RPi 4: Use 1-2 for best results
                                       # RPi Zero 2 W: Use 2 or 3 (lower power)
-                                      # 0 = Fastest (~1000Hz+) - RPi 4 only
-                                      # 1 = Fast (~500Hz) - BEST for RPi 4
-                                      # 2 = Balanced (~250-300Hz) - RPi Zero 2 W
-                                      # 3 = Slower (~200Hz) - Pi Zero 2 W with flicker issues
+                                      # 0 = Fastest (~1000Hz+) - may cause glitches
+                                      # 1 = Fast (~500Hz) - try if display stable
+                                      # 2 = Balanced (~250-300Hz) - BEST for RPi 4 stability
+                                      # 3 = Slower (~200Hz) - Pi Zero 2 W
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
-MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 levels, default)
+MATRIX_PWM_BITS        = 6           # 1-11; PWM bits for color depth (11=2048 levels, default)
                                       # Lower values = faster refresh but less color accuracy
                                       # 11 = Best color (slower refresh)
                                       # 7-9 = Good compromise
-                                      # 1-6 = Faster but reduced colors
+                                      # 6 = Faster, less glitches, still good colors
+                                      # 1-5 = Very fast but reduced colors
 MATRIX_SCAN_MODE        = 0           # 0 = progressive (default), 1 = interlaced
                                       # Try 1 if you see line flickering
 MATRIX_ROW_ADDRESS_TYPE = 0           # 0-4; Different panels use different addressing

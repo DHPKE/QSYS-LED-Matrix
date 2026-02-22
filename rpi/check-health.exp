@@ -1,0 +1,6 @@
+#!/usr/bin/expect -f
+set timeout 10
+set password "node"
+spawn ssh node@10.1.1.25 "echo '=== Service Status ===' && sudo systemctl status led-matrix --no-pager -n 20 && echo '' && echo '=== Recent Logs (last 30 lines) ===' && sudo journalctl -u led-matrix -n 30 --no-pager && echo '' && echo '=== System Health ===' && uptime && free -h | head -2 && vcgencmd measure_temp"
+expect "password:" { send "${password}\r" }
+expect eof
