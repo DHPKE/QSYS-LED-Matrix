@@ -70,13 +70,13 @@ MATRIX_MULTIPLEXING     = 0           # 0-18; Panel multiplexing mode
                                       # 0 = default (best for most panels)
                                       # Try 1,2,3,4 if lines flicker
                                       # Different panels use different modes
-MATRIX_PWM_DITHER_BITS  = 1           # 0 = off; 1-2 = dithering for smoother color
-                                      # 1 = Enables temporal dithering to reduce flicker
+MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother color
                                       # Can reduce color banding with lower PWM bits
 MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
                                       # Try if colors look wrong
-MATRIX_REFRESH_LIMIT    = 0           # Hz; 0 = no limit, 120-200 = limit refresh rate
-                                      # Use if display looks oversaturated or unstable
+MATRIX_REFRESH_LIMIT    = 200         # Hz; 0 = no limit, 120-200 = limit refresh rate
+                                      # Limiting to 200Hz provides stable, consistent refresh
+                                      # Helps eliminate flickering by preventing over-refresh
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display Orientation
