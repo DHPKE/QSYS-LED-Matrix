@@ -347,8 +347,8 @@ if Controls then
         ["White"]   = "FFFFFF", ["Red"]     = "FF0000", ["Lime"]    = "00FF00",
         ["Blue"]    = "0000FF", ["Yellow"]  = "FFFF00", ["Magenta"] = "FF00FF",
         ["Cyan"]    = "00FFFF", ["Orange"]  = "FFA500", ["Purple"]  = "800080",
-        ["Green"]   = "008000", ["Pink"]    = "FFC0CB", ["Gold"]    = "FFD700",
-        ["Silver"]  = "C0C0C0", ["Gray"]    = "808080", ["Black"]   = "000000"
+        ["Green"]   = "008000", ["Gold"]    = "FFD700",
+        ["Gray"]    = "808080", ["Black"]   = "000000"
     }
     local FontMap  = { ["Arial"]="arial", ["Verdana"]="verdana", ["Digital"]="digital12", ["Mono"]="mono9" }
     local AlignMap = { ["Left"]="L", ["Center"]="C", ["Right"]="R" }
@@ -487,9 +487,9 @@ if Controls then
         Controls.layout_preset.String  = LayoutChoices[1]
 
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
-                               "Orange","Purple","Green","Pink","Gold","Silver","Gray","Black"}
+                               "Orange","Purple","Green","Gold","Gray","Black"}
         local bgChoices     = {"Black","White","Red","Lime","Blue","Yellow","Magenta","Cyan",
-                               "Orange","Purple","Green","Pink","Gold","Silver","Gray"}
+                               "Orange","Purple","Green","Gold","Gray"}
         local fontChoices   = {"Arial","Verdana","Digital","Mono"}
         local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}

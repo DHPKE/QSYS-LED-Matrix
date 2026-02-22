@@ -1,596 +1,385 @@
-# QSYS-LED-Matrix# QSYS-LED-Matrix
+# QSYS-LED-Matrix
 
+A complete firmware and plugin solution for displaying dynamic text on a **64×32 HUB75 LED matrix** controlled from **Q-SYS** via UDP. Three hardware targets are supported:
 
-
-Control a **64x32 HUB75 LED matrix** from **Q-SYS** via JSON UDP commands.  A complete firmware and plugin solution for displaying dynamic text on a **64Ã—32 HUB75 LED matrix** controlled from **Q-SYS** via UDP. Three hardware targets are supported:
-
-Three hardware targets are supported — pick the one that fits your installation.
-
-| Target | Folder | Connection |
-
-| Target | Folder | Language | Network ||---|---|---|
-
-| --- | --- | --- | --- || ESP32 Dev Module | `src/` (PlatformIO) | Wired Ethernet (LAN8720) |
-
-| ESP32 Dev Module | `src/` | C++ / Arduino (PlatformIO) | Wired Ethernet (LAN8720 PHY) || Raspberry Pi Zero 2 W | `rpi/` | Wired Ethernet via PoE HAT |
-
-| Raspberry Pi Zero 2 W | `rpi/` | Python 3 | Wired Ethernet via PoE HAT || RADXA Rock Pi S | `rockpis/` | Built-in Ethernet |
-
+| Target | Folder | Language | Network |
+|---|---|---|---|
+| WT32-ETH01 (ESP32) | `src/` | C++ / Arduino (PlatformIO) | Wired Ethernet (LAN8720 PHY) |
+| Raspberry Pi Zero 2 W | `rpi/` | Python 3 | Wired Ethernet via PoE HAT |
 | RADXA Rock Pi S | `rockpis/` | Python 3 | Built-in Ethernet (RK3308) |
 
 ---
 
-> **Note on the ESP32 target:** The firmware is built with PlatformIO for a generic
-
-> ESP32 Dev Module (not the Olimex Gateway). The Olimex Gateway's Ethernet PHY## ðŸŽ¯ Features
-
-> occupies most of the available GPIOs, leaving too few free pins for HUB75.
-
-> A plain ESP32 Dev Module with a separate LAN8720 breakout avoids this conflict.- **JSON UDP Control** â€” receive text, colours, fonts, and effects over UDP (port 21324)
-
-- **Multi-Segment Layouts** â€” up to 4 independent text areas (fullscreen, split, quad)
-
----- **Auto-Scaling Text** â€” automatically fits text to the available segment area
-
-- **Text Effects** â€” scroll, blink, fade, rainbow
-
-## Features- **Web Interface** â€” built-in status page and test commands
-
-- **Q-SYS Plugin** â€” drag-and-drop Lua plugin (`qsys-plugin/LEDMatrix_Complete.qplug`)
-
-- JSON UDP control (port 21324) -- text, colour, font, size, alignment, effects- **Full RGB Colour** â€” 24-bit hex colour codes
-
-- Up to 4 independent segments per display (fullscreen / split vertical / split horizontal / quad)
-
-- Auto-scaling text -- fits any string into its segment automatically---
-
-- Text effects: scroll, blink, fade, rainbow
-
-- Built-in web interface for status and manual testing## ðŸ“¡ UDP Protocol (JSON)
-
-- Q-SYS plugin (`LEDMatrix_Complete.qplug`) with layout presets and per-segment controls
-
-- Persistent config -- segments and brightness survive reboots (LittleFS on ESP32, JSON file on Pi)Send UDP packets to port **21324**. All commands are JSON objects.
-
-
-
----### Text command
-
-```json
-
-## UDP Protocol{"cmd":"text","seg":0,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
-
- "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
-
-All commands are sent as JSON datagrams to **UDP port 21324**.```
-
-
-
-### Send text to a segment### Layout config
-
-```json
-
-```json{"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":32}
-
-{```
-
-  "cmd":       "text",
-
-  "seg":       0,### Other commands
-
-  "text":      "Hello World",```json
-
-  "color":     "FFFFFF",{"cmd":"clear","seg":0}
-
-  "bgcolor":   "000000",{"cmd":"clear_all"}
-
-  "font":      "arial",{"cmd":"brightness","value":200}
-
-  "size":      "auto",```
-
-  "align":     "C",
-
-  "effect":    "none",**Parameters:**
-
-  "intensity": 255| Field | Values |
-
-}|---|---|
-
-```| `seg` | 0â€“3 |
-
-| `color` / `bgcolor` | `RRGGBB` hex string (no `#`) |
-
-### Configure a segment geometry (layout change)| `font` | `arial`, `verdana`, `digital12`, `mono9` |
-
-| `size` | `auto`, `8`, `12`, `16`, `24`, `32` |
-
-```json| `align` | `L`, `C`, `R` |
-
-{ "cmd": "config", "seg": 0, "x": 0, "y": 0, "w": 64, "h": 32 }| `effect` | `none`, `scroll`, `blink`, `fade`, `rainbow` |
-
-```| `intensity` | 0â€“255 |
-
-
-
-### Other commands---
-
-
-
-```json## ðŸ› ï¸ Hardware Targets
-
-{ "cmd": "clear",      "seg": 0  }
-
-{ "cmd": "clear_all"              }### ESP32 Dev Module (`src/`)
-
-{ "cmd": "brightness", "value": 200 }
-
-```**Requirements:**
-
-- ESP32 Dev Module board
-
-### Parameter reference- 64Ã—32 HUB75 LED matrix panel
-
-- External 5V / 4A+ power supply for matrix
-
-| Field | Valid values |
-
-| --- | --- |**Build & Flash (PlatformIO):**
-
-| `seg` | 0 - 3 |```bash
-
-| `color` / `bgcolor` | `RRGGBB` hex string, no `#` (e.g. `FF0000`) |pio run --target upload --upload-port COM4
-
-| `font` | `arial`, `verdana`, `digital12`, `mono9` |```
-
-| `size` | `auto`, `8`, `12`, `16`, `24`, `32` |Or use the VS Code PlatformIO extension.
-
-| `align` | `L` (left), `C` (center), `R` (right) |
-
-| `effect` | `none`, `scroll`, `blink`, `fade`, `rainbow` |**HUB75 Pinout** â€” see [`docs/PINOUT.md`](docs/PINOUT.md) for full wiring.
-
-| `intensity` | 0 - 255 |
+## 🎯 Features
+
+- **JSON UDP Control** — receive text, colours, fonts, and effects over UDP (port 21324)
+- **Multi-Segment Layouts** — up to 4 independent text areas with 6 layout presets
+- **Auto-Scaling Text** — automatically fits text to the available segment area
+- **Text Effects** — scroll, blink, fade, rainbow
+- **Web Interface** — built-in status page and test commands
+- **Q-SYS Plugin** — drag-and-drop Lua plugin with layout presets and per-segment controls
+- **Full RGB Colour** — 24-bit hex colour codes or 14 named colours
+- **Persistent Config** — settings survive reboots (LittleFS on ESP32, JSON on Pi)
+- **IP Splash Screen** — displays device IP on boot until first command received
+- **Fallback Static IP** — configurable fallback when DHCP fails (WT32-ETH01)
 
 ---
 
-### Important: always apply the layout before sending text
+## 📡 UDP Protocol (JSON)
 
-### Raspberry Pi Zero 2 W (`rpi/`)
+Send UDP packets to port **21324**. All commands are JSON objects.
 
-The firmware/software only renders a segment when it is **active**.  
-
-A segment becomes active on receipt of a `text` command and inactive on `clear`.  **Requirements:**
-
-A `config` command updates geometry only -- it does not activate the segment.  - Raspberry Pi Zero 2 W
-
-This means stale segments from a previous layout are automatically hidden when the- PoE HAT (802.3af) for wired Ethernet and power
-
-layout changes, as long as the Q-SYS plugin sends `clear` for unused segments.- 64Ã—32 HUB75 LED matrix panel
-
-
-
----**Install:**
-
-```bash
-
-## Hardware Targetsgit clone https://github.com/DHPKE/QSYS-LED-Matrix.git
-
-cd QSYS-LED-Matrix/rpi
-
-### 1. ESP32 Dev Module (`src/`)bash install.sh
-
+### Text command
+```json
+{"cmd":"text","seg":0,"text":"Hello World","color":"FFFFFF","bgcolor":"000000",
+ "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
 ```
 
-**What you need**
-
-The install script:
-
-- ESP32 Dev Module (38-pin or 30-pin)1. Blacklists `snd_bcm2835` (conflicts with LED matrix PWM)
-
-- LAN8720 Ethernet breakout (wired Ethernet) *or* WiFi (configure SSID in `config.h`)2. Installs all dependencies
-
-- 64x32 HUB75 LED matrix panel3. Clones and builds `rpi-rgb-led-matrix` from source
-
-- External 5V / 4A+ PSU for the matrix (never power from the ESP32 pin)4. Copies app to `/opt/led-matrix`
-
-5. Installs and starts the `led-matrix` systemd service
-
-**ESP32 HUB75 pin assignment** (`src/config.h`)
-
-**HUB75 Pinout** â€” BCM GPIO "regular" mapping:
-
-| HUB75 signal | ESP32 GPIO |
-
-| --- | --- || Signal | BCM GPIO | Physical Pin |
-
-| R1 | GPIO 2 ||---|---|---|
-
-| G1 | GPIO 15 || R1 | 5 | 29 |
-
-| B1 | GPIO 4 || G1 | 13 | 33 |
-
-| R2 | GPIO 16 || B1 | 6 | 31 |
-
-| G2 | GPIO 12 || R2 | 12 | 32 |
-
-| B2 | GPIO 14 || G2 | 16 | 36 |
-
-| A  | GPIO 33 || B2 | 23 | 16 |
-
-| B  | GPIO 13 || A  | 22 | 15 |
-
-| LAT | GPIO 32 || B  | 26 | 37 |
-
-| C, D, OE, CLK | see `config.h` || C  | 27 | 13 |
-
-| D  | 20 | 38 |
-
-**Build and flash (PlatformIO)**| CLK | 17 | 11 |
-
-| LAT | 4  | 7  |
-
-```bash| OE  | 18 | 12 |
-
-# From the repository root:
-
-pio run --target upload --upload-port COM4---
-
+Or use integer IDs for more compact commands:
+```json
+{"cmd":"text","seg":0,"text":"ONLINE","color":1,"bgcolor":14,"font":1,"effect":0}
 ```
 
-### RADXA Rock Pi S (`rockpis/`)
+### Layout presets
+```json
+{"cmd":"layout","preset":1}
+```
 
-Or use the VS Code PlatformIO extension (click the upload arrow in the status bar).
+**Available presets:**
+- `1` = Fullscreen (seg0: 64×32)
+- `2` = Split Horizontal (seg0: top 64×16, seg1: bottom 64×16)
+- `3` = Split Vertical (seg0: left 32×32, seg1: right 32×32)
+- `4` = Quad (2×2 grid, 32×16 each)
+- `5` = Thirds (3 columns approx. 21×32 each)
+- `6` = Triple (seg0: left 32×32, seg1/2: right quarters 32×16)
+- `11-14` = Single segment fullscreen (activates only seg 0-3)
+
+### Other commands
+```json
+{"cmd":"clear","seg":0}
+{"cmd":"clear_all"}
+{"cmd":"brightness","value":200}
+{"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":32}
+```
+
+### Parameter reference
+
+| Field | Valid values |
+|---|---|
+| `seg` | 0–3 |
+| `color` / `bgcolor` | Hex: `RRGGBB` (no `#`) OR Integer: 1–14 |
+| `font` | String: `arial`, `verdana`, `impact` OR Integer: 1–3 |
+| `size` | `auto`, `8`, `12`, `16`, `24`, `32` |
+| `align` | `L` (left), `C` (center), `R` (right) |
+| `effect` | String: `none`, `scroll`, `blink`, `fade` OR Integer: 0–3 |
+| `intensity` | 0–255 |
+
+**Integer Enums:**
+
+| Colors (1–14) | | | |
+|---|---|---|---|
+| 1=White | 2=Red | 3=Lime | 4=Blue |
+| 5=Yellow | 6=Magenta | 7=Cyan | 8=Orange |
+| 9=Purple | 10=Gold | 11=Grey | 12=Black |
+| 13=Grey | 14=Black | | |
+
+| Fonts (1–3) | Effects (0–3) |
+|---|---|
+| 1=Arial (Bold) | 0=None |
+| 2=Verdana | 1=Scroll |
+| 3=Impact | 2=Blink |
+| | 3=Fade |
+
+---
+
+## 🛠️ Hardware Setup
+
+## WT32-ETH01 (ESP32) — `src/`
+
+> **⚠️ IMPORTANT - Library Compatibility Issue**  
+> The current library versions (AsyncTCP/ESPAsyncWebServer) are not compatible with Arduino-ESP32 framework 2.0+/3.0+. Until this is resolved:
+> - **Workaround**: Use `platform = espressif32@3.5.0` in platformio.ini (Arduino framework 1.0.6)
+> - **Alternative**: Use the Raspberry Pi or Rock Pi S implementations which work perfectly
+> - Issue tracked: [GitHub Issue Link TBD]
 
 **Requirements:**
+- WT32-ETH01 board (ESP32 + LAN8720 Ethernet PHY)
+- 64×32 HUB75 LED matrix panel
+- External 5V / 4A+ power supply for matrix
 
-**Monitor serial output**- RADXA Rock Pi S (RK3308)
-
-- 64Ã—32 HUB75 LED matrix panel
-
-```bash- Armbian OS (Bookworm / Jammy recommended)
-
-pio device monitor --port COM4 --baud 115200
-
-```**Install:**
-
+**Build & Flash (PlatformIO):**
 ```bash
+pio run --target upload --upload-port COM3
+```
+Or use the VS Code PlatformIO extension.
 
-The IP address is printed to serial on boot. Access the web UI at `http://<IP>/`.git clone https://github.com/DHPKE/QSYS-LED-Matrix.git
-
-cd QSYS-LED-Matrix/rockpis
-
----bash install.sh
-
+**Monitor serial output:**
+```bash
+pio device monitor --port COM3 --baud 115200
 ```
 
-### 2. Raspberry Pi Zero 2 W (`rpi/`)
+**Pin Assignment** — See [docs/PINOUT.md](docs/PINOUT.md) for full details.
+
+**Key configuration** ([src/config.h](src/config.h)):
+```cpp
+#define FALLBACK_IP      "10.10.10.99"   // Used when DHCP times out (15s)
+#define FALLBACK_GW      "10.10.10.1"
+#define FALLBACK_SUBNET  "255.255.255.0"
+```
+
+**Web UI:** `http://<IP>/` (port 80)
+
+---
+
+### Raspberry Pi Zero 2 W — `rpi/`
+
+**Requirements:**
+- Raspberry Pi Zero 2 W
+- PoE HAT (802.3af) for wired Ethernet and power
+- 64×32 HUB75 LED matrix panel
+- Raspberry Pi OS Bookworm (64-bit recommended)
+
+**Install:**
+```bash
+git clone https://github.com/DHPKE/QSYS-LED-Matrix.git
+cd QSYS-LED-Matrix/rpi
+bash install.sh
+```
+
+The install script:
+1. Blacklists `snd_bcm2835` (conflicts with LED matrix PWM)
+2. Installs all dependencies
+3. Clones and builds `rpi-rgb-led-matrix` from source
+4. Copies app to `/opt/led-matrix`
+5. Installs and starts the `led-matrix` systemd service
+
+**Check service status:**
+```bash
+sudo systemctl status led-matrix
+sudo journalctl -u led-matrix -f
+```
+
+**HUB75 Pinout** — BCM GPIO "regular" mapping:
+
+| Signal | BCM GPIO | Physical Pin |
+|---|---|---|
+| R1  | 5  | 29 |
+| G1  | 13 | 33 |
+| B1  | 6  | 31 |
+| R2  | 12 | 32 |
+| G2  | 16 | 36 |
+| B2  | 23 | 16 |
+| A   | 22 | 15 |
+| B   | 26 | 37 |
+| C   | 27 | 13 |
+| D   | 20 | 38 |
+| CLK | 17 | 11 |
+| LAT | 4  | 7  |
+| OE  | 18 | 12 |
+
+> **PoE HAT fan warning:** Some PoE HATs use GPIO 4 (LAT) or GPIO 26 (B) for their cooling fan. Check your HAT datasheet and adjust the wiring / `config.py` if there is a conflict.
+
+**Web UI:** `http://<Pi-IP>:8080/`
+
+---
+
+### RADXA Rock Pi S — `rockpis/`
+
+**Requirements:**
+- RADXA Rock Pi S (RK3308 SoC)
+- 64×32 HUB75 LED matrix panel
+- Armbian OS (Bookworm / Jammy recommended)
+
+**Install:**
+```bash
+git clone https://github.com/DHPKE/QSYS-LED-Matrix.git
+cd QSYS-LED-Matrix/rockpis
+bash install.sh
+```
 
 The install script patches the `rpi-rgb-led-matrix` hardware mapping for the RK3308 GPIO layout and disables the UART0 serial console (those pins are needed for HUB75 address lines).
 
-**What you need**
+See [rockpis/README.md](rockpis/README.md) for full wiring and GPIO details.
 
-See [`rockpis/README.md`](rockpis/README.md) for full wiring and GPIO details.
-
-- Raspberry Pi Zero 2 W
-
-- PoE HAT (802.3af/at) -- provides both wired Ethernet and 5V power---
-
-- 64x32 HUB75 LED matrix panel
-
-- Raspberry Pi OS Bookworm (64-bit recommended)## ðŸŽ›ï¸ Q-SYS Plugin
-
-
-
-**HUB75 wiring** -- BCM GPIO "regular" mapping (rpi-rgb-led-matrix defaults)File: `qsys-plugin/LEDMatrix_Complete.qplug`
-
-
-
-| HUB75 signal | BCM GPIO | Physical pin |**Install in Q-SYS Designer:**
-
-| --- | --- | --- |1. Copy the `.qplug` file to your Q-SYS plugin folder
-
-| R1  | 5  | 29 |2. Drag the plugin from the Plugins library onto your schematic
-
-| G1  | 13 | 33 |3. Set the **IP Address** and **UDP Port** (21324) in the plugin properties
-
-| B1  | 6  | 31 |4. Use the **Apply Layout** button to set the segment layout before sending text
-
-| R2  | 12 | 32 |
-
-| G2  | 16 | 36 |**Layouts available:** Fullscreen, Split Vertical, Split Horizontal, Quad
-
-| B2  | 23 | 16 |
-
-| A   | 22 | 15 |---
-
-| B   | 26 | 37 |
-
-| C   | 27 | 13 |## ðŸ“ Project Structure
-
-| D   | 20 | 38 |
-
-| CLK | 17 | 11 |```
-
-| LAT | 4  | 7  |QSYS-LED-Matrix/
-
-| OE  | 18 | 12 |â”œâ”€â”€ src/                    # ESP32 firmware (PlatformIO)
-
-| GND | -- | 6 / 9 / 14 / 20 / 25 |â”‚   â”œâ”€â”€ main.cpp
-
-â”‚   â”œâ”€â”€ config.h
-
-> **PoE HAT fan warning:** Some PoE HATs use GPIO 4 (LAT) or GPIO 26 (B) forâ”‚   â”œâ”€â”€ segment_manager.h
-
-> their cooling fan. Check your HAT datasheet and adjust the wiring / `config.py`â”‚   â”œâ”€â”€ text_renderer.h
-
-> if there is a conflict.â”‚   â””â”€â”€ udp_handler.h
-
-â”œâ”€â”€ rpi/                    # Raspberry Pi Zero 2 W port
-
-**Install**â”‚   â”œâ”€â”€ main.py
-
-â”‚   â”œâ”€â”€ config.py
-
-```bashâ”‚   â”œâ”€â”€ segment_manager.py
-
-git clone https://github.com/DHPKE/QSYS-LED-Matrix.gitâ”‚   â”œâ”€â”€ text_renderer.py
-
-cd QSYS-LED-Matrix/rpiâ”‚   â”œâ”€â”€ udp_handler.py
-
-bash install.shâ”‚   â”œâ”€â”€ web_server.py
-
-```â”‚   â”œâ”€â”€ led-matrix.service
-
-â”‚   â””â”€â”€ install.sh
-
-The script will:â”œâ”€â”€ rockpis/                # RADXA Rock Pi S port
-
-â”‚   â”œâ”€â”€ main.py
-
-1. Blacklist `snd_bcm2835` (on-board audio conflicts with the LED matrix PWM hardware)â”‚   â”œâ”€â”€ config.py
-
-2. Install system packages and build toolsâ”‚   â”œâ”€â”€ segment_manager.py
-
-3. Clone and build `rpi-rgb-led-matrix` from sourceâ”‚   â”œâ”€â”€ text_renderer.py
-
-4. Install the Python bindingsâ”‚   â”œâ”€â”€ udp_handler.py
-
-5. Copy app files to `/opt/led-matrix/`â”‚   â”œâ”€â”€ web_server.py
-
-6. Install and start the `led-matrix` systemd serviceâ”‚   â”œâ”€â”€ led-matrix.service
-
-â”‚   â”œâ”€â”€ install.sh
-
-**Check service status**â”‚   â””â”€â”€ README.md
-
-â”œâ”€â”€ qsys-plugin/
-
-```bashâ”‚   â””â”€â”€ LEDMatrix_Complete.qplug
-
-sudo systemctl status led-matrixâ”œâ”€â”€ docs/
-
-sudo journalctl -u led-matrix -fâ”‚   â”œâ”€â”€ PINOUT.md
-
-```â”‚   â”œâ”€â”€ UDP_PROTOCOL.md
-
-â”‚   â”œâ”€â”€ QSYS_INTEGRATION.md
-
-Web UI is available at `http://<Pi-IP>:8080/`.â”‚   â””â”€â”€ HARDWARE_SETUP.md
-
-â”œâ”€â”€ examples/               # Test scripts (Python, Node.js, bash)
-
-**Key config options** (`rpi/config.py`)â”œâ”€â”€ archive/                # Superseded docs
-
-â”œâ”€â”€ platformio.ini
-
-| Setting | Default | Description |â””â”€â”€ README.md
-
-| --- | --- | --- |```
-
-| `MATRIX_WIDTH` | 64 | Panel width in pixels |
-
-| `MATRIX_HEIGHT` | 32 | Panel height in pixels |---
-
-| `MATRIX_GPIO_SLOWDOWN` | 1 | 0 = fastest, 4 = slowest/most stable |
-
-| `MATRIX_BRIGHTNESS` | 50 | 0-100% |## ðŸ› Troubleshooting
-
-| `MATRIX_PWM_BITS` | 8 | 1-11; higher = more colour depth |
-
-| `UDP_PORT` | 21324 | UDP listen port |### Matrix doesn't light up
-
-| `WEB_PORT` | 8080 | Web UI port |- Verify external 5V power supply is connected (never power from the controller board)
-
-- Check HUB75 ribbon cable orientation
-
----- Confirm GPIO pin assignments in `config.h` / `config.py`
-
-
-
-### 3. RADXA Rock Pi S (`rockpis/`)### UDP commands not received
-
-- Check firewall on the host / Q-SYS core
-
-**What you need**- Verify IP address and port 21324
-
-- Watch logs: `sudo journalctl -u led-matrix -f` (Pi/Rock Pi S)
-
-- RADXA Rock Pi S (RK3308 SoC, built-in 100M Ethernet)- Watch serial output (ESP32): `pio device monitor --port COM4 --baud 115200`
-
-- 64x32 HUB75 LED matrix panel
-
-- Armbian OS (Bookworm or Jammy)### RPi service crash-loop (`snd_bcm2835` error)
-
-- Run `sudo bash install.sh` to apply the blacklist, or manually:
-
-**Install**  ```bash
-
-  echo "blacklist snd_bcm2835" | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf
-
-```bash  sudo reboot
-
-git clone https://github.com/DHPKE/QSYS-LED-Matrix.git  ```
-
-cd QSYS-LED-Matrix/rockpis
-
-bash install.sh### Text on wrong segment / ghost segments after layout change
-
-```- Always press **Apply Layout** in the Q-SYS plugin before sending text
-
-- The plugin only auto-sends to segments that belong to the active layout
-
-The script will:
+**Web UI:** `http://<Rock-Pi-IP>:8080/`
 
 ---
 
-1. Detect hardware and Armbian version
+## 🎛️ Q-SYS Plugin
 
-2. Install system packages and build tools## ðŸ“ License
+**Current versions:**
+- `WT32_LEDMatrix_v4.qplug` — Latest version with integer protocol support
+- `LEDMatrix_v3.qplug` — Alternative version
+- `LEDMatrix_Complete.qplug` — Legacy version
 
-3. Clone `rpi-rgb-led-matrix` and patch in the Rock Pi S GPIO hardware mapping
-
-4. Build the library and Python bindingsSee [LICENSE](LICENSE) for details.
-
-5. Disable the UART0 serial console (pins 8 and 10 are needed for HUB75 address lines)
-
-6. Copy app files to `/opt/led-matrix/`## ðŸ“ž Support
-
-7. Install and start the `led-matrix` systemd service
-
-- GitHub Issues: [github.com/DHPKE/QSYS-LED-Matrix/issues](https://github.com/DHPKE/QSYS-LED-Matrix/issues)
-
-See [`rockpis/README.md`](rockpis/README.md) for the full GPIO wiring table and
-RK3308 GPIO numbering details.
-
----
-
-## Q-SYS Plugin
-
-File: `qsys-plugin/LEDMatrix_Complete.qplug`
-
-**Install in Q-SYS Designer**
-
-1. Copy `LEDMatrix_Complete.qplug` to your Q-SYS Plugins folder
+**Install in Q-SYS Designer:**
+1. Copy the `.qplug` file to your Q-SYS plugin folder  
    (typically `%USERPROFILE%\Documents\QSC\Q-SYS Designer\Plugins`)
-2. In Q-SYS Designer, drag the **LED Matrix Complete** block onto your schematic
-3. Set **IP Address** and **UDP Port** (21324) in the component properties
-4. In the Q-SYS UCI / control page:
-   - Select a **Layout Preset** (Fullscreen / Split Vertical / Split Horizontal / Quad)
-   - Press **Apply Layout** -- this configures segment geometry and clears inactive segments
-   - Type text into the segment **Text** fields; press **Display** or let auto-send fire
+2. Drag the plugin from the Plugins library onto your schematic
+3. Set the **IP Address** and **UDP Port** (21324) in the plugin properties
+4. Use the **Layout** dropdown to select a preset (Fullscreen, Split, Quad, etc.)
+5. Type text into segment fields — changes auto-send after 400ms
 
-**Plugin controls per segment**
+**Plugin controls per segment:**
+- Text content
+- Text Color (ComboBox: 1–White … 14–Black)
+- Background Color
+- Font (ComboBox: 1–Arial … 3–Impact)
+- Alignment (L / C / R)
+- Effect (0–None … 3–Fade)
+- Display button (manual send)
+- Clear button (deactivate segment)
+- Invert button (swap color ↔ bgcolor)
 
-| Control | Description |
-| --- | --- |
-| Text | Content to display |
-| Text Color | Foreground colour (named colour list) |
-| BG Color | Background colour |
-| Font | arial / verdana / digital / mono |
-| Size | auto or fixed pixel size |
-| Align | Left / Center / Right |
-| Effect | none / scroll / blink / fade / rainbow |
-| Intensity | 0-255 brightness multiplier |
-| Display | Send the text command immediately |
-| Clear | Deactivate this segment |
-
-**Global controls:** Brightness fader, Clear All button, Connection Status indicator.
+**Global controls:**
+- Layout preset selector
+- Brightness (0-255)
+- Clear All button
+- Connection status indicator
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 QSYS-LED-Matrix/
-|
-+-- src/                    ESP32 firmware (C++, PlatformIO)
-|   +-- main.cpp
-|   +-- config.h            Pin assignments, network config
-|   +-- segment_manager.h   Segment state management
-|   +-- text_renderer.h     HUB75 text rendering
-|   +-- udp_handler.h       JSON UDP command dispatch
-|   +-- fonts.h             Embedded font data
-|
-+-- rpi/                    Raspberry Pi Zero 2 W port (Python 3)
-|   +-- main.py
-|   +-- config.py           All hardware/network constants
-|   +-- segment_manager.py
-|   +-- text_renderer.py
-|   +-- udp_handler.py
-|   +-- web_server.py
-|   +-- led-matrix.service  systemd unit
-|   +-- install.sh          One-shot install script
-|
-+-- rockpis/                RADXA Rock Pi S port (Python 3)
-|   +-- main.py
-|   +-- config.py
-|   +-- segment_manager.py
-|   +-- text_renderer.py
-|   +-- udp_handler.py
-|   +-- web_server.py
-|   +-- led-matrix.service
-|   +-- install.sh
-|   +-- README.md           Rock Pi S specific wiring + GPIO table
-|
-+-- qsys-plugin/
-|   +-- LEDMatrix_Complete.qplug    Main plugin (use this)
-|   +-- led_matrix_controller.lua   Legacy standalone Lua script
-|
-+-- docs/
-|   +-- PINOUT.md
-|   +-- UDP_PROTOCOL.md
-|   +-- HARDWARE_SETUP.md
-|   +-- QSYS_INTEGRATION.md
-|
-+-- examples/               Test scripts (Python, Node.js, bash)
-+-- arduino/                Legacy Arduino IDE sketch (reference only)
-+-- archive/                Superseded documentation
-+-- platformio.ini
-+-- README.md               This file
+├── src/                    # WT32-ETH01 firmware (PlatformIO)
+│   ├── main.cpp
+│   ├── config.h            # Pin assignments, network config
+│   ├── segment_manager.h   # Segment state management
+│   ├── text_renderer.h     # HUB75 text rendering
+│   ├── udp_handler.h       # JSON UDP command dispatch
+│   └── fonts.h             # Embedded font data
+├── rpi/                    # Raspberry Pi Zero 2 W port (Python)
+│   ├── main.py
+│   ├── config.py
+│   ├── segment_manager.py
+│   ├── text_renderer.py
+│   ├── udp_handler.py
+│   ├── web_server.py
+│   ├── led-matrix.service
+│   └── install.sh
+├── rockpis/                # RADXA Rock Pi S port (Python)
+│   ├── main.py
+│   ├── config.py
+│   ├── segment_manager.py
+│   ├── text_renderer.py
+│   ├── udp_handler.py
+│   ├── web_server.py
+│   ├── led-matrix.service
+│   ├── install.sh
+│   └── README.md
+├── qsys-plugin/
+│   ├── WT32_LEDMatrix_v4.qplug      # Latest recommended
+│   ├── LEDMatrix_v3.qplug
+│   └── LEDMatrix_Complete.qplug     # Legacy
+├── docs/
+│   ├── PINOUT.md
+│   ├── UDP_PROTOCOL.md
+│   ├── QSYS_INTEGRATION.md
+│   └── HARDWARE_SETUP.md
+├── examples/               # Test scripts (Python, Node.js, bash)
+├── archive/                # Superseded documentation
+├── platformio.ini
+└── README.md
 ```
 
 ---
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
-### Matrix does not light up
+### ESP32 firmware won't compile (AsyncTCP errors)
+**Issue**: Compilation fails with IPAddress conversion errors in AsyncTCP/ESPAsyncWebServer libraries.
 
-- Use an **external 5V / 4A+ PSU** for the matrix -- never draw power from the controller board
-- Check HUB75 ribbon cable direction (pin 1 marking)
-- Verify GPIO/pin assignments match your wiring in `config.h` (ESP32) or `config.py` (Pi/Rock Pi S)
+**Cause**: Current AsyncTCP library versions are incompatible with Arduino-ESP32 framework 2.0+ and 3.0+.
 
-### No UDP packets received
+**Solutions**:
+1. **Use older framework** (temporary workaround):
+   ```ini
+   # In platformio.ini
+   platform = espressif32@3.5.0
+   ```
+   
+2. **Use Raspberry Pi or Rock Pi S implementations** - These work perfectly and don't have this issue
 
-- Confirm the device IP and port 21324 are correct in the Q-SYS plugin properties
-- Check any firewalls between the Q-SYS Core and the display controller
-- ESP32: watch serial -- `pio device monitor --port COM4 --baud 115200`
-- Pi / Rock Pi S: `sudo journalctl -u led-matrix -f`
+3. **Wait for library updates** - Monitor https://github.com/esp32async/AsyncTCP for compatibility updates
 
-### RPi service crash-loop with "snd_bcm2835" message
+### Matrix doesn't light up
+- Verify external 5V power supply is connected (never power from the controller board)
+- Check HUB75 ribbon cable orientation (pin 1 marking)
+- Confirm GPIO pin assignments in `config.h` (ESP32) or `config.py` (Pi/Rock Pi S)
+- ESP32: Remove `-DNO_DISPLAY` flag from `platformio.ini` build_flags
 
-The on-board audio driver conflicts with the LED matrix PWM hardware.
-The `install.sh` script blacklists it automatically.  To fix manually:
+### UDP commands not received
+- Check firewall on the host network / Q-SYS core
+- Verify IP address and port 21324
+- Watch logs:
+  - ESP32: `pio device monitor --port COM3 --baud 115200`
+  - Pi/Rock Pi S: `sudo journalctl -u led-matrix -f`
 
+### RPi service crash-loop (`snd_bcm2835` error)
+The on-board audio driver conflicts with the LED matrix PWM hardware. The `install.sh` script blacklists it automatically. To fix manually:
 ```bash
 echo "blacklist snd_bcm2835" | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf
 sudo reboot
 ```
 
-### Ghost text / wrong segment visible after layout change
-
-Always press **Apply Layout** in the Q-SYS plugin after selecting a new layout.
-This sends `config` + `clear` commands to reset inactive segments before new text arrives.
+### Text on wrong segment / ghost segments after layout change
+- Always apply the layout preset before sending text
+- The Q-SYS plugin auto-sends layout changes when you select a new preset from the dropdown
+- Previous segment data is cleared when layout changes
 
 ### Web UI not reachable
+- WT32-ETH01: `http://<IP>/` (port 80)
+- Pi / Rock Pi S: `http://<IP>:8080/` (port 8080)
+- Check if device obtained IP (ESP32: watch serial output, Pi: `ip addr`)
+- WT32-ETH01: If DHCP fails, device uses fallback IP (default: 10.10.10.99)
 
-- ESP32: port 80, `http://<IP>/`
-- Pi / Rock Pi S: port 8080, `http://<IP>:8080/`
+### IP address not displayed on boot (WT32-ETH01)
+- IP splash displays for 15 seconds or until first UDP command
+- Check if NO_DISPLAY flag is set in platformio.ini (remove it once panel is connected)
+- Verify matrix is powered and HUB75 cable is connected
 
 ---
 
-## License
+## 🚀 Quick Start Example
+
+1. Flash WT32-ETH01 firmware:
+   ```bash
+   pio run --target upload --upload-port COM3
+   ```
+
+2. Connect to device serial to see IP address:
+   ```bash
+   pio device monitor --port COM3 --baud 115200
+   ```
+
+3. Install Q-SYS plugin (copy `.qplug` to plugins folder)
+
+4. In Q-SYS Designer:
+   - Add plugin to schematic
+   - Set IP address from serial output
+   - Select "1 – Fullscreen" layout
+   - Type "HELLO WORLD" in Segment 1 text field
+   - Auto-send triggers after 400ms
+
+5. Test from command line:
+   ```bash
+   echo '{"cmd":"text","seg":0,"text":"TEST","color":1,"bgcolor":14}' | nc -u <IP> 21324
+   ```
+
+---
+
+## 📜 License
 
 See [LICENSE](LICENSE) for details.
 
-## Support
+## 📞 Support
 
-GitHub Issues: https://github.com/DHPKE/QSYS-LED-Matrix/issues
+- GitHub Issues: [github.com/DHPKE/QSYS-LED-Matrix/issues](https://github.com/DHPKE/QSYS-LED-Matrix/issues)
+- Documentation: See `/docs` folder for detailed guides
+
+---
+
+**Version:** 2.0.0  
+**Last Updated:** 2026-02-20

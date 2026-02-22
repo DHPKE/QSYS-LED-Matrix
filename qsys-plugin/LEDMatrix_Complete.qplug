@@ -20,9 +20,9 @@
 --   6 = Triple                  (seg0: left / seg1: top-right / seg2: bottom-right)
 --   11-14 = Single segment fullscreen (seg0-3 respectively)
 --
--- Color IDs (1-14):
+-- Color IDs (1-12):
 --   1=White  2=Red  3=Lime  4=Blue  5=Yellow  6=Magenta  7=Cyan
---   8=Orange 9=Purple 10=Pink 11=Gold 12=Silver 13=Grey 14=Black
+--   8=Orange 9=Purple 10=Gold 11=Grey 12=Black
 --
 -- Font IDs: 1=Arial  2=Verdana  3=Impact
 -- Effect IDs: 0=None  1=Scroll  2=Blink  3=Fade
@@ -185,8 +185,8 @@ if Controls then
     local ColorId = {
         ["White"]=1,  ["Red"]=2,    ["Lime"]=3,   ["Blue"]=4,
         ["Yellow"]=5, ["Magenta"]=6,["Cyan"]=7,   ["Orange"]=8,
-        ["Purple"]=9, ["Pink"]=10,  ["Gold"]=11,  ["Silver"]=12,
-        ["Grey"]=13,  ["Gray"]=13,  ["Black"]=14, ["Green"]=3
+        ["Purple"]=9, ["Gold"]=10,  ["Grey"]=11,  ["Gray"]=11,
+        ["Black"]=12, ["Green"]=3
     }
     local FontId = {
         ["FreeSans Bold"]=1,   ["Arial (Bold)"]=1, ["Arial"]=1, ["Bold"]=1,
@@ -366,7 +366,7 @@ if Controls then
         }
         Controls.layout.String = "1 - Fullscreen"
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
-                                "Orange","Purple","Pink","Gold","Silver","Grey","Black"}
+                                "Orange","Purple","Gold","Grey","Black"}
         local fontChoices   = {"Arial","Verdana","Impact"}
         local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}

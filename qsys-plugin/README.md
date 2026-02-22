@@ -121,7 +121,7 @@ All 52 pins are organized into groups in the Control Pins window:
 ## 🎨 Available Options
 
 ### Colors
-White, Red, Lime, Blue, Yellow, Magenta, Cyan, Orange, Purple, Green, Pink, Gold, Silver, Gray, Black
+White, Red, Lime, Blue, Yellow, Magenta, Cyan, Orange, Purple, Green, Gold, Gray, Black
 
 ### Fonts
 - Arial (default)

@@ -244,8 +244,8 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 const COLORS = [
   ['#FFFFFF','White'],['#FF0000','Red'],['#00FF00','Lime'],['#0000FF','Blue'],
   ['#FFFF00','Yellow'],['#FF00FF','Magenta'],['#00FFFF','Cyan'],['#FFA500','Orange'],
-  ['#800080','Purple'],['#008000','Green'],['#FFC0CB','Pink'],['#FFD700','Gold'],
-  ['#C0C0C0','Silver'],['#808080','Gray'],['#000000','Black']
+  ['#800080','Purple'],['#008000','Green'],['#FFD700','Gold'],
+  ['#808080','Gray'],['#000000','Black']
 ];
 const DEFAULT_FG = ['#FFFFFF','#00FF00','#FF0000','#FFFF00'];
 const canvas = document.getElementById('preview');

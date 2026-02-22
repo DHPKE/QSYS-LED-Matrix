@@ -84,12 +84,12 @@ function GetControls(props)
             Choices = {
                 "1 – White","2 – Red","3 – Lime","4 – Blue","5 – Yellow",
                 "6 – Magenta","7 – Cyan","8 – Orange","9 – Purple",
-                "10 – Pink","11 – Gold","12 – Silver","13 – Grey","14 – Black"
+                "10 – Gold","11 – Grey","12 – Black"
             },
             Count=1, UserPin=true, PinStyle="Input"
         })
 
-        -- Background color (integer 1-14)
+        -- Background color (integer 1-12)
         table.insert(ctrls, {
             Name = string.format("bgcolor_%d", s),
             ControlType = "Text",
@@ -97,7 +97,7 @@ function GetControls(props)
             Choices = {
                 "1 – White","2 – Red","3 – Lime","4 – Blue","5 – Yellow",
                 "6 – Magenta","7 – Cyan","8 – Orange","9 – Purple",
-                "10 – Pink","11 – Gold","12 – Silver","13 – Grey","14 – Black"
+                "10 – Gold","11 – Grey","12 – Black"
             },
             Count=1, UserPin=true, PinStyle="Input"
         })

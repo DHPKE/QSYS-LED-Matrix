@@ -24,7 +24,7 @@
 //   {"cmd":"config","seg":0,"x":0,"y":0,"w":64,"h":32}
 //
 // ── Integer enums ────────────────────────────────────────────────────────────
-//   Colors 1-14: white red lime blue yellow magenta cyan orange purple pink gold silver grey black
+//   Colors 1-12: white red lime blue yellow magenta cyan orange purple gold grey black
 //   Fonts  1-3 : Arial Verdana Impact
 //   Effects 0-3: none scroll blink fade
 //   Align  l/c/r
@@ -56,11 +56,9 @@ static uint16_t colorIdTo565(int id) {
         case  7: return rgb888to565(0x00FFFF); // cyan
         case  8: return rgb888to565(0xFF8000); // orange
         case  9: return rgb888to565(0x800080); // purple
-        case 10: return rgb888to565(0xFF69B4); // pink
-        case 11: return rgb888to565(0xFFD700); // gold
-        case 12: return rgb888to565(0xC0C0C0); // silver
-        case 13: return rgb888to565(0x808080); // grey
-        case 14: return rgb888to565(0x000000); // black
+        case 10: return rgb888to565(0xFFD700); // gold
+        case 11: return rgb888to565(0x808080); // grey
+        case 12: return rgb888to565(0x000000); // black
         default: return rgb888to565(0xFFFFFF);
     }
 }

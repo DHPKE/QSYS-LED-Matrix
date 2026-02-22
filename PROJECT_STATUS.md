@@ -93,7 +93,7 @@ upload_speed             = 921600
 | 11-14 | Single-seg fullscreen | seg(N-11) covers full panel |
 
 **Colors (1–14)**
-`1=White 2=Red 3=Lime 4=Blue 5=Yellow 6=Magenta 7=Cyan 8=Orange 9=Purple 10=Pink 11=Gold 12=Silver 13=Grey 14=Black`
+`1=White 2=Red 3=Lime 4=Blue 5=Yellow 6=Magenta 7=Cyan 8=Orange 9=Purple 10=Gold 11=Grey 12=Black`
 
 **Fonts (1–3)**
 `1=Arial(FreeSansBold)  2=Verdana(FreeSans)  3=Impact(FreeMonoBold)`
