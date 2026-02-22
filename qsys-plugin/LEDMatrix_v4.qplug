@@ -45,6 +45,7 @@ function GetControls(props)
     -- Connection
     table.insert(controls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
     table.insert(controls, { Name="udp_port",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="reconnect",         ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input"  })
     table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
     table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
 
@@ -136,12 +137,13 @@ function GetControlLayout(props)
     GBox(0, y, W, 54, "Connection")
     Lbl("IP Address",    6,   y+5, 124)
     Lbl("Port",        138,   y+5,  62)
-    Lbl("Status",      208,   y+5,  62)
-    Lbl("Last Command",278,   y+5, W-284)
-    layout["ip_address"]        = { PrettyName="Conn~IP",      Style="Text",      Position={6,   y+18}, Size={124,   CH} }
-    layout["udp_port"]          = { PrettyName="Conn~Port",    Style="Text",      Position={138, y+18}, Size={62,    CH} }
-    layout["connection_status"] = { PrettyName="Conn~Status",  Style="Indicator", Position={208, y+18}, Size={62,    CH} }
-    layout["last_command"]      = { PrettyName="Conn~LastCmd", Style="Text",      Position={278, y+18}, Size={W-284, CH} }
+    Lbl("Status",      278,   y+5,  62)
+    Lbl("Last Command",348,   y+5, W-354)
+    layout["ip_address"]        = { PrettyName="Conn~IP",       Style="Text",      Position={6,   y+18}, Size={124,   CH} }
+    layout["udp_port"]          = { PrettyName="Conn~Port",     Style="Text",      Position={138, y+18}, Size={62,    CH} }
+    layout["reconnect"]         = { PrettyName="Conn~Reconnect", Style="Button",   ButtonStyle="Trigger", Legend="Reconnect", Color=C_BTN_B, Position={208, y+18}, Size={62, BH} }
+    layout["connection_status"] = { PrettyName="Conn~Status",   Style="Indicator", Position={278, y+18}, Size={62,    CH} }
+    layout["last_command"]      = { PrettyName="Conn~LastCmd",  Style="Text",      Position={348, y+18}, Size={W-354, CH} }
 
     -- ── Display Layout ──────────────────────────────────────────────
     -- Layout:
@@ -152,6 +154,7 @@ function GetControlLayout(props)
     --   y+96 : "Layout Preset" label (12 px)
     --   y+110: ComboBox + Apply button (24 px)
     --   Total inner height = 110+24+8 = 142  →  GBox height = 148
+    --   Bottom margin: +12px for better spacing
     --
     -- 7 thumbnails: TW=62, gap=6  → 7*(62+6)-6 = 470 px  (fits in W=600)
     -- 4 thumbnails: TW=62, gap=6  → 4*(62+6)-6 = 266 px
@@ -288,11 +291,11 @@ function GetControlLayout(props)
     -- ── Segment rows ────────────────────────────────────────────────
     -- Each segment GroupBox contains:
     --   Row 1 at +20: Active LED | Text field | [Display][Invert][Clear] buttons
-    --   Row 2 at +54: 6 ComboBoxes with labels above
-    --   Row 3 at +88: Intensity fader
-    --   GroupBox height = 88 + 22 + 4 = 114
-    y = y + 154
-    local SEG_H = 114
+    --   Row 2 at +58: 6 ComboBoxes with labels above (moved down 4px for spacing)
+    --   Row 3 at +92: Intensity fader (moved down 4px)
+    --   GroupBox height = 92 + 22 + 4 = 118
+    y = y + 166
+    local SEG_H = 118
 
     -- 6 combo columns: widths must sum to W-12 minus 5 gaps of 6px
     -- W=600: W-12=588; 5 gaps=30; net=558
@@ -332,10 +335,10 @@ function GetControlLayout(props)
             Position={W-100, r1}, Size={94, BH} }
 
         -- Row 2: 6 ComboBoxes
-        local r2 = sy + 54
+        local r2 = sy + 58
         local cx = 6
         for _, col in ipairs(comboCols) do
-            Lbl(col[1], cx, r2-13, col[4])
+            Lbl(col[1], cx, r2-15, col[4])
             layout[sn..col[2]] = { PrettyName=grp.."~"..col[3], Style="ComboBox",
                 IsReadOnly=false,
                 Position={cx, r2}, Size={col[4], CH} }
@@ -343,8 +346,8 @@ function GetControlLayout(props)
         end
 
         -- Row 3: Intensity fader
-        local r3 = sy + 88
-        Lbl("Intensity  (0=off  255=full)", 6, r3-13, 260)
+        local r3 = sy + 92
+        Lbl("Intensity  (0=off  255=full)", 6, r3-15, 260)
         layout[sn.."intensity"] = { PrettyName=grp.."~Intensity", Style="Fader",
             Position={6, r3}, Size={W-14, 22} }
     end
@@ -629,6 +632,13 @@ if Controls then
         local num = tonumber(input)
         if num then return math.floor(num) end
         return LayoutNameToKey[input]
+    end
+
+    -- Reconnect button
+    Controls.reconnect.EventHandler = function()
+        print("=== Manual Reconnect Triggered ===")
+        ReopenSocket()
+        Controls.last_command.String = "Reconnected"
     end
 
     -- Apply button
