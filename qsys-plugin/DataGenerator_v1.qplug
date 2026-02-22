@@ -1,0 +1,604 @@
+-- Q-SYS Data Generator Plugin
+-- Version 1.0.0
+-- Generates random strings, integers, floats, displays clock time, and countdown timer
+--
+-- Features:
+--   • Random String Generator (customizable length, character set)
+--   • Random Integer Generator (min/max range)
+--   • Random Float Generator (min/max range, decimal precision)
+--   • Real-time Clock (multiple formats)
+--   • Countdown Timer (adjustable duration, start/pause/reset)
+--
+-- Each function has dedicated outputs, triggers, and controls exposed as pins
+
+PluginInfo = {
+    Name = "PKE~Data Generator",
+    Version = "1.0.0",
+    Id = "dhpke.data.generator.1.0.0",
+    Description = "Multi-function generator: random strings/integers/floats, clock, countdown timer",
+    ShowDebug = true,
+    Author = "DHPKE"
+}
+
+function GetColor(props)
+    return { 102, 102, 102 }
+end
+
+function GetPrettyName(props)
+    return "Data Generator v1.0"
+end
+
+function GetProperties()
+    return {
+        { Name = "Enable All", Type = "boolean", Value = false }
+    }
+end
+
+function GetControls(props)
+    local controls = {}
+    
+    -- Global
+    table.insert(controls, { Name = "enable_all", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "status", ControlType = "Indicator", IndicatorType = "Status", Count = 1, UserPin = true, PinStyle = "Output" })
+    
+    -- Random String Generator
+    table.insert(controls, { Name = "string_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "string_generate", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
+    table.insert(controls, { Name = "string_length", ControlType = "Knob", ControlUnit = "Integer", Min = 1, Max = 100, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "string_charset", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "string_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "string_rate", ControlType = "Knob", ControlUnit = "Float", Min = 0.1, Max = 60, Count = 1, UserPin = true, PinStyle = "Both" })
+    
+    -- Random Integer Generator
+    table.insert(controls, { Name = "int_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "int_generate", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
+    table.insert(controls, { Name = "int_min", ControlType = "Knob", ControlUnit = "Integer", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "int_max", ControlType = "Knob", ControlUnit = "Integer", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "int_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "int_value", ControlType = "Knob", ControlUnit = "Integer", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "int_rate", ControlType = "Knob", ControlUnit = "Float", Min = 0.1, Max = 60, Count = 1, UserPin = true, PinStyle = "Both" })
+    
+    -- Random Float Generator
+    table.insert(controls, { Name = "float_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "float_generate", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
+    table.insert(controls, { Name = "float_min", ControlType = "Knob", ControlUnit = "Float", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "float_max", ControlType = "Knob", ControlUnit = "Float", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "float_decimals", ControlType = "Knob", ControlUnit = "Integer", Min = 0, Max = 10, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "float_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "float_value", ControlType = "Knob", ControlUnit = "Float", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "float_rate", ControlType = "Knob", ControlUnit = "Float", Min = 0.1, Max = 60, Count = 1, UserPin = true, PinStyle = "Both" })
+    
+    -- Clock
+    table.insert(controls, { Name = "clock_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "clock_format", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "clock_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "clock_24h", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    
+    -- Countdown Timer
+    table.insert(controls, { Name = "countdown_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "countdown_start", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
+    table.insert(controls, { Name = "countdown_pause", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "countdown_reset", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
+    table.insert(controls, { Name = "countdown_duration", ControlType = "Knob", ControlUnit = "Integer", Min = 1, Max = 86400, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "countdown_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "countdown_remaining", ControlType = "Knob", ControlUnit = "Integer", Min = 0, Max = 86400, Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "countdown_finished", ControlType = "Indicator", IndicatorType = "Led", Count = 1, UserPin = true, PinStyle = "Output" })
+    
+    return controls
+end
+
+function GetControlLayout(props)
+    local layout   = {}
+    local graphics = {}
+    
+    local W  = 700    -- total plugin width
+    local CH = 24     -- control height
+    local BH = 28     -- button height
+    
+    local C_GRP   = {62,  62,  62}
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55}
+    local C_BTN_B = {45,  105, 195}
+    local C_BTN_O = {200, 110, 0}
+    local C_BTN_R = {165, 38,  38}
+    
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, {
+            Type = "GroupBox", Text = title or "", Fill = C_GRP,
+            StrokeWidth = 1, CornerRadius = 4,
+            Position = {x, y}, Size = {w, h}
+        })
+    end
+    
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, {
+            Type = "Text", Text = text, Font = "Roboto", FontSize = 9,
+            HTextAlign = "Left", Color = C_LBL,
+            Position = {x, y}, Size = {w, 12}
+        })
+    end
+    
+    -- Title bar
+    table.insert(graphics, {
+        Type = "GroupBox", Text = "", Fill = {38,38,38},
+        StrokeWidth = 0, CornerRadius = 5,
+        Position = {0, 0}, Size = {W, 36}
+    })
+    table.insert(graphics, {
+        Type = "Text", Text = "Data Generator  v1.0.0",
+        Font = "Roboto", FontSize = 14, FontStyle = "Bold",
+        HTextAlign = "Center", Color = {255,255,255},
+        Position = {0, 9}, Size = {W, 20}
+    })
+    
+    -- Global Controls
+    local y = 42
+    GBox(0, y, W, 54, "Global")
+    Lbl("Enable All", 6, y+5, 80)
+    Lbl("Status", 100, y+5, 80)
+    layout["enable_all"] = { PrettyName = "Global~EnableAll", Style = "Button", Legend = "Enable All",
+        Color = C_BTN_G, Position = {6, y+18}, Size = {86, BH} }
+    layout["status"] = { PrettyName = "Global~Status", Style = "Indicator",
+        Position = {100, y+18}, Size = {60, CH} }
+    
+    -- Random String Generator
+    y = y + 60
+    GBox(0, y, W, 94, "Random String Generator")
+    Lbl("Enable", 6, y+5, 50)
+    Lbl("Generate", 70, y+5, 60)
+    Lbl("Length", 140, y+5, 60)
+    Lbl("Rate (s)", 210, y+5, 60)
+    Lbl("Character Set", 280, y+5, 100)
+    Lbl("Output", 390, y+5, W-396)
+    
+    layout["string_enable"] = { PrettyName = "String~Enable", Style = "Button", Legend = "On",
+        Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
+    layout["string_generate"] = { PrettyName = "String~Generate", Style = "Button", Legend = "Generate",
+        Color = C_BTN_B, Position = {70, y+18}, Size = {62, BH} }
+    layout["string_length"] = { PrettyName = "String~Length", Style = "Fader",
+        Position = {140, y+18}, Size = {62, 22} }
+    layout["string_rate"] = { PrettyName = "String~Rate", Style = "Fader",
+        Position = {210, y+18}, Size = {62, 22} }
+    layout["string_charset"] = { PrettyName = "String~CharSet", Style = "Text",
+        Position = {280, y+18}, Size = {102, CH} }
+    layout["string_output"] = { PrettyName = "String~Output", Style = "Text",
+        Position = {390, y+18}, Size = {W-396, CH} }
+    
+    Lbl("Length Value", 140, y+48, 80)
+    Lbl("Rate Value", 230, y+48, 80)
+    Lbl("(Auto-generate when enabled)", 280, y+62, 200)
+    
+    -- Random Integer Generator
+    y = y + 100
+    GBox(0, y, W, 94, "Random Integer Generator")
+    Lbl("Enable", 6, y+5, 50)
+    Lbl("Generate", 70, y+5, 60)
+    Lbl("Min Value", 140, y+5, 70)
+    Lbl("Max Value", 220, y+5, 70)
+    Lbl("Rate (s)", 300, y+5, 60)
+    Lbl("Output Text", 370, y+5, 100)
+    Lbl("Output Value", 500, y+5, W-506)
+    
+    layout["int_enable"] = { PrettyName = "Int~Enable", Style = "Button", Legend = "On",
+        Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
+    layout["int_generate"] = { PrettyName = "Int~Generate", Style = "Button", Legend = "Generate",
+        Color = C_BTN_B, Position = {70, y+18}, Size = {62, BH} }
+    layout["int_min"] = { PrettyName = "Int~Min", Style = "Fader",
+        Position = {140, y+18}, Size = {72, 22} }
+    layout["int_max"] = { PrettyName = "Int~Max", Style = "Fader",
+        Position = {220, y+18}, Size = {72, 22} }
+    layout["int_rate"] = { PrettyName = "Int~Rate", Style = "Fader",
+        Position = {300, y+18}, Size = {62, 22} }
+    layout["int_output"] = { PrettyName = "Int~OutputText", Style = "Text",
+        Position = {370, y+18}, Size = {122, CH} }
+    layout["int_value"] = { PrettyName = "Int~OutputValue", Style = "Text",
+        Position = {500, y+18}, Size = {W-506, CH} }
+    
+    Lbl("Min", 140, y+48, 30)
+    Lbl("Max", 220, y+48, 30)
+    Lbl("Rate", 300, y+48, 30)
+    Lbl("(Auto-generate when enabled)", 370, y+62, 200)
+    
+    -- Random Float Generator
+    y = y + 100
+    GBox(0, y, W, 94, "Random Float Generator")
+    Lbl("Enable", 6, y+5, 50)
+    Lbl("Generate", 70, y+5, 60)
+    Lbl("Min Value", 140, y+5, 70)
+    Lbl("Max Value", 220, y+5, 70)
+    Lbl("Decimals", 300, y+5, 60)
+    Lbl("Rate (s)", 370, y+5, 60)
+    Lbl("Output", 440, y+5, W-446)
+    
+    layout["float_enable"] = { PrettyName = "Float~Enable", Style = "Button", Legend = "On",
+        Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
+    layout["float_generate"] = { PrettyName = "Float~Generate", Style = "Button", Legend = "Generate",
+        Color = C_BTN_B, Position = {70, y+18}, Size = {62, BH} }
+    layout["float_min"] = { PrettyName = "Float~Min", Style = "Fader",
+        Position = {140, y+18}, Size = {72, 22} }
+    layout["float_max"] = { PrettyName = "Float~Max", Style = "Fader",
+        Position = {220, y+18}, Size = {72, 22} }
+    layout["float_decimals"] = { PrettyName = "Float~Decimals", Style = "Fader",
+        Position = {300, y+18}, Size = {62, 22} }
+    layout["float_rate"] = { PrettyName = "Float~Rate", Style = "Fader",
+        Position = {370, y+18}, Size = {62, 22} }
+    layout["float_output"] = { PrettyName = "Float~OutputText", Style = "Text",
+        Position = {440, y+18}, Size = {122, CH} }
+    layout["float_value"] = { PrettyName = "Float~OutputValue", Style = "Text",
+        Position = {570, y+18}, Size = {W-576, CH} }
+    
+    Lbl("Min", 140, y+48, 30)
+    Lbl("Max", 220, y+48, 30)
+    Lbl("Dec", 300, y+48, 30)
+    Lbl("Rate", 370, y+48, 30)
+    Lbl("(Auto-generate when enabled)", 440, y+62, 200)
+    
+    -- Clock
+    y = y + 100
+    GBox(0, y, W, 72, "Real-Time Clock")
+    Lbl("Enable", 6, y+5, 50)
+    Lbl("24-Hour Mode", 70, y+5, 80)
+    Lbl("Format", 160, y+5, 100)
+    Lbl("Current Time", 380, y+5, W-386)
+    
+    layout["clock_enable"] = { PrettyName = "Clock~Enable", Style = "Button", Legend = "On",
+        Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
+    layout["clock_24h"] = { PrettyName = "Clock~24Hour", Style = "Button", Legend = "24h",
+        Color = C_BTN_B, Position = {70, y+18}, Size = {82, BH} }
+    layout["clock_format"] = { PrettyName = "Clock~Format", Style = "ComboBox",
+        IsReadOnly = false, Position = {160, y+18}, Size = {212, CH} }
+    layout["clock_output"] = { PrettyName = "Clock~Output", Style = "Text",
+        Position = {380, y+18}, Size = {W-386, CH} }
+    
+    Lbl("Format: HH:MM:SS / HH:MM / YYYY-MM-DD HH:MM:SS", 6, y+52, 400)
+    
+    -- Countdown Timer
+    y = y + 78
+    GBox(0, y, W, 94, "Countdown Timer")
+    Lbl("Enable", 6, y+5, 50)
+    Lbl("Start", 70, y+5, 50)
+    Lbl("Pause", 130, y+5, 50)
+    Lbl("Reset", 190, y+5, 50)
+    Lbl("Duration (s)", 250, y+5, 80)
+    Lbl("Remaining", 350, y+5, 80)
+    Lbl("Time Display", 450, y+5, 120)
+    Lbl("Finished", 580, y+5, W-586)
+    
+    layout["countdown_enable"] = { PrettyName = "Countdown~Enable", Style = "Button", Legend = "On",
+        Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
+    layout["countdown_start"] = { PrettyName = "Countdown~Start", Style = "Button", Legend = "Start",
+        Color = C_BTN_G, Position = {70, y+18}, Size = {52, BH} }
+    layout["countdown_pause"] = { PrettyName = "Countdown~Pause", Style = "Button", Legend = "Pause",
+        Color = C_BTN_O, Position = {130, y+18}, Size = {52, BH} }
+    layout["countdown_reset"] = { PrettyName = "Countdown~Reset", Style = "Button", Legend = "Reset",
+        Color = C_BTN_R, Position = {190, y+18}, Size = {52, BH} }
+    layout["countdown_duration"] = { PrettyName = "Countdown~Duration", Style = "Fader",
+        Position = {250, y+18}, Size = {92, 22} }
+    layout["countdown_remaining"] = { PrettyName = "Countdown~Remaining", Style = "Text",
+        Position = {350, y+18}, Size = {92, CH} }
+    layout["countdown_output"] = { PrettyName = "Countdown~Output", Style = "Text",
+        Position = {450, y+18}, Size = {122, CH} }
+    layout["countdown_finished"] = { PrettyName = "Countdown~Finished", Style = "Led",
+        Position = {580, y+18}, Size = {22, 22} }
+    
+    Lbl("Duration", 250, y+48, 60)
+    Lbl("Format: HH:MM:SS", 450, y+62, 120)
+    
+    return layout, graphics
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- Runtime
+-- ══════════════════════════════════════════════════════════════════
+if Controls then
+    -- Timers
+    local StringTimer = nil
+    local IntTimer = nil
+    local FloatTimer = nil
+    local ClockTimer = nil
+    local CountdownTimer = nil
+    
+    -- Countdown state
+    local countdown_start_time = 0
+    local countdown_paused_time = 0
+    local countdown_running = false
+    
+    -- Random string generation
+    local function GenerateRandomString()
+        local length = Controls.string_length.Value
+        local charset = Controls.string_charset.String
+        if charset == "" then charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" end
+        
+        local result = ""
+        for i = 1, length do
+            local idx = math.random(1, #charset)
+            result = result .. charset:sub(idx, idx)
+        end
+        
+        Controls.string_output.String = result
+        print(string.format("[STRING] Generated: %s", result))
+    end
+    
+    -- Random integer generation
+    local function GenerateRandomInt()
+        local min = Controls.int_min.Value
+        local max = Controls.int_max.Value
+        if min > max then min, max = max, min end
+        
+        local value = math.random(min, max)
+        Controls.int_output.String = tostring(value)
+        Controls.int_value.Value = value
+        print(string.format("[INT] Generated: %d", value))
+    end
+    
+    -- Random float generation
+    local function GenerateRandomFloat()
+        local min = Controls.float_min.Value
+        local max = Controls.float_max.Value
+        if min > max then min, max = max, min end
+        
+        local decimals = Controls.float_decimals.Value
+        local value = min + math.random() * (max - min)
+        local formatted = string.format("%." .. decimals .. "f", value)
+        
+        Controls.float_output.String = formatted
+        Controls.float_value.Value = value
+        print(string.format("[FLOAT] Generated: %s", formatted))
+    end
+    
+    -- Update clock
+    local function UpdateClock()
+        local format = Controls.clock_format.String
+        local use_24h = Controls.clock_24h.Boolean
+        local now = os.date("*t")
+        
+        local time_str = ""
+        if format == "HH:MM:SS" or format == "" then
+            if use_24h then
+                time_str = string.format("%02d:%02d:%02d", now.hour, now.min, now.sec)
+            else
+                local hour = now.hour % 12
+                if hour == 0 then hour = 12 end
+                local ampm = now.hour >= 12 and "PM" or "AM"
+                time_str = string.format("%02d:%02d:%02d %s", hour, now.min, now.sec, ampm)
+            end
+        elseif format == "HH:MM" then
+            if use_24h then
+                time_str = string.format("%02d:%02d", now.hour, now.min)
+            else
+                local hour = now.hour % 12
+                if hour == 0 then hour = 12 end
+                local ampm = now.hour >= 12 and "PM" or "AM"
+                time_str = string.format("%02d:%02d %s", hour, now.min, ampm)
+            end
+        elseif format == "YYYY-MM-DD HH:MM:SS" then
+            time_str = string.format("%04d-%02d-%02d %02d:%02d:%02d", 
+                now.year, now.month, now.day, now.hour, now.min, now.sec)
+        else
+            time_str = os.date(format)
+        end
+        
+        Controls.clock_output.String = time_str
+    end
+    
+    -- Update countdown
+    local function UpdateCountdown()
+        if not countdown_running or Controls.countdown_pause.Boolean then
+            return
+        end
+        
+        local duration = Controls.countdown_duration.Value
+        local elapsed = os.time() - countdown_start_time
+        local remaining = math.max(0, duration - elapsed)
+        
+        Controls.countdown_remaining.Value = remaining
+        
+        local hours = math.floor(remaining / 3600)
+        local mins = math.floor((remaining % 3600) / 60)
+        local secs = remaining % 60
+        Controls.countdown_output.String = string.format("%02d:%02d:%02d", hours, mins, secs)
+        
+        if remaining <= 0 then
+            countdown_running = false
+            Controls.countdown_finished.Boolean = true
+            print("[COUNTDOWN] Finished!")
+        else
+            Controls.countdown_finished.Boolean = false
+        end
+    end
+    
+    -- Initialize function
+    local function Initialize()
+        print("=== Data Generator v1.0 Initializing ===")
+        
+        -- Set defaults
+        if Controls.string_length.Value == 0 then Controls.string_length.Value = 10 end
+        if Controls.string_charset.String == "" then 
+            Controls.string_charset.String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" 
+        end
+        if Controls.string_rate.Value == 0 then Controls.string_rate.Value = 1.0 end
+        
+        if Controls.int_min.Value == 0 and Controls.int_max.Value == 0 then
+            Controls.int_min.Value = 0
+            Controls.int_max.Value = 100
+        end
+        if Controls.int_rate.Value == 0 then Controls.int_rate.Value = 1.0 end
+        
+        if Controls.float_min.Value == 0 and Controls.float_max.Value == 0 then
+            Controls.float_min.Value = 0.0
+            Controls.float_max.Value = 1.0
+        end
+        if Controls.float_decimals.Value == 0 then Controls.float_decimals.Value = 2 end
+        if Controls.float_rate.Value == 0 then Controls.float_rate.Value = 1.0 end
+        
+        Controls.clock_format.Choices = {"HH:MM:SS", "HH:MM", "YYYY-MM-DD HH:MM:SS"}
+        if Controls.clock_format.String == "" then Controls.clock_format.String = "HH:MM:SS" end
+        
+        if Controls.countdown_duration.Value == 0 then Controls.countdown_duration.Value = 60 end
+        Controls.countdown_finished.Boolean = false
+        
+        Controls.status.Value = 0  -- OK
+        Controls.status.String = "Ready"
+        
+        print("=== Ready ===")
+    end
+    
+    -- Event Handlers
+    
+    -- Enable All
+    Controls.enable_all.EventHandler = function(ctl)
+        local enable = ctl.Boolean
+        Controls.string_enable.Boolean = enable
+        Controls.int_enable.Boolean = enable
+        Controls.float_enable.Boolean = enable
+        Controls.clock_enable.Boolean = enable
+        Controls.countdown_enable.Boolean = enable
+        print(string.format("[GLOBAL] Enable All: %s", enable and "ON" or "OFF"))
+    end
+    
+    -- String Generator
+    Controls.string_enable.EventHandler = function(ctl)
+        if ctl.Boolean then
+            if StringTimer then StringTimer:Stop() end
+            StringTimer = Timer.New()
+            StringTimer.EventHandler = GenerateRandomString
+            StringTimer:Start(Controls.string_rate.Value)
+            print("[STRING] Auto-generation enabled")
+        else
+            if StringTimer then StringTimer:Stop() end
+            print("[STRING] Auto-generation disabled")
+        end
+    end
+    
+    Controls.string_generate.EventHandler = GenerateRandomString
+    
+    Controls.string_rate.EventHandler = function(ctl)
+        if Controls.string_enable.Boolean and StringTimer then
+            StringTimer:Stop()
+            StringTimer:Start(ctl.Value)
+        end
+    end
+    
+    -- Integer Generator
+    Controls.int_enable.EventHandler = function(ctl)
+        if ctl.Boolean then
+            if IntTimer then IntTimer:Stop() end
+            IntTimer = Timer.New()
+            IntTimer.EventHandler = GenerateRandomInt
+            IntTimer:Start(Controls.int_rate.Value)
+            print("[INT] Auto-generation enabled")
+        else
+            if IntTimer then IntTimer:Stop() end
+            print("[INT] Auto-generation disabled")
+        end
+    end
+    
+    Controls.int_generate.EventHandler = GenerateRandomInt
+    
+    Controls.int_rate.EventHandler = function(ctl)
+        if Controls.int_enable.Boolean and IntTimer then
+            IntTimer:Stop()
+            IntTimer:Start(ctl.Value)
+        end
+    end
+    
+    -- Float Generator
+    Controls.float_enable.EventHandler = function(ctl)
+        if ctl.Boolean then
+            if FloatTimer then FloatTimer:Stop() end
+            FloatTimer = Timer.New()
+            FloatTimer.EventHandler = GenerateRandomFloat
+            FloatTimer:Start(Controls.float_rate.Value)
+            print("[FLOAT] Auto-generation enabled")
+        else
+            if FloatTimer then FloatTimer:Stop() end
+            print("[FLOAT] Auto-generation disabled")
+        end
+    end
+    
+    Controls.float_generate.EventHandler = GenerateRandomFloat
+    
+    Controls.float_rate.EventHandler = function(ctl)
+        if Controls.float_enable.Boolean and FloatTimer then
+            FloatTimer:Stop()
+            FloatTimer:Start(ctl.Value)
+        end
+    end
+    
+    -- Clock
+    Controls.clock_enable.EventHandler = function(ctl)
+        if ctl.Boolean then
+            if ClockTimer then ClockTimer:Stop() end
+            ClockTimer = Timer.New()
+            ClockTimer.EventHandler = UpdateClock
+            ClockTimer:Start(1.0)  -- Update every second
+            UpdateClock()  -- Immediate update
+            print("[CLOCK] Enabled")
+        else
+            if ClockTimer then ClockTimer:Stop() end
+            print("[CLOCK] Disabled")
+        end
+    end
+    
+    Controls.clock_24h.EventHandler = UpdateClock
+    Controls.clock_format.EventHandler = UpdateClock
+    
+    -- Countdown
+    Controls.countdown_enable.EventHandler = function(ctl)
+        if ctl.Boolean then
+            if CountdownTimer then CountdownTimer:Stop() end
+            CountdownTimer = Timer.New()
+            CountdownTimer.EventHandler = UpdateCountdown
+            CountdownTimer:Start(1.0)  -- Update every second
+            print("[COUNTDOWN] Enabled")
+        else
+            if CountdownTimer then CountdownTimer:Stop() end
+            countdown_running = false
+            print("[COUNTDOWN] Disabled")
+        end
+    end
+    
+    Controls.countdown_start.EventHandler = function()
+        countdown_start_time = os.time()
+        countdown_running = true
+        Controls.countdown_pause.Boolean = false
+        Controls.countdown_finished.Boolean = false
+        print("[COUNTDOWN] Started")
+    end
+    
+    Controls.countdown_pause.EventHandler = function(ctl)
+        if ctl.Boolean then
+            countdown_paused_time = os.time()
+            print("[COUNTDOWN] Paused")
+        else
+            if countdown_running then
+                local pause_duration = os.time() - countdown_paused_time
+                countdown_start_time = countdown_start_time + pause_duration
+                print("[COUNTDOWN] Resumed")
+            end
+        end
+    end
+    
+    Controls.countdown_reset.EventHandler = function()
+        countdown_running = false
+        countdown_start_time = 0
+        Controls.countdown_remaining.Value = Controls.countdown_duration.Value
+        Controls.countdown_output.String = "00:00:00"
+        Controls.countdown_pause.Boolean = false
+        Controls.countdown_finished.Boolean = false
+        print("[COUNTDOWN] Reset")
+    end
+    
+    Controls.countdown_duration.EventHandler = function(ctl)
+        if not countdown_running then
+            Controls.countdown_remaining.Value = ctl.Value
+            local hours = math.floor(ctl.Value / 3600)
+            local mins = math.floor((ctl.Value % 3600) / 60)
+            local secs = ctl.Value % 60
+            Controls.countdown_output.String = string.format("%02d:%02d:%02d", hours, mins, secs)
+        end
+    end
+    
+    -- Initialize
+    Initialize()
+end
