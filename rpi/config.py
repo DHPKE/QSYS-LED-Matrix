@@ -45,20 +45,20 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 3           # 0–4; Controls LED refresh rate
-                                      # RPi 4: Use 2-3 for glitch-free display
+MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
+                                      # RPi 4: Use 1-2 for best balance
                                       # RPi Zero 2 W: Use 2 or 3 (lower power)
                                       # 0 = Fastest (~1000Hz+) - may cause glitches
-                                      # 1 = Fast (~500Hz) - may glitch on some panels
-                                      # 2 = Balanced (~250-300Hz) - good starting point
-                                      # 3 = Slower (~200Hz) - BEST for stability, minimal glitches
+                                      # 1 = Fast (~500Hz) - high refresh, may glitch
+                                      # 2 = Balanced (~250-300Hz) - BEST for RPi 4
+                                      # 3 = Slower (~200Hz) - maximum stability
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
-MATRIX_PWM_BITS        = 5           # 1-11; PWM bits for color depth (11=2048 levels, default)
+MATRIX_PWM_BITS        = 6           # 1-11; PWM bits for color depth (11=2048 levels, default)
                                       # Lower values = faster refresh but less color accuracy
                                       # 11 = Best color (slower refresh)
                                       # 7-9 = Good compromise
-                                      # 6 = Faster, less glitches, still good colors
-                                      # 5 = Fast refresh, minimal glitches, acceptable colors
+                                      # 6 = Fast refresh, good colors, balanced
+                                      # 5 = Faster, minimal glitches, acceptable colors
                                       # 1-4 = Very fast but visibly reduced colors
 MATRIX_SCAN_MODE        = 1           # 0 = progressive (default), 1 = interlaced
                                       # Interlaced (1) can reduce line glitches on some panels
