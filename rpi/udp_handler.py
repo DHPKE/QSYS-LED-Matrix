@@ -136,7 +136,9 @@ class UDPHandler:
         self._brightness_callback = brightness_callback
         self._orientation_callback = orientation_callback
         self._orientation = get_orientation()  # Track current orientation for layout presets
-        self._current_layout = 1  # Track current layout preset (default to 1)
+        # Track layout preset per orientation (landscape and portrait can have different layouts)
+        self._current_layout_landscape = 1
+        self._current_layout_portrait = 1
         # Set to True on the first successfully dispatched command so
         # main.py can dismiss the IP splash screen.
         self._first_command_received = False
@@ -166,8 +168,11 @@ class UDPHandler:
         return self._first_command_received
     
     def get_current_layout(self) -> int:
-        """Return the current layout preset number."""
-        return self._current_layout
+        """Return the current layout preset number for the current orientation."""
+        if self._orientation == "portrait":
+            return self._current_layout_portrait
+        else:
+            return self._current_layout_landscape
 
     def dispatch(self, raw: str):
         """Parse a raw JSON string and apply the command (thread-safe)."""
@@ -244,8 +249,11 @@ class UDPHandler:
             logger.warning(f"[UDP] Unknown layout preset {preset}")
             return
         
-        # Remember the current layout preset
-        self._current_layout = preset
+        # Remember the current layout preset for this orientation
+        if self._orientation == "portrait":
+            self._current_layout_portrait = preset
+        else:
+            self._current_layout_landscape = preset
         
         logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s)) in {self._orientation} mode")
         for i in range(MAX_SEGMENTS):
