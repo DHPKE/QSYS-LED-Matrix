@@ -249,9 +249,48 @@ class TextRenderer:
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 
-        # SMOOTH ANTI-ALIASED RENDERING (default)
-        # Render text directly with PIL's native anti-aliasing
-        self._draw.text((draw_x, draw_y), text, font=font, fill=fg)
+        # SHARP NO-ALIAS RENDERING: Binary threshold for crisp edges
+        # Render on grayscale then convert to pure black/white
+        if seg.effect == TextEffect.SCROLL:
+            # For scrolling text, render on larger canvas
+            tmp_gray = Image.new("L", (MATRIX_WIDTH + tw, seg.height), 0)
+            tmp_draw = ImageDraw.Draw(tmp_gray)
+            tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
+                          text, font=font, fill=255)
+            
+            # Binary threshold: > 128 becomes white (pixels > 50% gray)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+            
+            # Crop to segment width
+            tmp_crop = tmp_binary.crop((0, 0, seg.width, seg.height))
+            
+            # Convert to RGB with pure colors (no anti-aliasing)
+            mask_array = np.array(tmp_crop, dtype=np.uint8)
+            mask_bool = mask_array == 255
+            
+            region_array = np.full((seg.height, seg.width, 3), bg, dtype=np.uint8)
+            region_array[mask_bool] = fg
+            
+            region = Image.fromarray(region_array, 'RGB')
+            self._image.paste(region, (seg.x, seg.y))
+        else:
+            # For static text
+            tmp_gray = Image.new("L", (seg.width, seg.height), 0)
+            tmp_draw = ImageDraw.Draw(tmp_gray)
+            tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
+            
+            # Binary threshold: > 128 becomes white (pixels > 50% gray)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+            
+            # Convert to RGB with pure colors (no anti-aliasing)
+            mask_array = np.array(tmp_binary, dtype=np.uint8)
+            mask_bool = mask_array == 255
+            
+            segment_array = np.full((seg.height, seg.width, 3), bg, dtype=np.uint8)
+            segment_array[mask_bool] = fg
+            
+            segment_img = Image.fromarray(segment_array, 'RGB')
+            self._image.paste(segment_img, (seg.x, seg.y))
 
     @property
     def canvas(self):
