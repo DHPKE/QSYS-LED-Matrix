@@ -33,7 +33,9 @@ import time
 from config import (
     MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_CHAIN, MATRIX_PARALLEL,
     MATRIX_HARDWARE_MAPPING, MATRIX_GPIO_SLOWDOWN, MATRIX_BRIGHTNESS,
-    MATRIX_PWM_BITS, LOG_LEVEL, UDP_PORT, WEB_PORT, EFFECT_INTERVAL,
+    MATRIX_PWM_BITS, MATRIX_SCAN_MODE, MATRIX_ROW_ADDRESS_TYPE,
+    MATRIX_MULTIPLEXING, MATRIX_PWM_DITHER_BITS, MATRIX_LED_RGB_SEQUENCE,
+    MATRIX_REFRESH_LIMIT, LOG_LEVEL, UDP_PORT, WEB_PORT, EFFECT_INTERVAL,
     FALLBACK_IP, FALLBACK_NETMASK, FALLBACK_GATEWAY, FALLBACK_IFACE,
     DHCP_TIMEOUT_S,
 )
@@ -174,12 +176,20 @@ def main():
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
         options.pwm_bits            = MATRIX_PWM_BITS
-        options.pwm_lsb_nanoseconds = 200
+        options.pwm_lsb_nanoseconds = 200  # Higher = more stable (was 130, trying more conservative)
+        options.scan_mode           = MATRIX_SCAN_MODE
+        options.row_address_type    = MATRIX_ROW_ADDRESS_TYPE
+        options.multiplexing        = MATRIX_MULTIPLEXING
+        options.pwm_dither_bits     = MATRIX_PWM_DITHER_BITS
+        options.led_rgb_sequence    = MATRIX_LED_RGB_SEQUENCE
+        options.limit_refresh_rate_hz = MATRIX_REFRESH_LIMIT
         # Software PWM — avoids conflict with snd_bcm2835 BCM PWM peripheral.
         # To use hardware pulsing: blacklist snd_bcm2835 in /etc/modprobe.d/
         options.disable_hardware_pulsing = True
         options.show_refresh_rate   = False
-        options.limit_refresh_rate_hz = 0
+        # Additional stability options
+        options.inverse_colors      = False
+        options.daemon              = 0   # 0 = don't drop privileges
 
         matrix = RGBMatrix(options=options)
         canvas = matrix.CreateFrameCanvas()
@@ -203,11 +213,12 @@ def main():
     
     def on_orientation_change(orientation: str):
         logger.info(f"[MAIN] Orientation → {orientation}")
-        # Reapply Layout 1 (fullscreen) for the new orientation
-        # This ensures segment dimensions match the new canvas size
+        # Reapply the same layout preset for the new orientation
+        # This ensures segment dimensions match the new canvas size while preserving layout choice
         if udp:
-            udp._apply_layout(1)
-            logger.info(f"[MAIN] Applied Layout 1 for {orientation} mode")
+            current_layout = udp.get_current_layout()
+            udp._apply_layout(current_layout)
+            logger.info(f"[MAIN] Reapplied Layout {current_layout} for {orientation} mode")
         else:
             # During startup, just mark dirty
             sm.mark_all_dirty()
@@ -280,10 +291,8 @@ def main():
                 except Exception as exc:
                     logger.error(f"[RENDER] Exception: {exc}")
 
-        # Adaptive sleep to maintain framerate without busy-waiting
-        elapsed = time.monotonic() - now
-        sleep_for = max(0.001, EFFECT_INTERVAL - elapsed)
-        time.sleep(sleep_for)
+        # Longer sleep to reduce CPU load and give matrix library uninterrupted time
+        time.sleep(0.05)  # 50ms sleep reduces CPU load significantly
 
 
 if __name__ == "__main__":
