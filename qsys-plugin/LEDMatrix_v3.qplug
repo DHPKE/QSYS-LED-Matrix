@@ -256,11 +256,11 @@ function GetControlLayout(props)
     -- ── Segment rows ────────────────────────────────────────────────
     -- Each segment GroupBox contains:
     --   Row 1 at +20: Active LED | Text field | [Display][Invert][Clear] buttons
-    --   Row 2 at +54: 6 ComboBoxes with labels above
-    --   Row 3 at +88: Intensity fader
-    --   GroupBox height = 88 + 22 + 4 = 114 → increased to 118 for spacing
+    --   Row 2 at +54: 6 ComboBoxes with labels above (height 24px, ends at sy+78)
+    --   Row 3 at +96: Intensity fader (label at sy+81, 3px gap after ComboBoxes)
+    --   GroupBox height = 96 + 22 + 4 = 122
     y = y + 118
-    local SEG_H = 118
+    local SEG_H = 122
 
     -- 6 combo columns: widths must sum to W-12 minus 5 gaps of 6px
     -- W=600: W-12=588; 5 gaps=30; net=558
@@ -311,7 +311,7 @@ function GetControlLayout(props)
         end
 
         -- Row 3: Intensity fader
-        local r3 = sy + 88
+        local r3 = sy + 96
         Lbl("Intensity  (0=off  255=full)", 6, r3-15, 260)
         layout[sn.."intensity"] = { PrettyName=grp.."~Intensity", Style="Fader",
             Position={6, r3}, Size={W-14, 22} }
