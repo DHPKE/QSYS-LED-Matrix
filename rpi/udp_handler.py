@@ -20,7 +20,7 @@ import json
 import threading
 import logging
 
-from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, LAYOUT_SINGLE_SEG, MAX_SEGMENTS
+from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, MAX_SEGMENTS
 from segment_manager import SegmentManager
 
 logger = logging.getLogger(__name__)
@@ -147,37 +147,19 @@ class UDPHandler:
     # ─── Layout presets ────────────────────────────────────────────────────
 
     def _apply_layout(self, preset: int):
-        """Apply a numbered layout preset from config.LAYOUT_PRESETS.
-
-        Presets 1-7: standard multi-segment layouts.
-        Presets 11-14: single segment fullscreen — only seg N is active,
-                       all others are deactivated.
-        """
+        """Apply a numbered layout preset from config.LAYOUT_PRESETS."""
         zones = LAYOUT_PRESETS.get(preset)
         if zones is None:
             logger.warning(f"[UDP] Unknown layout preset {preset}")
             return
-        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} zone(s))")
-
-        single_seg = LAYOUT_SINGLE_SEG.get(preset)  # None for presets 1-7
-
+        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s))")
         for i in range(MAX_SEGMENTS):
-            if single_seg is not None:
-                # Presets 11-14: only the named segment gets fullscreen
-                if i == single_seg:
-                    x, y, w, h = zones[0]
-                    self._sm.configure(i, x, y, w, h)
-                    self._sm.activate(i, True)
-                else:
-                    self._sm.activate(i, False)
+            if i < len(zones):
+                x, y, w, h = zones[i]
+                self._sm.configure(i, x, y, w, h)
+                self._sm.activate(i, True)
             else:
-                # Presets 1-7: zones list maps directly to seg indices
-                if i < len(zones):
-                    x, y, w, h = zones[i]
-                    self._sm.configure(i, x, y, w, h)
-                    self._sm.activate(i, True)
-                else:
-                    self._sm.activate(i, False)
+                self._sm.activate(i, False)
 
     # ─── Internal ──────────────────────────────────────────────────────────
 
