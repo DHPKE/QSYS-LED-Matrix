@@ -176,7 +176,7 @@ def main():
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
         options.pwm_bits            = MATRIX_PWM_BITS
-        options.pwm_lsb_nanoseconds = 200  # Balanced timing for RPi 4 (130 too fast, caused glitches)
+        options.pwm_lsb_nanoseconds = 250  # Conservative timing for maximum stability (reduced glitches)
         options.scan_mode           = MATRIX_SCAN_MODE
         options.row_address_type    = MATRIX_ROW_ADDRESS_TYPE
         options.multiplexing        = MATRIX_MULTIPLEXING
