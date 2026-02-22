@@ -125,7 +125,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v3.14.0",
+        Type="Text", Text="LED Matrix Controller  v4.0.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -145,16 +145,19 @@ function GetControlLayout(props)
 
     -- ── Display Layout ──────────────────────────────────────────────
     -- Layout:
-    --   y+6  : thumbnail row   (TH=26 px tall)
+    --   y+6  : thumbnail row 1 (presets 1-7)  (TH=26 px tall)
     --   y+32 : thumbnail labels (10 px)
-    --   y+44 : "Layout Preset" label (12 px)
-    --   y+58 : ComboBox + Apply button (24 px)
-    --   Total inner height = 58+24+8 = 90  →  GBox height = 96
+    --   y+48 : thumbnail row 2 (presets 11-14) (TH=26 px tall)
+    --   y+74 : thumbnail labels (10 px)
+    --   y+88 : "Layout Preset" label (12 px)
+    --   y+102: ComboBox + Apply button (24 px)
+    --   Total inner height = 102+24+8 = 134  →  GBox height = 140
     --
     -- 7 thumbnails: TW=62, gap=6  → 7*(62+6)-6 = 470 px  (fits in W=600)
+    -- 4 thumbnails: TW=62, gap=6  → 4*(62+6)-6 = 266 px
     -- All pixel offsets are explicit integers — no division operators.
     y = y + 60
-    GBox(0, y, W, 96, "Display Layout")
+    GBox(0, y, W, 140, "Display Layout")
 
     local TW  = 62   -- thumbnail width
     local TH  = 26   -- thumbnail height
@@ -170,7 +173,7 @@ function GetControlLayout(props)
         })
     end
 
-    -- Thumbnail outer borders + labels
+    -- Thumbnail outer borders + labels - Row 1 (Presets 1-7)
     local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
     for i = 0, 6 do
         local tx = TX + i*(TW+GAP)
@@ -180,6 +183,20 @@ function GetControlLayout(props)
             StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
         -- label below
         table.insert(graphics, {Type="Text", Text=thumbLabels[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+    
+    -- Thumbnail outer borders + labels - Row 2 (Presets 11-14)
+    local thumbLabels2 = {"11 Seg1","12 Seg2","13 Seg3","14 Seg4"}
+    for i = 0, 3 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 48
+        -- dark background
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        -- label below
+        table.insert(graphics, {Type="Text", Text=thumbLabels2[i+1],
             Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
             Position={tx, ty+TH+2}, Size={TW, 10}})
     end
@@ -236,19 +253,36 @@ function GetControlLayout(props)
         TRect(cC, tx,    ty+HH, HW, HH)
         TRect(cD, tx+HW, ty+HH, HW, HH)
     end
+    
+    -- Preset 11 — Fullscreen Seg1 (green)
+    do local tx=TX+0*(TW+GAP); local ty=y+48
+        TRect(cA, tx, ty, TW, TH)
+    end
+    -- Preset 12 — Fullscreen Seg2 (blue)
+    do local tx=TX+1*(TW+GAP); local ty=y+48
+        TRect(cB, tx, ty, TW, TH)
+    end
+    -- Preset 13 — Fullscreen Seg3 (red)
+    do local tx=TX+2*(TW+GAP); local ty=y+48
+        TRect(cC, tx, ty, TW, TH)
+    end
+    -- Preset 14 — Fullscreen Seg4 (yellow)
+    do local tx=TX+3*(TW+GAP); local ty=y+48
+        TRect(cD, tx, ty, TW, TH)
+    end
 
     -- ComboBox + Apply button
-    Lbl("Layout Preset  (1-7, 11-14)", TX, y+44, 210)
+    Lbl("Layout Preset  (1-7, 11-14)", TX, y+88, 210)
     layout["layout_preset"] = {
         PrettyName="Layout~Preset",
         Style="ComboBox", IsReadOnly=false,
-        Position={TX, y+58}, Size={220, CH}
+        Position={TX, y+102}, Size={220, CH}
     }
     layout["apply_layout"] = {
         PrettyName="Layout~Apply",
         Style="Button", ButtonStyle="Trigger",
         Legend="Apply Layout", Color=C_BTN_O,
-        Position={234, y+58}, Size={160, CH}
+        Position={234, y+102}, Size={160, CH}
     }
 
     -- ── Segment rows ────────────────────────────────────────────────
@@ -257,7 +291,7 @@ function GetControlLayout(props)
     --   Row 2 at +50: 6 ComboBoxes with labels above
     --   Row 3 at +84: Intensity fader
     --   GroupBox height = 84 + 22 + 8 = 114
-    y = y + 102
+    y = y + 146
     local SEG_H = 114
 
     -- 6 combo columns: widths must sum to W-12 minus 5 gaps of 6px
