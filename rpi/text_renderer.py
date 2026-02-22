@@ -249,16 +249,16 @@ class TextRenderer:
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 
-        # ANTI-FLICKER RENDERING: Higher threshold to reduce single-pixel flickering
+        # BALANCED ANTI-FLICKER: Compromise between font weight and flicker reduction
         if seg.effect == TextEffect.SCROLL:
-            # Render on grayscale then apply higher threshold to eliminate anti-aliased artifacts
+            # Render on grayscale then apply threshold to balance weight and flicker
             tmp_gray = Image.new("L", (MATRIX_WIDTH + tw, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
                           text, font=font, fill=255)
             
-            # HIGHER THRESHOLD: Pixels > 150 become white (reduces flicker, maintains weight)
-            tmp_binary = tmp_gray.point(lambda p: 255 if p > 150 else 0, mode='L')
+            # BALANCED THRESHOLD: Pixels > 130 become white (good weight, reduced flicker)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 130 else 0, mode='L')
             
             # Crop to segment width
             tmp_crop = tmp_binary.crop((0, 0, seg.width, seg.height))
@@ -275,13 +275,13 @@ class TextRenderer:
             region = Image.fromarray(region_array, 'RGB')
             self._image.paste(region, (seg.x, seg.y))
         else:
-            # Render on grayscale then apply higher threshold to eliminate anti-aliased artifacts
+            # Render on grayscale then apply threshold to balance weight and flicker
             tmp_gray = Image.new("L", (seg.width, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
             
-            # HIGHER THRESHOLD: Pixels > 150 become white (reduces flicker, maintains weight)
-            tmp_binary = tmp_gray.point(lambda p: 255 if p > 150 else 0, mode='L')
+            # BALANCED THRESHOLD: Pixels > 130 become white (good weight, reduced flicker)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 130 else 0, mode='L')
             
             # Convert to pure RGB colors
             mask_array = np.array(tmp_binary, dtype=np.uint8)
