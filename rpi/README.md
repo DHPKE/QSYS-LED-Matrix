@@ -89,6 +89,17 @@ The install script will:
 4. Create config storage at `/var/lib/led-matrix/`
 5. Install and start the **`led-matrix` systemd service** (auto-start on boot)
 
+### Updating existing installation
+
+After pulling new changes from git:
+
+```bash
+cd QSYS-LED-Matrix/rpi
+bash update.sh
+```
+
+This will copy updated Python files and restart the service.
+
 ---
 
 ## Running manually (for testing)
