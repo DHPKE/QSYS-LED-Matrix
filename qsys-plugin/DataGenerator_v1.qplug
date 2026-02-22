@@ -44,19 +44,19 @@ function GetControls(props)
     -- Random String Generator
     table.insert(controls, { Name = "string_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "string_generate", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
-    table.insert(controls, { Name = "string_length", ControlType = "Knob", ControlUnit = "Integer", Min = 1, Max = 100, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "string_length", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "string_charset", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "string_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
-    table.insert(controls, { Name = "string_rate", ControlType = "Knob", ControlUnit = "Float", Min = 0.1, Max = 60, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "string_rate", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
     
     -- Random Integer Generator
     table.insert(controls, { Name = "int_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "int_generate", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
-    table.insert(controls, { Name = "int_min", ControlType = "Knob", ControlUnit = "Integer", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Both" })
-    table.insert(controls, { Name = "int_max", ControlType = "Knob", ControlUnit = "Integer", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "int_min", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "int_max", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "int_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
-    table.insert(controls, { Name = "int_value", ControlType = "Knob", ControlUnit = "Integer", Min = -1000000, Max = 1000000, Count = 1, UserPin = true, PinStyle = "Output" })
-    table.insert(controls, { Name = "int_rate", ControlType = "Knob", ControlUnit = "Float", Min = 0.1, Max = 60, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "int_value", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "int_rate", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
     
     -- Random Float Generator
     table.insert(controls, { Name = "float_enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
@@ -79,9 +79,9 @@ function GetControls(props)
     table.insert(controls, { Name = "countdown_start", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
     table.insert(controls, { Name = "countdown_pause", ControlType = "Button", ButtonType = "Toggle", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "countdown_reset", ControlType = "Button", ButtonType = "Trigger", Count = 1, UserPin = true, PinStyle = "Input" })
-    table.insert(controls, { Name = "countdown_duration", ControlType = "Knob", ControlUnit = "Integer", Min = 1, Max = 86400, Count = 1, UserPin = true, PinStyle = "Both" })
+    table.insert(controls, { Name = "countdown_duration", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Both" })
     table.insert(controls, { Name = "countdown_output", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
-    table.insert(controls, { Name = "countdown_remaining", ControlType = "Knob", ControlUnit = "Integer", Min = 0, Max = 86400, Count = 1, UserPin = true, PinStyle = "Output" })
+    table.insert(controls, { Name = "countdown_remaining", ControlType = "Text", Count = 1, UserPin = true, PinStyle = "Output" })
     table.insert(controls, { Name = "countdown_finished", ControlType = "Indicator", IndicatorType = "Led", Count = 1, UserPin = true, PinStyle = "Output" })
     
     return controls
@@ -155,10 +155,10 @@ function GetControlLayout(props)
         Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
     layout["string_generate"] = { PrettyName = "String~Generate", Style = "Button", Legend = "Generate",
         Color = C_BTN_B, Position = {70, y+18}, Size = {62, BH} }
-    layout["string_length"] = { PrettyName = "String~Length", Style = "Fader",
-        Position = {140, y+18}, Size = {62, 22} }
-    layout["string_rate"] = { PrettyName = "String~Rate", Style = "Fader",
-        Position = {210, y+18}, Size = {62, 22} }
+    layout["string_length"] = { PrettyName = "String~Length", Style = "Text",
+        Position = {140, y+18}, Size = {62, CH} }
+    layout["string_rate"] = { PrettyName = "String~Rate", Style = "Text",
+        Position = {210, y+18}, Size = {62, CH} }
     layout["string_charset"] = { PrettyName = "String~CharSet", Style = "Text",
         Position = {280, y+18}, Size = {102, CH} }
     layout["string_output"] = { PrettyName = "String~Output", Style = "Text",
@@ -183,12 +183,12 @@ function GetControlLayout(props)
         Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
     layout["int_generate"] = { PrettyName = "Int~Generate", Style = "Button", Legend = "Generate",
         Color = C_BTN_B, Position = {70, y+18}, Size = {62, BH} }
-    layout["int_min"] = { PrettyName = "Int~Min", Style = "Fader",
-        Position = {140, y+18}, Size = {72, 22} }
-    layout["int_max"] = { PrettyName = "Int~Max", Style = "Fader",
-        Position = {220, y+18}, Size = {72, 22} }
-    layout["int_rate"] = { PrettyName = "Int~Rate", Style = "Fader",
-        Position = {300, y+18}, Size = {62, 22} }
+    layout["int_min"] = { PrettyName = "Int~Min", Style = "Text",
+        Position = {140, y+18}, Size = {72, CH} }
+    layout["int_max"] = { PrettyName = "Int~Max", Style = "Text",
+        Position = {220, y+18}, Size = {72, CH} }
+    layout["int_rate"] = { PrettyName = "Int~Rate", Style = "Text",
+        Position = {300, y+18}, Size = {62, CH} }
     layout["int_output"] = { PrettyName = "Int~OutputText", Style = "Text",
         Position = {370, y+18}, Size = {122, CH} }
     layout["int_value"] = { PrettyName = "Int~OutputValue", Style = "Text",
@@ -214,14 +214,14 @@ function GetControlLayout(props)
         Color = C_BTN_G, Position = {6, y+18}, Size = {56, BH} }
     layout["float_generate"] = { PrettyName = "Float~Generate", Style = "Button", Legend = "Generate",
         Color = C_BTN_B, Position = {70, y+18}, Size = {62, BH} }
-    layout["float_min"] = { PrettyName = "Float~Min", Style = "Fader",
-        Position = {140, y+18}, Size = {72, 22} }
-    layout["float_max"] = { PrettyName = "Float~Max", Style = "Fader",
-        Position = {220, y+18}, Size = {72, 22} }
-    layout["float_decimals"] = { PrettyName = "Float~Decimals", Style = "Fader",
-        Position = {300, y+18}, Size = {62, 22} }
-    layout["float_rate"] = { PrettyName = "Float~Rate", Style = "Fader",
-        Position = {370, y+18}, Size = {62, 22} }
+    layout["float_min"] = { PrettyName = "Float~Min", Style = "Text",
+        Position = {140, y+18}, Size = {72, CH} }
+    layout["float_max"] = { PrettyName = "Float~Max", Style = "Text",
+        Position = {220, y+18}, Size = {72, CH} }
+    layout["float_decimals"] = { PrettyName = "Float~Decimals", Style = "Text",
+        Position = {300, y+18}, Size = {62, CH} }
+    layout["float_rate"] = { PrettyName = "Float~Rate", Style = "Text",
+        Position = {370, y+18}, Size = {62, CH} }
     layout["float_output"] = { PrettyName = "Float~OutputText", Style = "Text",
         Position = {440, y+18}, Size = {122, CH} }
     layout["float_value"] = { PrettyName = "Float~OutputValue", Style = "Text",
@@ -272,8 +272,8 @@ function GetControlLayout(props)
         Color = C_BTN_O, Position = {130, y+18}, Size = {52, BH} }
     layout["countdown_reset"] = { PrettyName = "Countdown~Reset", Style = "Button", Legend = "Reset",
         Color = C_BTN_R, Position = {190, y+18}, Size = {52, BH} }
-    layout["countdown_duration"] = { PrettyName = "Countdown~Duration", Style = "Fader",
-        Position = {250, y+18}, Size = {92, 22} }
+    layout["countdown_duration"] = { PrettyName = "Countdown~Duration", Style = "Text",
+        Position = {250, y+18}, Size = {92, CH} }
     layout["countdown_remaining"] = { PrettyName = "Countdown~Remaining", Style = "Text",
         Position = {350, y+18}, Size = {92, CH} }
     layout["countdown_output"] = { PrettyName = "Countdown~Output", Style = "Text",
@@ -305,7 +305,7 @@ if Controls then
     
     -- Random string generation
     local function GenerateRandomString()
-        local length = Controls.string_length.Value
+        local length = tonumber(Controls.string_length.String) or 10
         local charset = Controls.string_charset.String
         if charset == "" then charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" end
         
@@ -321,28 +321,28 @@ if Controls then
     
     -- Random integer generation
     local function GenerateRandomInt()
-        local min = Controls.int_min.Value
-        local max = Controls.int_max.Value
+        local min = tonumber(Controls.int_min.String) or 0
+        local max = tonumber(Controls.int_max.String) or 100
         if min > max then min, max = max, min end
         
         local value = math.random(min, max)
         Controls.int_output.String = tostring(value)
-        Controls.int_value.Value = value
+        Controls.int_value.String = tostring(value)
         print(string.format("[INT] Generated: %d", value))
     end
     
     -- Random float generation
     local function GenerateRandomFloat()
-        local min = Controls.float_min.Value
-        local max = Controls.float_max.Value
+        local min = tonumber(Controls.float_min.String) or 0.0
+        local max = tonumber(Controls.float_max.String) or 1.0
         if min > max then min, max = max, min end
         
-        local decimals = Controls.float_decimals.Value
+        local decimals = tonumber(Controls.float_decimals.String) or 2
         local value = min + math.random() * (max - min)
         local formatted = string.format("%." .. decimals .. "f", value)
         
         Controls.float_output.String = formatted
-        Controls.float_value.Value = value
+        Controls.float_value.String = formatted
         print(string.format("[FLOAT] Generated: %s", formatted))
     end
     
@@ -387,11 +387,11 @@ if Controls then
             return
         end
         
-        local duration = Controls.countdown_duration.Value
+        local duration = tonumber(Controls.countdown_duration.String) or 60
         local elapsed = os.time() - countdown_start_time
         local remaining = math.max(0, duration - elapsed)
         
-        Controls.countdown_remaining.Value = remaining
+        Controls.countdown_remaining.String = tostring(remaining)
         
         local hours = math.floor(remaining / 3600)
         local mins = math.floor((remaining % 3600) / 60)
@@ -412,29 +412,25 @@ if Controls then
         print("=== Data Generator v1.0 Initializing ===")
         
         -- Set defaults
-        if Controls.string_length.Value == 0 then Controls.string_length.Value = 10 end
+        if Controls.string_length.String == "" then Controls.string_length.String = "10" end
         if Controls.string_charset.String == "" then 
             Controls.string_charset.String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" 
         end
-        if Controls.string_rate.Value == 0 then Controls.string_rate.Value = 1.0 end
+        if Controls.string_rate.String == "" then Controls.string_rate.String = "1.0" end
         
-        if Controls.int_min.Value == 0 and Controls.int_max.Value == 0 then
-            Controls.int_min.Value = 0
-            Controls.int_max.Value = 100
-        end
-        if Controls.int_rate.Value == 0 then Controls.int_rate.Value = 1.0 end
+        if Controls.int_min.String == "" then Controls.int_min.String = "0" end
+        if Controls.int_max.String == "" then Controls.int_max.String = "100" end
+        if Controls.int_rate.String == "" then Controls.int_rate.String = "1.0" end
         
-        if Controls.float_min.Value == 0 and Controls.float_max.Value == 0 then
-            Controls.float_min.Value = 0.0
-            Controls.float_max.Value = 1.0
-        end
-        if Controls.float_decimals.Value == 0 then Controls.float_decimals.Value = 2 end
-        if Controls.float_rate.Value == 0 then Controls.float_rate.Value = 1.0 end
+        if Controls.float_min.String == "" then Controls.float_min.String = "0.0" end
+        if Controls.float_max.String == "" then Controls.float_max.String = "1.0" end
+        if Controls.float_decimals.String == "" then Controls.float_decimals.String = "2" end
+        if Controls.float_rate.String == "" then Controls.float_rate.String = "1.0" end
         
         Controls.clock_format.Choices = {"HH:MM:SS", "HH:MM", "YYYY-MM-DD HH:MM:SS"}
         if Controls.clock_format.String == "" then Controls.clock_format.String = "HH:MM:SS" end
         
-        if Controls.countdown_duration.Value == 0 then Controls.countdown_duration.Value = 60 end
+        if Controls.countdown_duration.String == "" then Controls.countdown_duration.String = "60" end
         Controls.countdown_finished.Boolean = false
         
         Controls.status.Value = 0  -- OK
@@ -462,7 +458,7 @@ if Controls then
             if StringTimer then StringTimer:Stop() end
             StringTimer = Timer.New()
             StringTimer.EventHandler = GenerateRandomString
-            StringTimer:Start(Controls.string_rate.Value)
+            StringTimer:Start(tonumber(Controls.string_rate.String) or 1.0)
             print("[STRING] Auto-generation enabled")
         else
             if StringTimer then StringTimer:Stop() end
@@ -475,7 +471,7 @@ if Controls then
     Controls.string_rate.EventHandler = function(ctl)
         if Controls.string_enable.Boolean and StringTimer then
             StringTimer:Stop()
-            StringTimer:Start(ctl.Value)
+            StringTimer:Start(tonumber(ctl.String) or 1.0)
         end
     end
     
@@ -485,7 +481,7 @@ if Controls then
             if IntTimer then IntTimer:Stop() end
             IntTimer = Timer.New()
             IntTimer.EventHandler = GenerateRandomInt
-            IntTimer:Start(Controls.int_rate.Value)
+            IntTimer:Start(tonumber(Controls.int_rate.String) or 1.0)
             print("[INT] Auto-generation enabled")
         else
             if IntTimer then IntTimer:Stop() end
@@ -498,7 +494,7 @@ if Controls then
     Controls.int_rate.EventHandler = function(ctl)
         if Controls.int_enable.Boolean and IntTimer then
             IntTimer:Stop()
-            IntTimer:Start(ctl.Value)
+            IntTimer:Start(tonumber(ctl.String) or 1.0)
         end
     end
     
@@ -508,7 +504,7 @@ if Controls then
             if FloatTimer then FloatTimer:Stop() end
             FloatTimer = Timer.New()
             FloatTimer.EventHandler = GenerateRandomFloat
-            FloatTimer:Start(Controls.float_rate.Value)
+            FloatTimer:Start(tonumber(Controls.float_rate.String) or 1.0)
             print("[FLOAT] Auto-generation enabled")
         else
             if FloatTimer then FloatTimer:Stop() end
@@ -521,7 +517,7 @@ if Controls then
     Controls.float_rate.EventHandler = function(ctl)
         if Controls.float_enable.Boolean and FloatTimer then
             FloatTimer:Stop()
-            FloatTimer:Start(ctl.Value)
+            FloatTimer:Start(tonumber(ctl.String) or 1.0)
         end
     end
     
@@ -582,7 +578,8 @@ if Controls then
     Controls.countdown_reset.EventHandler = function()
         countdown_running = false
         countdown_start_time = 0
-        Controls.countdown_remaining.Value = Controls.countdown_duration.Value
+        local duration = tonumber(Controls.countdown_duration.String) or 60
+        Controls.countdown_remaining.String = tostring(duration)
         Controls.countdown_output.String = "00:00:00"
         Controls.countdown_pause.Boolean = false
         Controls.countdown_finished.Boolean = false
@@ -591,10 +588,11 @@ if Controls then
     
     Controls.countdown_duration.EventHandler = function(ctl)
         if not countdown_running then
-            Controls.countdown_remaining.Value = ctl.Value
-            local hours = math.floor(ctl.Value / 3600)
-            local mins = math.floor((ctl.Value % 3600) / 60)
-            local secs = ctl.Value % 60
+            local duration = tonumber(ctl.String) or 60
+            Controls.countdown_remaining.String = tostring(duration)
+            local hours = math.floor(duration / 3600)
+            local mins = math.floor((duration % 3600) / 60)
+            local secs = duration % 60
             Controls.countdown_output.String = string.format("%02d:%02d:%02d", hours, mins, secs)
         end
     end
