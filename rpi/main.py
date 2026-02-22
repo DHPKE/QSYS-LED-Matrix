@@ -38,7 +38,7 @@ from config import (
     DHCP_TIMEOUT_S,
 )
 from segment_manager import SegmentManager
-from udp_handler import UDPHandler
+from udp_handler import UDPHandler, _load_config
 from web_server import WebServer
 
 # ─── Logging ────────────────────────────────────────────────────────────────
@@ -195,21 +195,44 @@ def main():
     except Exception as exc:
         logger.error(f"⚠  LED matrix init failed: {exc} — falling back to NO_DISPLAY mode")
 
-    # ── 4. Brightness callback ────────────────────────────────────────────
+    # ── 4. Brightness and orientation callbacks ──────────────────────────
     def on_brightness_change(value_255: int):
         if matrix:
             matrix.brightness = _brightness_255_to_pct(value_255)
             logger.info(f"[MAIN] Brightness → {matrix.brightness}%")
+    
+    def on_orientation_change(orientation: str):
+        logger.info(f"[MAIN] Orientation → {orientation}")
+        # Reapply Layout 1 (fullscreen) for the new orientation
+        # This ensures segment dimensions match the new canvas size
+        if udp:
+            udp._apply_layout(1)
+            logger.info(f"[MAIN] Applied Layout 1 for {orientation} mode")
+        else:
+            # During startup, just mark dirty
+            sm.mark_all_dirty()
 
-    # ── 5. Start UDP listener ────────────────────────────────────────────
-    udp = UDPHandler(sm, brightness_callback=on_brightness_change)
+    # ── 5. Load saved configuration ───────────────────────────────────────
+    _load_config()
+
+    # ── 6. Start UDP listener ────────────────────────────────────────────
+    udp = UDPHandler(sm, 
+                     brightness_callback=on_brightness_change,
+                     orientation_callback=on_orientation_change)
     udp.start()
+    
+    # Apply the correct layout based on loaded orientation
+    # This ensures segments match the canvas dimensions on startup
+    from udp_handler import get_orientation
+    initial_orientation = get_orientation()
+    logger.info(f"[MAIN] Initial orientation: {initial_orientation}")
+    udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for current orientation
 
-    # ── 6. Start web server ──────────────────────────────────────────────
+    # ── 7. Start web server ──────────────────────────────────────────────
     web = WebServer(sm, udp)
     web.start()
 
-    # ── 7. IP address splash screen ──────────────────────────────────────
+    # ── 8. IP address splash screen ──────────────────────────────────────
     # Display the device IP on segment 0 (full-screen, white on black) until
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
     ip_splash_active = True
@@ -220,7 +243,7 @@ def main():
     logger.info("System ready — press Ctrl+C to stop")
     logger.info("=" * 50)
 
-    # ── 8. Shutdown handler ──────────────────────────────────────────────
+    # ── 9. Shutdown handler ──────────────────────────────────────────────
     def _shutdown(sig, frame):
         logger.info("\nShutting down…")
         udp.stop()
@@ -232,7 +255,7 @@ def main():
     signal.signal(signal.SIGINT,  _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
-    # ── 9. Main render loop ──────────────────────────────────────────────
+    # ── 10. Main render loop ──────────────────────────────────────────────
     last_effect = time.monotonic()
 
     while True:

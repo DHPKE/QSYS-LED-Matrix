@@ -17,14 +17,45 @@ WEB_PORT to 8080 in config.py for unprivileged access.
 import json
 import logging
 import threading
+import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 from config import WEB_PORT, UDP_PORT, MATRIX_WIDTH, MATRIX_HEIGHT
 from segment_manager import SegmentManager
-from udp_handler import UDPHandler, get_brightness
+from udp_handler import UDPHandler, get_brightness, get_orientation, set_orientation
 
 logger = logging.getLogger(__name__)
+
+
+def _get_real_ip(iface: str = "eth0") -> str:
+    """Return the actual IPv4 address of the network interface (not 127.0.1.1)."""
+    try:
+        import socket as _socket
+        import fcntl
+        import struct
+        SIOCGIFADDR = 0x8915
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        try:
+            packed = fcntl.ioctl(s.fileno(), SIOCGIFADDR,
+                                 struct.pack("256s", iface[:15].encode()))
+            return _socket.inet_ntoa(packed[20:24])
+        finally:
+            s.close()
+    except Exception:
+        pass
+    # Fallback: parse `ip addr show`
+    try:
+        out = subprocess.check_output(
+            ["ip", "-4", "addr", "show", iface],
+            stderr=subprocess.DEVNULL, text=True)
+        for line in out.splitlines():
+            line = line.strip()
+            if line.startswith("inet "):
+                return line.split()[1].split("/")[0]
+    except Exception:
+        pass
+    return "unknown"
 
 
 # ─── HTML template (same layout / JS as the ESP32 version) ─────────────────
@@ -117,18 +148,23 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div class="header">
     <h1>LED Matrix Controller</h1>
     <div class="subtitle">RPi Zero 2 W + PoE HAT — 64×32 RGB Display</div>
+    <div class="subtitle" style="margin-top:8px;color:#60a5fa;font-size:0.95em;">IP: {{DEVICE_IP}}</div>
   </div>
 
   <div class="grid">
     <div class="card" style="grid-column:1/-1;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;">
-        <div>
+        <div style="flex:1;">
           <h2 style="margin:0 0 15px 0;">Network Information</h2>
-          <div style="display:flex;gap:20px;flex-wrap:wrap;">
+          <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:end;">
             <div class="info-item"><span class="info-label">IP Address</span>
-              <div class="info-value"><input type="text" id="ip-address" value="{{IP_ADDRESS}}"></div></div>
+              <div class="info-value"><input type="text" id="ip-address" value="{{IP_ADDRESS}}" 
+                placeholder="e.g., 10.1.1.22" style="min-width:140px;"></div></div>
             <div class="info-item"><span class="info-label">UDP Port</span>
-              <div class="info-value"><input type="number" id="udp-port" value="{{UDP_PORT}}" style="width:100px;"></div></div>
+              <div class="info-value"><input type="number" id="udp-port" value="{{UDP_PORT}}" 
+                placeholder="21324" style="width:100px;"></div></div>
+            <button class="btn-primary" onclick="applyNetworkSettings()" 
+              style="padding:8px 20px;margin-bottom:2px;">Apply</button>
             <div class="info-item"><span class="info-label">Display Size</span>
               <span class="info-value" style="padding:6px 10px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid rgba(255,255,255,.1);">{{MATRIX_SIZE}}</span></div>
           </div>
@@ -138,7 +174,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
     </div>
 
     <div class="card" style="grid-column:1/-1;text-align:center;">
-      <h2>Live Preview</h2>
+      <h2>Live Preview <span id="preview-size" style="color:#888;font-size:0.8em;font-weight:normal;"></span></h2>
       <canvas id="preview" width="64" height="32" style="width:100%;max-width:640px;height:auto;"></canvas>
     </div>
 
@@ -185,6 +221,13 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div class="card" style="margin-bottom:20px;">
     <h2>Display Settings</h2>
     <div class="form-group">
+      <label>Orientation</label>
+      <div class="align-group">
+        <button class="align-btn" id="orient-landscape" onclick="setOrientation('landscape')">Landscape <br/>(64×32)</button>
+        <button class="align-btn" id="orient-portrait" onclick="setOrientation('portrait')">Portrait <br/>(32×64)</button>
+      </div>
+    </div>
+    <div class="form-group">
       <label>Brightness</label>
       <input type="range" id="brightness" min="0" max="255" value="128" oninput="updateBrightness(this.value)">
       <div class="brightness-display">
@@ -212,6 +255,9 @@ const segmentBounds = [
   {x:0,y:0,width:32,height:32},{x:32,y:0,width:32,height:32},
   {x:0,y:16,width:32,height:16},{x:32,y:16,width:32,height:16}
 ];
+
+// Current orientation, updated by loadOrientation()
+let currentOrientation = 'landscape';
 
 ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
 
@@ -262,7 +308,7 @@ function buildSegmentCards() {
 
 buildSegmentCards();
 
-window.addEventListener('load', () => { pollSegments(); setInterval(pollSegments,1000); });
+window.addEventListener('load', () => { loadOrientation(); pollSegments(); setInterval(pollSegments,1000); });
 
 // Auto-send text with debounce (waits 500ms after last keystroke)
 function autoSendText(seg) {
@@ -296,7 +342,8 @@ function pollSegments() {
         }
       }
     });
-    ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
+    ctx.fillStyle='#000'; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     data.segments.forEach(s => {
       if (s.active&&s.w>0&&s.h>0&&s.text)
         drawSegmentOnCanvas(s.id,s.text,s.color||'#FFF',s.bgcolor||'#000',s.align||'C');
@@ -338,7 +385,9 @@ function sendText(seg) {
 }
 function clearSegment(seg) {
   sendJSON({cmd:'clear',seg});
-  const b=segmentBounds[seg]; ctx.fillStyle='#000'; ctx.fillRect(b.x,b.y,b.width,b.height);
+  const b=segmentBounds[seg]; 
+  ctx.fillStyle='#000'; 
+  ctx.fillRect(b.x,b.y,b.width,b.height);
 }
 function invertColors(seg) {
   const colorEl = document.getElementById('color'+seg);
@@ -353,15 +402,82 @@ function invertColors(seg) {
   autoSendText(seg);
 }
 function clearAll() {
-  sendJSON({cmd:'clear_all'}); ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
+  sendJSON({cmd:'clear_all'}); 
+  ctx.fillStyle='#000'; 
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 function updateBrightness(v) {
   document.getElementById('brightness-value').textContent=v;
   sendJSON({cmd:'brightness',value:parseInt(v)});
 }
+function setOrientation(orientation) {
+  fetch('/api/orientation',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({value:orientation})
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    currentOrientation = data.orientation;
+    updateOrientationButtons(data.orientation);
+    updateCanvasSize(data.orientation);
+    console.log('Orientation set to:',data.orientation);
+  })
+  .catch(err=>console.error('Failed to set orientation:',err));
+}
+function updateOrientationButtons(orientation) {
+  const landscapeBtn = document.getElementById('orient-landscape');
+  const portraitBtn = document.getElementById('orient-portrait');
+  if (orientation === 'landscape') {
+    landscapeBtn.classList.add('active');
+    portraitBtn.classList.remove('active');
+  } else {
+    landscapeBtn.classList.remove('active');
+    portraitBtn.classList.add('active');
+  }
+}
+function updateCanvasSize(orientation) {
+  if (orientation === 'portrait') {
+    canvas.width = 32;
+    canvas.height = 64;
+    document.getElementById('preview-size').textContent = '(32×64)';
+  } else {
+    canvas.width = 64;
+    canvas.height = 32;
+    document.getElementById('preview-size').textContent = '(64×32)';
+  }
+  ctx.fillStyle='#000'; 
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+function loadOrientation() {
+  fetch('/api/orientation')
+    .then(r=>r.json())
+    .then(data=>{
+      currentOrientation = data.orientation;
+      updateOrientationButtons(data.orientation);
+      updateCanvasSize(data.orientation);
+    })
+    .catch(err=>console.error('Failed to load orientation:',err));
+}
+function applyNetworkSettings() {
+  const ip = document.getElementById('ip-address').value;
+  const port = parseInt(document.getElementById('udp-port').value);
+  
+  if (!ip || !port || port < 1 || port > 65535) {
+    updateStatus('Invalid IP or port', 'error');
+    return;
+  }
+  
+  updateStatus('Network settings noted (changing IP requires system reconfiguration)', 'ready');
+  console.log('Network settings:', {ip, port});
+  // Note: Actual IP change requires system-level networking changes
+  // Port change would require restarting the UDP handler
+  // This UI update is informational only for now
+}
 // Layout presets — mirrors config.py LAYOUT_PRESETS exactly.
 // Each entry: list of [x, y, w, h] per active segment.
-const LAYOUTS = {
+// Landscape layouts (64×32)
+const LAYOUTS_LANDSCAPE = {
   1: [[0,0,64,32]],
   2: [[0,0,64,16],[0,16,64,16]],
   3: [[0,0,32,32],[32,0,32,32]],
@@ -370,7 +486,18 @@ const LAYOUTS = {
   6: [[0,0,21,32],[21,0,21,32],[42,0,22,32]],
   7: [[0,0,32,16],[32,0,32,16],[0,16,32,16],[32,16,32,16]],
 };
+// Portrait layouts (32×64)
+const LAYOUTS_PORTRAIT = {
+  1: [[0,0,32,64]],
+  2: [[0,0,32,32],[0,32,32,32]],
+  3: [[0,0,16,64],[16,0,16,64]],
+  4: [[0,0,32,32],[0,32,16,32],[16,32,16,32]],
+  5: [[0,0,16,32],[16,0,16,32],[0,32,32,32]],
+  6: [[0,0,32,21],[0,21,32,21],[0,42,32,22]],
+  7: [[0,0,16,32],[16,0,16,32],[0,32,16,32],[16,32,16,32]],
+};
 function applyLayout(preset) {
+  const LAYOUTS = currentOrientation === 'portrait' ? LAYOUTS_PORTRAIT : LAYOUTS_LANDSCAPE;
   const zones = LAYOUTS[preset] || [];
   // Update local segmentBounds for the canvas preview
   for(let i=0;i<4;i++){
@@ -385,7 +512,8 @@ function applyLayout(preset) {
   updateSegmentStates(activeSegs);
   // Send a single layout command — the backend applies all segment geometry
   sendJSON({cmd:'layout',preset});
-  ctx.fillStyle='#000'; ctx.fillRect(0,0,64,32);
+  ctx.fillStyle='#000'; 
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 function drawSegmentOnCanvas(seg,text,color,bgcolor,align) {
   const b=segmentBounds[seg]; if(!b||b.width===0||b.height===0) return;
@@ -440,12 +568,9 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path in ("/", "/index.html"):
-            import socket as _socket
-            try:
-                ip = _socket.gethostbyname(_socket.gethostname())
-            except Exception:
-                ip = "unknown"
+            ip = _get_real_ip()
             html = _HTML_TEMPLATE \
+                .replace("{{DEVICE_IP}}", ip) \
                 .replace("{{IP_ADDRESS}}", ip) \
                 .replace("{{UDP_PORT}}",   str(UDP_PORT)) \
                 .replace("{{MATRIX_SIZE}}", f"{MATRIX_WIDTH}x{MATRIX_HEIGHT}")
@@ -464,6 +589,10 @@ class _Handler(BaseHTTPRequestHandler):
             doc = {"segments": self._sm.snapshot()}
             self._send(200, "application/json", json.dumps(doc))
 
+        elif path == "/api/orientation":
+            doc = {"orientation": get_orientation()}
+            self._send(200, "application/json", json.dumps(doc))
+
         else:
             self._send(404, "text/plain", "Not found")
 
@@ -476,6 +605,21 @@ class _Handler(BaseHTTPRequestHandler):
             logger.info(f"[HTTP] /api/test  body={body[:120]}")
             self._udp.dispatch(body)
             self._send(200, "text/plain", f"Command dispatched: {body}")
+        
+        elif path == "/api/orientation":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode("utf-8", errors="replace")
+            try:
+                data = json.loads(body)
+                orientation = data.get("value", "landscape")
+                logger.info(f"[HTTP] /api/orientation  value={orientation}")
+                cmd = json.dumps({"cmd": "orientation", "value": orientation})
+                self._udp.dispatch(cmd)
+                self._send(200, "application/json", json.dumps({"status": "ok", "orientation": get_orientation()}))
+            except Exception as e:
+                logger.error(f"[HTTP] /api/orientation failed: {e}")
+                self._send(400, "text/plain", f"Error: {e}")
+        
         else:
             self._send(404, "text/plain", "Not found")
 

@@ -6,32 +6,34 @@ Hardware:
   - PoE HAT (802.3af) providing power + wired Ethernet via USB or HAT
   - 64x32 HUB75 LED Matrix panel
 
-HUB75 GPIO Wiring (BCM numbering) — Adafruit RGB Matrix Bonnet/HAT pinout:
-  Using the 'adafruit-hat' hardware mapping for compatibility with
-  Adafruit RGB Matrix Bonnet/HAT pinout:
+HUB75 GPIO Wiring (BCM numbering) — rpi-rgb-led-matrix defaults:
+  The rpi-rgb-led-matrix library has well-tested default pin mappings.
+  Using the 'regular' (non-adafruit-hat) mapping:
 
-    Control Pins:
-      OE  = GPIO 18  (physical pin 12)  — Output Enable
-      CLK = GPIO 17  (physical pin 11)  — Clock
-      LAT = GPIO 4   (physical pin 7)   — Latch
+    R1  = GPIO 5   (physical pin 29)
+    G1  = GPIO 13  (physical pin 33)
+    B1  = GPIO 6   (physical pin 31)
+    R2  = GPIO 12  (physical pin 32)
+    G2  = GPIO 16  (physical pin 36)
+    B2  = GPIO 23  (physical pin 16)
+    A   = GPIO 22  (physical pin 15)
+    B   = GPIO 26  (physical pin 37)
+    C   = GPIO 27  (physical pin 13)
+    D   = GPIO 20  (physical pin 38)
+    E   = GPIO 24  (physical pin 18)  — only needed for 1/64 scan (64px tall panels)
+    CLK = GPIO 17  (physical pin 11)
+    LAT = GPIO 4   (physical pin 7)
+    OE  = GPIO 18  (physical pin 12)
 
-    Address Pins (Row Select):
-      A   = GPIO 22  (physical pin 15)  — Address A (1->32, 1->16, or 1->8 mux)
-      B   = GPIO 23  (physical pin 16)  — Address B (1->32, 1->16, or 1->8 mux)
-      C   = GPIO 24  (physical pin 18)  — Address C (1->32, 1->16, or 1->8 mux)
-      D   = GPIO 25  (physical pin 22)  — Address D (1->32 or 1->16 mux only)
-      E   = GPIO 15  (physical pin 10, RxD)  — Address E (1->64 mux, 64px tall only)
+  All 40 GPIO pins remain available — wired Ethernet is via the PoE HAT
+  USB/SPI path, NOT via silicon RMII, so there is NO GPIO conflict.
 
-    Port 1 Color Pins:
-      R1  = GPIO 11  (physical pin 23)  — Red top half
-      G1  = GPIO 27  (physical pin 13)  — Green top half
-      B1  = GPIO 7   (physical pin 26)  — Blue top half
-      R2  = GPIO 8   (physical pin 24)  — Red bottom half
-      G2  = GPIO 9   (physical pin 21)  — Green bottom half
-      B2  = GPIO 10  (physical pin 19)  — Blue bottom half
-
-  This pinout is optimized for Adafruit RGB Matrix Bonnet/HAT and is
-  confirmed working with this hardware configuration.
+PoE HAT notes:
+  - Most PoE HATs for Pi Zero use a small fan on GPIO 4 & 14 for cooling.
+  - If your HAT uses GPIO 4 for the fan, change LAT to a different free pin
+    and update both this file AND your physical wiring.
+  - Check your HAT datasheet. The Waveshare PoE HAT (B) uses GPIO 26/35 for
+    the fan — both of which ARE used above. Adjust as needed.
 """
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -42,8 +44,8 @@ MATRIX_HEIGHT  = 32
 MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
-MATRIX_HARDWARE_MAPPING = "adafruit-hat"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
+MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
+MATRIX_GPIO_SLOWDOWN    = 1           # 0–4; Controls LED refresh rate
                                       # 0 = Fastest (~1000Hz+) - BEST for reducing flicker
                                       # 1 = Fast (~500Hz) - Good balance for Pi Zero 2 W
                                       # 2 = Good balance (~250-300Hz)
@@ -57,11 +59,24 @@ MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 l
                                       # 1-6 = Faster but reduced colors
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Display Orientation
+# ──────────────────────────────────────────────────────────────────────────────
+ORIENTATION = "landscape"  # "landscape" (64×32) or "portrait" (32×64)
+                            # Portrait mode rotates the display 90° clockwise
+                            # Can be changed via WebUI, QSYS plugin, or UDP command
+                            # NOTE: When orientation changes, Layout 1 (fullscreen) is
+                            # automatically applied to ensure segment dimensions match
+                            # the new canvas size. Use layout presets or send new
+                            # segment configs after changing orientation.
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Segments
 # ──────────────────────────────────────────────────────────────────────────────
 MAX_SEGMENTS = 4
 
 # Default segment layout: fullscreen on segment 0, others inactive
+# NOTE: These defaults are for LANDSCAPE mode (64×32).
+# On startup, if orientation is portrait, Layout 1 will be auto-applied.
 DEFAULT_SEGMENTS = [
     {"id": 0, "x": 0,  "y": 0, "w": MATRIX_WIDTH, "h": MATRIX_HEIGHT,
      "text": "", "color": "#FFFFFF", "bgcolor": "#000000",
@@ -142,6 +157,39 @@ LAYOUT_PRESETS = {
         (W//2,      0,         W//2,  H//2 ),                            # top-right
         (0,         H//2,      W//2,  H//2 ),                            # bottom-left
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
+}
+
+# Portrait layout presets (32×64 virtual canvas)
+# Coordinates: (x, y, w, h) for 32 wide × 64 tall display
+#  Layout 1 — Fullscreen         [seg0: full 32×64]
+#  Layout 2 — Top/Bottom halves  [seg0: top, seg1: bottom]
+#  Layout 3 — Left/Right halves  [seg0: left, seg1: right]
+#  Layout 4 — Triple top         [seg0: top half, seg1: bottom-left, seg2: bottom-right]
+#  Layout 5 — Triple bottom      [seg0: top-left, seg1: top-right, seg2: bottom half]
+#  Layout 6 — Thirds horizontal  [seg0 — seg1 — seg2]
+#  Layout 7 — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+PW = MATRIX_HEIGHT  # Portrait width = 32
+PH = MATRIX_WIDTH   # Portrait height = 64
+
+LAYOUT_PRESETS_PORTRAIT = {
+    1: [(0,          0,         PW,     PH    )],                        # fullscreen
+    2: [(0,          0,         PW,     PH//2 ),                         # top half
+        (0,          PH//2,     PW,     PH//2 )],                        # bottom half
+    3: [(0,          0,         PW//2,  PH    ),                         # left half
+        (PW//2,      0,         PW//2,  PH    )],                        # right half
+    4: [(0,          0,         PW,     PH//2 ),                         # top half
+        (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left quarter
+        (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right quarter
+    5: [(0,          0,         PW//2,  PH//2 ),                         # top-left quarter
+        (PW//2,      0,         PW//2,  PH//2 ),                         # top-right quarter
+        (0,          PH//2,     PW,     PH//2 )],                        # bottom half
+    6: [(0,          0,         PW,     PH//3      ),                    # top third  (21px)
+        (0,          PH//3,     PW,     PH//3      ),                    # middle third (21px)
+        (0,          2*(PH//3), PW,     PH-2*(PH//3))],                  # bottom third  (22px)
+    7: [(0,          0,         PW//2,  PH//2 ),                         # top-left
+        (PW//2,      0,         PW//2,  PH//2 ),                         # top-right
+        (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left
+        (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right
 }
 
 # ──────────────────────────────────────────────────────────────────────────────

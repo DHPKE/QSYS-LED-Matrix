@@ -7,6 +7,8 @@ copies the pixels into the matrix's FrameCanvas.
 
 Font sizes are auto-fitted to the segment bounding box, mirroring
 the ESP32 firmware's `autoSize` behaviour.
+
+Supports landscape and portrait orientation modes.
 """
 
 import os
@@ -19,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 from config import (MATRIX_WIDTH, MATRIX_HEIGHT,
                     FONT_PATH, FONT_PATH_FALLBACK)
 from segment_manager import SegmentManager, TextAlign, TextEffect
+import udp_handler
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +69,7 @@ def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     return rgb
 
 
-def _fit_text(text: str, max_w: int, max_h: int) -> tuple[ImageFont.ImageFont, int]:
+def _fit_text(text: str, max_w: int, max_h: int, debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
     """Return (font, font_size) for the largest size that fits within max_w × max_h.
     Uses cached measurements for performance."""
     
@@ -86,9 +89,13 @@ def _fit_text(text: str, max_w: int, max_h: int) -> tuple[ImageFont.ImageFont, i
         
         # Return first (largest) size that fits
         if tw <= max_w and th <= max_h:
+            if debug_seg_id >= 0:
+                logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → size {size} ({tw}×{th} in {max_w}×{max_h})")
             return _load_font(size), size
     
     # Fallback: smallest size
+    if debug_seg_id >= 0:
+        logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {_FONT_SIZES[-1]} (text too long)")
     return _load_font(_FONT_SIZES[-1]), _FONT_SIZES[-1]
 
 
@@ -112,10 +119,12 @@ class TextRenderer:
         self._matrix  = matrix
         self._canvas  = canvas
         self._sm      = segment_manager
-        # Off-screen PIL image for compositing
+        # Off-screen PIL image for compositing - size depends on orientation
+        # Always matches the physical matrix dimensions (64×32)
         self._image   = Image.new("RGB", (MATRIX_WIDTH, MATRIX_HEIGHT), (0, 0, 0))
         self._draw    = ImageDraw.Draw(self._image)
         self._render_count = 0
+        self._current_orientation = "landscape"
 
     def render_all(self):
         """Composite all active segments and push to the matrix canvas."""
@@ -132,8 +141,33 @@ class TextRenderer:
         if not needs_render:
             return
         
+        # Get current orientation and check if we need to recreate the image
+        orientation = udp_handler.get_orientation()
+        
+        # Determine virtual canvas dimensions based on orientation
+        if orientation == "portrait":
+            # Portrait mode: 32 wide × 64 tall virtual space
+            canvas_width = MATRIX_HEIGHT  # 32
+            canvas_height = MATRIX_WIDTH  # 64
+        else:
+            # Landscape mode: 64 wide × 32 tall
+            canvas_width = MATRIX_WIDTH
+            canvas_height = MATRIX_HEIGHT
+        
+        # Recreate image if orientation changed
+        if orientation != self._current_orientation:
+            self._image = Image.new("RGB", (canvas_width, canvas_height), (0, 0, 0))
+            self._draw = ImageDraw.Draw(self._image)
+            self._current_orientation = orientation
+            logger.info(f"[RENDER] Canvas resized to {canvas_width}×{canvas_height} for {orientation} mode")
+            # Log active segment dimensions for debugging
+            with self._sm._lock:
+                for seg in self._sm._segments:
+                    if seg.is_active:
+                        logger.debug(f"[RENDER]   Segment {seg.id}: ({seg.x},{seg.y}) {seg.width}×{seg.height}")
+        
         # Clear full framebuffer to black (fast operation)
-        self._image.paste(0, [0, 0, MATRIX_WIDTH, MATRIX_HEIGHT])
+        self._image.paste(0, [0, 0, canvas_width, canvas_height])
 
         rendered_count = 0
         # Render ALL active segments when anything is dirty
@@ -154,8 +188,17 @@ class TextRenderer:
         if self._render_count % 50 == 0:
             logger.debug(f"[RENDER] Rendered {rendered_count} segments (count: {self._render_count})")
 
-        # Push the PIL image to the matrix canvas (outside lock)
-        self._canvas.SetImage(self._image)
+        # Apply rotation if in portrait mode to convert virtual 32×64 to physical 64×32
+        if orientation == "portrait":
+            # Rotate 270 degrees clockwise (= -90 degrees) to convert 32×64 to 64×32
+            # This maps virtual (0,0) at top-left to physical top-left corner
+            rotated_img = self._image.rotate(-90, expand=True)
+            self._canvas.SetImage(rotated_img)
+        else:
+            # Landscape mode - use image as-is
+            self._canvas.SetImage(self._image)
+        
+        # Swap canvas
         self._canvas = self._matrix.SwapOnVSync(self._canvas)
 
     # ─── Private ───────────────────────────────────────────────────────────
@@ -181,7 +224,7 @@ class TextRenderer:
         # Auto-fit font with 1px margin on all borders
         avail_w = max(1, seg.width  - 2)  # 1px margin left and right
         avail_h = max(1, seg.height - 2)  # 1px margin top and bottom
-        font, font_size = _fit_text(text, avail_w, avail_h)
+        font, font_size = _fit_text(text, avail_w, avail_h, debug_seg_id=seg.id)
 
         # Measure text
         try:

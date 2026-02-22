@@ -1,6 +1,11 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 3.0.0 - JSON Protocol & Optimization Update
+-- Version 3.1.0 - Portrait Mode Support
 -- Controls RPi Zero 2 W LED Matrix via UDP (JSON format)
+--
+-- CHANGES in v3.1.0:
+-- - Added portrait mode support with persistent orientation setting
+-- - Orientation control in plugin UI (landscape/portrait)
+-- - Configuration persistence for orientation
 --
 -- CHANGES in v3.0.0:
 -- - Updated to JSON protocol (matches web UI and UDP handler)
@@ -15,9 +20,9 @@
 
 PluginInfo = {
     Name = "Olimex~LED Matrix Text Display",
-    Version = "3.0.0",
-    Id = "dhpke.olimex.led.matrix.3.0.0",
-    Description = "UDP control for RPi Zero 2 W 64x32 LED Matrix (JSON protocol)",
+    Version = "3.1.0",
+    Id = "dhpke.olimex.led.matrix.3.1.0",
+    Description = "UDP control for RPi Zero 2 W 64x32 LED Matrix (JSON protocol, portrait mode support)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -211,6 +216,16 @@ function GetControls(props)
         ControlUnit = "Integer",
         Min = 0,
         Max = 255,
+        Count = 1,
+        UserPin = true,
+        PinStyle = "Both"
+    })
+    
+    table.insert(controls, {
+        Name = "orientation",
+        ControlType = "Text",
+        ControlUnit = "List",
+        Choices = {"landscape", "portrait"},
         Count = 1,
         UserPin = true,
         PinStyle = "Both"
@@ -429,7 +444,14 @@ function GetControlLayout(props)
         PrettyName = "Brightness (0-255)",
         Style = "Fader",
         Position = {20, yPos + 25},
-        Size = {250, 50}
+        Size = {200, 50}
+    }
+    
+    layout["orientation"] = {
+        PrettyName = "Orientation",
+        Style = "ComboBox",
+        Position = {240, yPos + 25},
+        Size = {150, 50}
     }
     
     layout["clear_all"] = {
@@ -438,15 +460,15 @@ function GetControlLayout(props)
         ButtonStyle = "Trigger",
         Legend = "Clear All Segments",
         Color = {200, 60, 60},
-        Position = {290, yPos + 25},
-        Size = {180, 50}
+        Position = {410, yPos + 25},
+        Size = {150, 50}
     }
     
     layout["layout"] = {
         PrettyName = "Display Layout",
         Style = "ComboBox",
-        Position = {490, yPos + 25},
-        Size = {270, 50}
+        Position = {580, yPos + 25},
+        Size = {180, 50}
     }
     
     return layout, graphics
@@ -499,6 +521,7 @@ if Controls then
         Controls.ip_address.String = ip_addr
         Controls.udp_port.String = tostring(udp_port)
         Controls.brightness.Value = 128
+        Controls.orientation.String = "landscape"
         Controls.last_command.String = "Ready"
         
         -- Set defaults for each segment
@@ -781,6 +804,15 @@ if Controls then
     -- Layout change handler
     Controls.layout.EventHandler = function(ctl)
         ApplyLayout(ctl.String)
+    end
+    
+    -- Orientation change handler
+    Controls.orientation.EventHandler = function(ctl)
+        local orient = ctl.String
+        local jsonCmd = string.format('{"cmd":"orientation","value":"%s"}', orient)
+        if SendCommand(jsonCmd) then
+            print("Orientation set to: " .. orient)
+        end
     end
     
     -- IP/Port change handlers

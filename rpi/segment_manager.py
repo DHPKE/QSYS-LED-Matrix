@@ -151,13 +151,18 @@ class SegmentManager:
             seg = self.get_segment(seg_id)
             if seg:
                 seg.text = ""
-                seg.is_active = False  # Deactivate when clearing
                 seg.is_dirty = True
 
     def clear_all(self):
         with self._lock:
             for seg in self._segments:
                 seg.text = ""
+                seg.is_dirty = True
+
+    def mark_all_dirty(self):
+        """Mark all segments as dirty to force re-render (e.g., on orientation change)"""
+        with self._lock:
+            for seg in self._segments:
                 seg.is_dirty = True
 
     def configure(self, seg_id: int, x: int, y: int, w: int, h: int):
