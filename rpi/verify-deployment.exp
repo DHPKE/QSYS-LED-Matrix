@@ -1,0 +1,6 @@
+#!/usr/bin/expect -f
+set timeout 10
+set password "node"
+spawn ssh node@10.1.1.22 "grep -A 5 '_current_layout' /home/node/led-matrix/udp_handler.py | head -20"
+expect "password:" { send "${password}\r" }
+expect eof

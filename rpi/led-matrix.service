@@ -13,6 +13,13 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
+# Performance optimizations
+Nice=-10
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+
 # Allow the process to access /dev/mem and GPIO
 PrivateDevices=no
 PrivateTmp=yes

@@ -1,0 +1,6 @@
+#!/usr/bin/expect -f
+set timeout 10
+set password "node"
+spawn ssh node@10.1.1.22 "sudo grep 'ExecStart' /etc/systemd/system/led-matrix.service"
+expect "password:" { send "${password}\r" }
+expect eof

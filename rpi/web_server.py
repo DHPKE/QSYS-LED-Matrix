@@ -308,7 +308,7 @@ function buildSegmentCards() {
 
 buildSegmentCards();
 
-window.addEventListener('load', () => { loadOrientation(); pollSegments(); setInterval(pollSegments,1000); });
+window.addEventListener('load', () => { loadOrientation(); pollSegments(); setInterval(pollSegments,5000); });
 
 // Auto-send text with debounce (waits 500ms after last keystroke)
 function autoSendText(seg) {
