@@ -354,17 +354,34 @@ if Controls then
 
     local function Initialize()
         print("LED Matrix Complete v5.0.0 Init")
-        Controls.ip_address.String   = ip_addr
-        Controls.udp_port.String     = tostring(udp_port)
-        Controls.brightness.Value    = 128
-        Controls.last_command.String = "Ready"
+        
+        -- Always set IP/port from Properties
+        if Controls.ip_address.String == "" then
+            Controls.ip_address.String = ip_addr
+        end
+        if Controls.udp_port.String == "" then
+            Controls.udp_port.String = tostring(udp_port)
+        end
+        
+        -- Always set Choices
         Controls.layout.Choices = {
             "1 - Fullscreen", "2 - Split Horizontal", "3 - Split Vertical", "4 - Quad",
             "5 - Thirds",     "6 - Triple",
             "11 - Fullscreen Seg1", "12 - Fullscreen Seg2",
             "13 - Fullscreen Seg3", "14 - Fullscreen Seg4"
         }
-        Controls.layout.String = "1 - Fullscreen"
+        
+        -- Only set defaults if empty (first run)
+        if Controls.brightness.Value == 0 then
+            Controls.brightness.Value = 128
+        end
+        if Controls.last_command.String == "" then
+            Controls.last_command.String = "Ready"
+        end
+        if Controls.layout.String == "" then
+            Controls.layout.String = "1 - Fullscreen"
+        end
+        
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
                                 "Orange","Purple","Gold","Grey","Black"}
         local fontChoices   = {"Arial","Verdana","Impact"}
@@ -372,25 +389,48 @@ if Controls then
         local alignChoices  = {"Left","Center","Right"}
         local effectChoices = {"none","scroll","blink","fade"}
         local defaultColors = {"White","Lime","Red","Yellow"}
+        
         for seg = 0, 3 do
             local s = seg + 1
             local p = "seg"..s.."_"
+            -- Always set Choices
             Controls[p.."text_color"].Choices = colorChoices
             Controls[p.."bg_color"].Choices   = colorChoices
             Controls[p.."font"].Choices       = fontChoices
             Controls[p.."size"].Choices       = sizeChoices
             Controls[p.."align"].Choices      = alignChoices
             Controls[p.."effect"].Choices     = effectChoices
-            Controls[p.."text"].String        = ""
-            Controls[p.."text_color"].String  = defaultColors[s]
-            Controls[p.."bg_color"].String    = "Black"
-            Controls[p.."intensity"].Value    = 255
-            Controls[p.."font"].String        = "Arial"
-            Controls[p.."size"].String        = "auto"
-            Controls[p.."align"].String       = "Center"
-            Controls[p.."effect"].String      = "none"
-            Controls[p.."active"].Boolean     = (seg == 0)
+            
+            -- Only set defaults if empty (first run)
+            if Controls[p.."text_color"].String == "" then
+                Controls[p.."text_color"].String = defaultColors[s]
+            end
+            if Controls[p.."bg_color"].String == "" then
+                Controls[p.."bg_color"].String = "Black"
+            end
+            if Controls[p.."intensity"].Value == 0 then
+                Controls[p.."intensity"].Value = 255
+            end
+            if Controls[p.."font"].String == "" then
+                Controls[p.."font"].String = "Arial"
+            end
+            if Controls[p.."size"].String == "" then
+                Controls[p.."size"].String = "auto"
+            end
+            if Controls[p.."align"].String == "" then
+                Controls[p.."align"].String = "Center"
+            end
+            if Controls[p.."effect"].String == "" then
+                Controls[p.."effect"].String = "none"
+            end
         end
+        
+        -- Restore active segment indicators from current state
+        activeLayoutSegments = activeLayoutSegments or {[0]=true}
+        for seg = 0, 3 do
+            Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+        end
+        
         ReopenSocket()
     end
 
