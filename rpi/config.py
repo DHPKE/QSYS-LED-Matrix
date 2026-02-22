@@ -60,8 +60,9 @@ MATRIX_PWM_BITS        = 6           # 1-11; PWM bits for color depth (11=2048 l
                                       # 6 = Faster, less glitches, still good colors (64 levels)
                                       # 5 = Fast refresh, minimal glitches, acceptable colors
                                       # 1-4 = Very fast but visibly reduced colors
-MATRIX_SCAN_MODE        = 0           # 0 = progressive (default), 1 = interlaced
-                                      # Try 1 if you see line flickering
+MATRIX_SCAN_MODE        = 1           # 0 = progressive (default), 1 = interlaced
+                                      # Interlaced can help reduce certain types of flickering
+                                      # Try 1 if you see line flickering or single-pixel artifacts
 MATRIX_ROW_ADDRESS_TYPE = 0           # 0-4; Different panels use different addressing
                                       # 0 = default (direct), 1 = AB-address panels
                                       # 2 = direct row select, 3 = ABC-addressed
