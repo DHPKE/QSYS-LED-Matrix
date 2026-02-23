@@ -568,9 +568,6 @@ if Controls then
             if Controls[s.."bg_color"].String == "" then
                 Controls[s.."bg_color"].String = "Black"
             end
-            if Controls[s.."intensity"].Value == 0 then
-                Controls[s.."intensity"].Value = 255
-            end
             if Controls[s.."font"].String == "" then
                 Controls[s.."font"].String = "Arial"
             end
