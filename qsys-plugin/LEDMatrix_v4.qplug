@@ -821,26 +821,44 @@ if Controls then
     end
 
     -- ── Group Selection handlers ────────────────────────────────────
+    -- Track if we're programmatically updating buttons to avoid event loops
+    local updatingGroups = false
+    
     for g = 0, 8 do
         local groupNum = g  -- Capture loop variable
         local gName = string.format("group%d_select", groupNum)
         Controls[gName].EventHandler = function(ctl)
+            -- Ignore programmatic updates
+            if updatingGroups then return end
+            
             if ctl.Boolean then
-                -- Set this as active, deactivate all others
+                -- User pressed this button - make it active
+                updatingGroups = true
+                
+                -- Set this as active group
                 Controls.active_group.String = tostring(groupNum)
+                
+                -- Deactivate all other group buttons
                 for otherG = 0, 8 do
                     if otherG ~= groupNum then
                         Controls[string.format("group%d_select", otherG)].Boolean = false
                     end
                 end
                 
+                updatingGroups = false
+                
                 -- Send command to Pi to set its group ID (configures which group this Pi belongs to)
                 SendCommand(buildJson({cmd="group", value=groupNum}))
                 
                 print(string.format("Group selected: %d", groupNum))
             else
-                -- Prevent deselection - at least one must be active
-                ctl.Boolean = true
+                -- User tried to deselect the active button - prevent it
+                local activeGrp = tonumber(Controls.active_group.String) or 0
+                if groupNum == activeGrp then
+                    updatingGroups = true
+                    ctl.Boolean = true
+                    updatingGroups = false
+                end
             end
         end
     end
