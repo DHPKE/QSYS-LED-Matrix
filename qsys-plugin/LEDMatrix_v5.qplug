@@ -614,6 +614,8 @@ if Controls then
                     local groupName = grp == 0 and "All" or tostring(grp)
                     Controls.active_group.String = groupName
                     print("Active group set to: " .. groupName)
+                    -- Send group assignment command to Pi(s)
+                    SendCommand(buildJson({cmd="group", value=grp}))
                 end, 0.05)
             else
                 -- Don't allow deselecting - always have one selected
