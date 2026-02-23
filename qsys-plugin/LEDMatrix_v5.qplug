@@ -346,7 +346,7 @@ function GetControlLayout(props)
             ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R,
             Position={W-100, r1}, Size={94, BH} }
 
-        local r2 = sy + 58
+        local r2 = sy + 70
         local cx = 6
         for _, col in ipairs(comboCols) do
             Lbl(col[1], cx, r2-20, col[4])
@@ -357,7 +357,7 @@ function GetControlLayout(props)
         end
 
         -- Row 3: Frame controls
-        local r3 = sy + 95
+        local r3 = sy + 107
         layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
             ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
             Position={6, r3}, Size={80, BH} }

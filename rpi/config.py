@@ -119,7 +119,7 @@ GROUP_COLORS = {
 }
 
 # Group indicator configuration
-GROUP_INDICATOR_SIZE = 4   # Size of the group indicator square (4×4 pixels)
+GROUP_INDICATOR_SIZE = 2   # Size of the group indicator square (2×2 pixels)
 GROUP_INDICATOR_X = 0      # X position (bottom-left corner)
 GROUP_INDICATOR_Y = -1     # Y position (-1 = auto-calculate bottom position)
 
