@@ -79,11 +79,6 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("seg%d_effect",     n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_font",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_size",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
-        table.insert(controls, {
-            Name=string.format("seg%d_intensity", n),
-            ControlType="Knob", ControlUnit="Integer", Min=0, Max=255,
-            Count=1, UserPin=true, PinStyle="Both"
-        })
         table.insert(controls, { Name=string.format("seg%d_send",   n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_clear",  n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -235,7 +230,71 @@ function GetControlLayout(props)
             Position={tx, ty+TH+2}, Size={TW, 10}})
     end
 
-    -- (Thumbnail visual fills omitted for brevity - same as v4)
+    -- Thumbnail visual fills (segment colors)
+    local cA = {70, 160,  70}   -- green   seg 0
+    local cB = {70,  80, 160}   -- blue    seg 1
+    local cC = {160, 70,  70}   -- red     seg 2
+    local cD = {160,160,  40}   -- yellow  seg 3
+
+    local HW = 31   -- half width
+    local HH = 13   -- half height
+    local T1 = 20   -- first third width
+    local T2 = 20   -- second third width
+    local T3 = 22   -- third third width
+
+    -- Preset 1 — Fullscreen
+    do local tx=TX+0*(TW+GAP); local ty=y+14
+        TRect(cA, tx, ty, TW, TH)
+    end
+    -- Preset 2 — Top/Bottom
+    do local tx=TX+1*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    TW, HH)
+        TRect(cB, tx,    ty+HH, TW, HH)
+    end
+    -- Preset 3 — Left/Right
+    do local tx=TX+2*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty, HW, TH)
+        TRect(cB, tx+HW, ty, HW, TH)
+    end
+    -- Preset 4 — Triple Left
+    do local tx=TX+3*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, TH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx+HW, ty+HH, HW, HH)
+    end
+    -- Preset 5 — Triple Right
+    do local tx=TX+4*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx,    ty+HH, HW, HH)
+        TRect(cC, tx+HW, ty,    HW, TH)
+    end
+    -- Preset 6 — Thirds
+    do local tx=TX+5*(TW+GAP); local ty=y+14
+        TRect(cA, tx,       ty, T1, TH)
+        TRect(cB, tx+T1,    ty, T2, TH)
+        TRect(cC, tx+T1+T2, ty, T3, TH)
+    end
+    -- Preset 7 — Quad
+    do local tx=TX+6*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx,    ty+HH, HW, HH)
+        TRect(cD, tx+HW, ty+HH, HW, HH)
+    end
+    
+    -- Preset 11-14 — Fullscreen per segment
+    do local tx=TX+0*(TW+GAP); local ty=y+56
+        TRect(cA, tx, ty, TW, TH)
+    end
+    do local tx=TX+1*(TW+GAP); local ty=y+56
+        TRect(cB, tx, ty, TW, TH)
+    end
+    do local tx=TX+2*(TW+GAP); local ty=y+56
+        TRect(cC, tx, ty, TW, TH)
+    end
+    do local tx=TX+3*(TW+GAP); local ty=y+56
+        TRect(cD, tx, ty, TW, TH)
+    end
     
     Lbl("Layout Preset", TX, y+96, 210)
     layout["layout_preset"] = {
@@ -252,7 +311,7 @@ function GetControlLayout(props)
 
     -- ── Segment rows ────────────────────────────────────────────────
     y = y + 166
-    local SEG_H = 180  -- Increased for frame controls (was 126)
+    local SEG_H = 145  -- Reduced: removed intensity fader, added frame controls
 
     local comboCols = {
         {"Text Color", "text_color", "TxtColor", 110},
@@ -290,27 +349,22 @@ function GetControlLayout(props)
         local r2 = sy + 58
         local cx = 6
         for _, col in ipairs(comboCols) do
-            Lbl(col[1], cx, r2-15, col[4])
+            Lbl(col[1], cx, r2-20, col[4])
             layout[sn..col[2]] = { PrettyName=grp.."~"..col[3], Style="ComboBox",
                 IsReadOnly=false,
                 Position={cx, r2}, Size={col[4], CH} }
             cx = cx + col[4] + 6
         end
 
-        local r3 = sy + 100
-        Lbl("Intensity", 6, r3-15, 260)
-        layout[sn.."intensity"] = { PrettyName=grp.."~Intensity", Style="Fader",
-            Position={6, r3}, Size={W-14, 22} }
-        
-        -- Row 4: Frame controls
-        local r4 = sy + 130
+        -- Row 3: Frame controls
+        local r3 = sy + 95
         layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
             ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
-            Position={6, r4}, Size={80, BH} }
-        Lbl("Color", 92, r4-12, 50)
+            Position={6, r3}, Size={80, BH} }
+        Lbl("Color", 92, r3-15, 50)
         layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
             IsReadOnly=false,
-            Position={92, r4}, Size={110, CH} }
+            Position={92, r3}, Size={110, CH} }
     end
 
     -- ── Global Controls ─────────────────────────────────────────────
@@ -450,12 +504,11 @@ if Controls then
         local size    = Controls[s.."size"].String                   or "auto"
         local align   = AlignMap[Controls[s.."align"].String]        or "C"
         local effect  = Controls[s.."effect"].String                 or "none"
-        local intens  = math.floor(Controls[s.."intensity"].Value)
         
         -- Add group routing
         return text, buildJson({
             cmd="text", seg=seg, group=activeGroup, text=text, color=color, bgcolor=bgcolor,
-            font=font, size=size, align=align, effect=effect, intensity=intens
+            font=font, size=size, align=align, effect=effect, intensity=255
         })
     end
 
@@ -530,7 +583,6 @@ if Controls then
             if Controls[s.."effect"].String == "" then
                 Controls[s.."effect"].String = "none"
             end
-            Controls[s.."frame"].Boolean = Controls[s.."frame"].Boolean or false
             if Controls[s.."frame_color"].String == "" then
                 Controls[s.."frame_color"].String = "White"
             end
@@ -676,14 +728,6 @@ if Controls then
         Controls[s.."align"].EventHandler      = AutoSend
         Controls[s.."size"].EventHandler       = AutoSend
         Controls[s.."effect"].EventHandler     = AutoSend
-
-        Controls[s.."intensity"].EventHandler = function()
-            if not activeLayoutSegments[seg] then return end
-            Debounce("intensity_"..seg, 0.5, function()
-                local _, cmd = BuildTextCommand(seg)
-                SendCommand(cmd)
-            end)
-        end
         
         Controls[s.."frame"].EventHandler = function(ctl)
             local enabled = ctl.Boolean
