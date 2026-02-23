@@ -254,12 +254,11 @@ class TextRenderer:
         if not font:
             return
 
-        # Render text to temporary image with anti-aliasing
-        tmp = Image.new('RGB', (snap['width'], snap['height']), bg)
-        tmp_draw = ImageDraw.Draw(tmp)
-        
-        # Get text bounding box
-        bbox = tmp_draw.textbbox((0, 0), text, font=font)
+        # Calculate text position
+        # Get text bounding box using a temporary draw context
+        tmp_bbox_img = Image.new('L', (1, 1))
+        tmp_bbox_draw = ImageDraw.Draw(tmp_bbox_img)
+        bbox = tmp_bbox_draw.textbbox((0, 0), text, font=font)
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]
         
@@ -274,14 +273,16 @@ class TextRenderer:
         # Adjust vertical position to account for bbox offset
         ty = (snap['height'] - th) // 2 - bbox[1]
         
-        # Draw text with anti-aliasing
-        tmp_draw.text((tx, ty), text, font=font, fill=fg)
+        # Render text as white on black for proper thresholding
+        # (Drawing colored text then converting to grayscale causes some colors to disappear)
+        tmp_mask = Image.new('L', (snap['width'], snap['height']), 0)
+        tmp_mask_draw = ImageDraw.Draw(tmp_mask)
+        tmp_mask_draw.text((tx, ty), text, font=font, fill=255)
         
-        # Convert to binary (no anti-aliasing on LED display)
-        tmp_gray = tmp.convert('L')
-        tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+        # Binary threshold: > 128 becomes white (pixels > 50% gray)
+        tmp_binary = tmp_mask.point(lambda p: 255 if p > 128 else 0, mode='L')
         
-        # Convert to RGB with pure colors
+        # Convert to RGB with actual colors
         mask_array = np.array(tmp_binary, dtype=np.uint8)
         mask_bool = mask_array == 255
         
