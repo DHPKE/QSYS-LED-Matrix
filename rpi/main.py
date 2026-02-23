@@ -291,9 +291,10 @@ def main():
                     renderer.render_all()
                 except Exception as exc:
                     logger.error(f"[RENDER] Exception: {exc}")
-
-        # Longer sleep to reduce CPU load and give matrix library uninterrupted time
-        time.sleep(0.05)  # 50ms sleep reduces CPU load significantly
+        
+        # Sleep to yield CPU and allow matrix library clean refresh cycles
+        # Aligned with EFFECT_INTERVAL for consistent timing
+        time.sleep(EFFECT_INTERVAL)
 
 
 if __name__ == "__main__":

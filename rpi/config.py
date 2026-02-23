@@ -45,23 +45,24 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
+MATRIX_GPIO_SLOWDOWN    = 3           # 0–4; Controls LED refresh rate
                                       # RPi 4: Use 1-2 for best balance
-                                      # RPi Zero 2 W: Use 2 or 3 (lower power)
+                                      # RPi Zero 2 W: Use 3 for maximum stability
                                       # 0 = Fastest (~1000Hz+) - may cause glitches
                                       # 1 = Fast (~500Hz) - high refresh, may glitch
                                       # 2 = Balanced (~250-300Hz) - BEST for RPi 4
-                                      # 3 = Slower (~200Hz) - maximum stability
+                                      # 3 = Slower (~200Hz) - maximum stability, no flicker
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
-MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 levels, default)
+MATRIX_PWM_BITS        = 8           # 1-11; PWM bits for color depth (11=2048 levels, default)
                                       # Lower values = faster refresh but less color accuracy
                                       # 11 = Best color (slower refresh)
+                                      # 8 = Excellent compromise (256 levels, stable)
                                       # 7-9 = Good compromise (128 levels per channel)
                                       # 6 = Faster, less glitches, still good colors
                                       # 5 = Fast refresh, minimal glitches, acceptable colors
                                       # 1-4 = Very fast but visibly reduced colors
 MATRIX_SCAN_MODE        = 0           # 0 = progressive (default), 1 = interlaced
-                                      # Try 1 if you see line flickering
+                                      # 0 = progressive for crisp, stable display
 MATRIX_ROW_ADDRESS_TYPE = 0           # 0-4; Different panels use different addressing
                                       # 0 = default (direct), 1 = AB-address panels
                                       # 2 = direct row select, 3 = ABC-addressed
@@ -71,11 +72,11 @@ MATRIX_MULTIPLEXING     = 0           # 0-18; Panel multiplexing mode
                                       # Try 1,2,3,4 if lines flicker
                                       # Different panels use different modes
 MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother color
-                                      # Can reduce color banding with lower PWM bits
+                                      # 0 = no dithering for stable, flicker-free display
 MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
                                       # Try if colors look wrong
-MATRIX_REFRESH_LIMIT    = 0           # Hz; 0 = no limit, 120-200 = limit refresh rate
-                                      # Use if display looks oversaturated or unstable
+MATRIX_REFRESH_LIMIT    = 200         # Hz; 0 = no limit, 200 = stable refresh
+                                      # Limiting refresh reduces flicker and power usage
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display Orientation
@@ -279,7 +280,7 @@ LOG_LEVEL = "WARNING"   # DEBUG | INFO | WARNING | ERROR
 # ──────────────────────────────────────────────────────────────────────────────
 # Display refresh rate
 # ──────────────────────────────────────────────────────────────────────────────
-EFFECT_INTERVAL = 0.1   # seconds (10 fps for reduced CPU load)
+EFFECT_INTERVAL = 0.05  # seconds (20 fps for smooth updates, matches main loop)
                         # Increase to reduce CPU usage, decrease for smoother animations
                         # Recommended: 0.05 (20fps) to 0.15 (7fps)
                         # Lower = less flicker from CPU interruptions
