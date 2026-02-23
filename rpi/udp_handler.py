@@ -260,6 +260,8 @@ class UDPHandler:
                 _set_brightness(int(val))
                 if self._brightness_callback:
                     self._brightness_callback(int(val))
+                # Force immediate render to show brightness change
+                self._sm.mark_all_dirty()
 
         elif cmd == "orientation":
             value = str(doc.get("value", "landscape"))
@@ -274,6 +276,8 @@ class UDPHandler:
             value = int(doc.get("value", 0))
             logger.info(f"[UDP] Group command -> value={value}")
             set_group_id(value)
+            # Force immediate render to show group indicator change
+            self._sm.mark_all_dirty()
 
         elif cmd == "config":
             seg = int(doc.get("seg", 0))

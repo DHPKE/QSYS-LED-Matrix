@@ -126,6 +126,9 @@ class TextRenderer:
         self._draw    = ImageDraw.Draw(self._image)
         self._render_count = 0
         self._current_orientation = "landscape"
+        # Cache group indicator color to prevent flashing
+        self._cached_group_id = udp_handler.get_group_id()
+        self._cached_group_color = GROUP_COLORS.get(self._cached_group_id, (0, 0, 0))
 
     def render_all(self):
         """Composite all active segments and push to the matrix canvas."""
@@ -206,26 +209,28 @@ class TextRenderer:
         """Draw a small colored square in the bottom-left corner to indicate the group."""
         group_id = udp_handler.get_group_id()
         
-        # Skip rendering if no group assigned (0)
-        if group_id == 0:
-            return
+        # Update cache if group changed
+        if group_id != self._cached_group_id:
+            self._cached_group_id = group_id
+            self._cached_group_color = GROUP_COLORS.get(group_id, (0, 0, 0))
         
-        # Get color for this group
-        color = GROUP_COLORS.get(group_id, (0, 0, 0))
+        # Skip rendering if no group assigned (0)
+        if self._cached_group_id == 0:
+            return
         
         # Skip if color is black (invisible)
-        if color == (0, 0, 0):
+        if self._cached_group_color == (0, 0, 0):
             return
         
-        # Position: bottom-left corner (4×4 pixel square by default)
+        # Position: bottom-left corner (2×2 pixel square by default)
         indicator_size = GROUP_INDICATOR_SIZE
         x1 = 0
         y1 = canvas_height - indicator_size
         x2 = indicator_size - 1
         y2 = canvas_height - 1
         
-        # Draw the colored square
-        self._draw.rectangle([x1, y1, x2, y2], fill=color)
+        # Draw the colored square using cached color
+        self._draw.rectangle([x1, y1, x2, y2], fill=self._cached_group_color)
 
     def _render_segment(self, seg):
         fg = _hex_to_rgb(seg.color)

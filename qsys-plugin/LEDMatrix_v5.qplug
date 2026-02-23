@@ -84,6 +84,7 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_frame",  n), ControlType="Button", ButtonType="Toggle",  Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_frame_color", n), ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_frame_link", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, {
             Name=string.format("seg%d_active", n),
             ControlType="Indicator", IndicatorType="LED",
@@ -365,6 +366,9 @@ function GetControlLayout(props)
         layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
             IsReadOnly=false,
             Position={92, r3}, Size={110, CH} }
+        layout[sn.."frame_link"] = { PrettyName=grp.."~LinkColor", Style="Button",
+            ButtonStyle="Trigger", Legend="→", Color={80,120,180},
+            Position={208, r3}, Size={32, BH}, FontSize=18 }
     end
 
     -- ── Global Controls ─────────────────────────────────────────────
@@ -744,6 +748,18 @@ if Controls then
                 }))
             end
         end
+        
+        Controls[s.."frame_link"].EventHandler = function()
+            -- Copy text color to frame color
+            Controls[s.."frame_color"].String = Controls[s.."text_color"].String
+            -- If frame is enabled, send update immediately
+            if Controls[s.."frame"].Boolean then
+                local color = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+                SendCommand(buildJson({
+                    cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                }))
+            end
+        end
     end
 
     Controls.clear_all.EventHandler = function()
@@ -759,9 +775,8 @@ if Controls then
         local value = tonumber(ctl.String) or 128
         value = math.max(0, math.min(255, math.floor(value)))  -- Clamp to 0-255
         ctl.String = tostring(value)
-        Debounce("brightness", 0.5, function()
-            SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
-        end)
+        -- Apply immediately (no debounce)
+        SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
     end
 
     Controls.orientation.EventHandler = function(ctl)
