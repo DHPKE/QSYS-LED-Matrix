@@ -19,7 +19,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from config import (MATRIX_WIDTH, MATRIX_HEIGHT,
-                    FONT_PATH, FONT_PATH_FALLBACK)
+                    FONT_PATH, FONT_PATH_FALLBACK,
+                    GROUP_COLORS, GROUP_INDICATOR_SIZE)
 from segment_manager import SegmentManager, TextAlign, TextEffect
 import udp_handler
 
@@ -183,6 +184,9 @@ class TextRenderer:
         if self._render_count % 500 == 0:
             logger.debug(f"[RENDER] Rendered {rendered_count} segments (count: {self._render_count})")
 
+        # Render group indicator (always visible on top of everything)
+        self._render_group_indicator(canvas_width, canvas_height)
+
         # Apply rotation if in portrait mode to convert virtual 32×64 to physical 64×32
         if orientation == "portrait":
             # Rotate 270 degrees clockwise (= -90 degrees) to convert 32×64 to 64×32
@@ -197,6 +201,31 @@ class TextRenderer:
         self._canvas = self._matrix.SwapOnVSync(self._canvas)
 
     # ─── Private ───────────────────────────────────────────────────────────
+
+    def _render_group_indicator(self, canvas_width: int, canvas_height: int):
+        """Draw a small colored square in the bottom-left corner to indicate the group."""
+        group_id = udp_handler.get_group_id()
+        
+        # Skip rendering if no group assigned (0)
+        if group_id == 0:
+            return
+        
+        # Get color for this group
+        color = GROUP_COLORS.get(group_id, (0, 0, 0))
+        
+        # Skip if color is black (invisible)
+        if color == (0, 0, 0):
+            return
+        
+        # Position: bottom-left corner (4×4 pixel square by default)
+        indicator_size = GROUP_INDICATOR_SIZE
+        x1 = 0
+        y1 = canvas_height - indicator_size
+        x2 = indicator_size - 1
+        y2 = canvas_height - 1
+        
+        # Draw the colored square
+        self._draw.rectangle([x1, y1, x2, y2], fill=color)
 
     def _render_segment(self, seg):
         fg = _hex_to_rgb(seg.color)

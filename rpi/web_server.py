@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 
 from config import WEB_PORT, UDP_PORT, MATRIX_WIDTH, MATRIX_HEIGHT
 from segment_manager import SegmentManager
-from udp_handler import UDPHandler, get_brightness, get_orientation, set_orientation
+from udp_handler import UDPHandler, get_brightness, get_orientation, set_orientation, get_group_id, set_group_id
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +228,23 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
       </div>
     </div>
     <div class="form-group">
+      <label>Group Assignment</label>
+      <div class="align-group" style="grid-template-columns: repeat(3, 1fr);">
+        <button class="align-btn" id="group-0" onclick="setGroup(0)" style="font-size:0.8em;">None<br/>(All)</button>
+        <button class="align-btn" id="group-1" onclick="setGroup(1)" style="font-size:0.8em;">1<br/>White</button>
+        <button class="align-btn" id="group-2" onclick="setGroup(2)" style="font-size:0.8em;">2<br/>Yellow</button>
+        <button class="align-btn" id="group-3" onclick="setGroup(3)" style="font-size:0.8em;">3<br/>Orange</button>
+        <button class="align-btn" id="group-4" onclick="setGroup(4)" style="font-size:0.8em;">4<br/>Red</button>
+        <button class="align-btn" id="group-5" onclick="setGroup(5)" style="font-size:0.8em;">5<br/>Magenta</button>
+        <button class="align-btn" id="group-6" onclick="setGroup(6)" style="font-size:0.8em;">6<br/>Blue</button>
+        <button class="align-btn" id="group-7" onclick="setGroup(7)" style="font-size:0.8em;">7<br/>Cyan</button>
+        <button class="align-btn" id="group-8" onclick="setGroup(8)" style="font-size:0.8em;">8<br/>Green</button>
+      </div>
+      <div style="color:#888;font-size:0.85em;margin-top:8px;">
+        Assigns this panel to a group. Group indicator shown in bottom-left corner.
+      </div>
+    </div>
+    <div class="form-group">
       <label>Brightness</label>
       <input type="range" id="brightness" min="0" max="255" value="128" oninput="updateBrightness(this.value)">
       <div class="brightness-display">
@@ -308,7 +325,7 @@ function buildSegmentCards() {
 
 buildSegmentCards();
 
-window.addEventListener('load', () => { loadOrientation(); pollSegments(); setInterval(pollSegments,5000); });
+window.addEventListener('load', () => { loadOrientation(); loadGroup(); pollSegments(); setInterval(pollSegments,5000); });
 
 // Auto-send text with debounce (waits 500ms after last keystroke)
 function autoSendText(seg) {
@@ -459,6 +476,39 @@ function loadOrientation() {
     })
     .catch(err=>console.error('Failed to load orientation:',err));
 }
+function setGroup(groupId) {
+  fetch('/api/group',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({value:groupId})
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    updateGroupButtons(data.group_id);
+    console.log('Group set to:',data.group_id);
+  })
+  .catch(err=>console.error('Failed to set group:',err));
+}
+function updateGroupButtons(groupId) {
+  for (let i = 0; i <= 8; i++) {
+    const btn = document.getElementById('group-' + i);
+    if (btn) {
+      if (i === groupId) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  }
+}
+function loadGroup() {
+  fetch('/api/group')
+    .then(r=>r.json())
+    .then(data=>{
+      updateGroupButtons(data.group_id);
+    })
+    .catch(err=>console.error('Failed to load group:',err));
+}
 function applyNetworkSettings() {
   const ip = document.getElementById('ip-address').value;
   const port = parseInt(document.getElementById('udp-port').value);
@@ -593,6 +643,10 @@ class _Handler(BaseHTTPRequestHandler):
             doc = {"orientation": get_orientation()}
             self._send(200, "application/json", json.dumps(doc))
 
+        elif path == "/api/group":
+            doc = {"group_id": get_group_id()}
+            self._send(200, "application/json", json.dumps(doc))
+
         else:
             self._send(404, "text/plain", "Not found")
 
@@ -618,6 +672,20 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, "application/json", json.dumps({"status": "ok", "orientation": get_orientation()}))
             except Exception as e:
                 logger.error(f"[HTTP] /api/orientation failed: {e}")
+                self._send(400, "text/plain", f"Error: {e}")
+        
+        elif path == "/api/group":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode("utf-8", errors="replace")
+            try:
+                data = json.loads(body)
+                group_id = int(data.get("value", 0))
+                logger.info(f"[HTTP] /api/group  value={group_id}")
+                cmd = json.dumps({"cmd": "group", "value": group_id})
+                self._udp.dispatch(cmd)
+                self._send(200, "application/json", json.dumps({"status": "ok", "group_id": get_group_id()}))
+            except Exception as e:
+                logger.error(f"[HTTP] /api/group failed: {e}")
                 self._send(400, "text/plain", f"Error: {e}")
         
         else:

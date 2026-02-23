@@ -21,7 +21,7 @@ import threading
 import logging
 import os
 
-from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, LAYOUT_PRESETS_PORTRAIT, MAX_SEGMENTS, CONFIG_FILE, ORIENTATION
+from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, LAYOUT_PRESETS_PORTRAIT, MAX_SEGMENTS, CONFIG_FILE, ORIENTATION, GROUP_ID
 from segment_manager import SegmentManager
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,10 @@ _brightness_lock = threading.Lock()
 # Orientation is "landscape" or "portrait"
 _orientation = ORIENTATION
 _orientation_lock = threading.Lock()
+
+# Group ID (0 = no grouping, 1-8 = assigned group)
+_group_id = GROUP_ID
+_group_id_lock = threading.Lock()
 
 
 def get_brightness() -> int:
@@ -84,11 +88,36 @@ def set_orientation(value: str):
     return True
 
 
+def get_group_id() -> int:
+    """Get current group ID (0 = no grouping, 1-8 = assigned group)"""
+    with _group_id_lock:
+        return _group_id
+
+
+def set_group_id(value: int):
+    """Set group ID and persist to config file"""
+    global _group_id
+    if not (0 <= value <= 8):
+        logger.warning(f"[GROUP] Invalid group ID: {value}")
+        return False
+    
+    with _group_id_lock:
+        _group_id = value
+    
+    # Persist to config file
+    _save_config()
+    logger.info(f"[GROUP] Set to: {value}")
+    return True
+
+
 def _save_config():
-    """Save current orientation to JSON config file"""
+    """Save current orientation and group ID to JSON config file"""
     try:
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        config_data = {"orientation": get_orientation()}
+        config_data = {
+            "orientation": get_orientation(),
+            "group_id": get_group_id()
+        }
         with open(CONFIG_FILE, "w") as f:
             json.dump(config_data, f)
         logger.debug(f"[CONFIG] Saved to {CONFIG_FILE}")
@@ -97,18 +126,21 @@ def _save_config():
 
 
 def _load_config():
-    """Load orientation from JSON config file"""
-    global _orientation
+    """Load orientation and group ID from JSON config file"""
+    global _orientation, _group_id
     try:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, "r") as f:
                 config_data = json.load(f)
                 orientation = config_data.get("orientation", "landscape")
+                group_id = config_data.get("group_id", 0)
                 with _orientation_lock:
                     _orientation = orientation
-                logger.info(f"[CONFIG] Loaded orientation: {orientation}")
+                with _group_id_lock:
+                    _group_id = group_id
+                logger.info(f"[CONFIG] Loaded orientation: {orientation}, group_id: {group_id}")
     except Exception as e:
-        logger.warning(f"[CONFIG] Failed to load: {e}, using default")
+        logger.warning(f"[CONFIG] Failed to load: {e}, using defaults")
 
 
 class UDPHandler:
@@ -181,6 +213,16 @@ class UDPHandler:
         # used by main.py to dismiss the IP address splash screen.
         self._first_command_received = True
 
+        # Check group filtering: if the command has a "group" field,
+        # only execute if it matches this panel's group_id (or if group_id is 0)
+        cmd_group = doc.get("group", 0)  # 0 = broadcast to all
+        my_group = get_group_id()
+        
+        if cmd_group != 0 and my_group != 0 and cmd_group != my_group:
+            # Command is for a different group, ignore it
+            logger.debug(f"[UDP] Ignoring command for group {cmd_group} (this panel is group {my_group})")
+            return
+
         cmd = doc.get("cmd", "")
 
         if cmd == "text":
@@ -218,6 +260,11 @@ class UDPHandler:
                 self._orientation = value  # Update instance variable for layout presets
                 if self._orientation_callback:
                     self._orientation_callback(value)
+
+        elif cmd == "group":
+            # Set this panel's group ID
+            value = int(doc.get("value", 0))
+            set_group_id(value)
 
         elif cmd == "config":
             seg = int(doc.get("seg", 0))

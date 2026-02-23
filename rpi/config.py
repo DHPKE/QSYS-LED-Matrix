@@ -89,6 +89,41 @@ ORIENTATION = "landscape"  # "landscape" (64×32) or "portrait" (32×64)
                             # segment configs after changing orientation.
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Group Configuration
+# ──────────────────────────────────────────────────────────────────────────────
+# Allows grouping multiple LED panels for centralized control via QSYS Plugin
+# Each panel can be assigned to a group (1-8) and will only respond to commands
+# sent to that group. The group indicator is displayed as a small square in the
+# bottom-left corner of the display (4×4 pixels).
+#
+# Group colors:
+#   1 = White    5 = Magenta
+#   2 = Yellow   6 = Blue
+#   3 = Orange   7 = Cyan
+#   4 = Red      8 = Green
+#
+# Set to 0 to disable grouping (panel responds to all commands)
+# Set to 1-8 to assign panel to a specific group
+GROUP_ID = 0  # 0 = no grouping, 1-8 = assigned group
+
+GROUP_COLORS = {
+    0: (0, 0, 0),          # No group (black/invisible)
+    1: (255, 255, 255),    # White
+    2: (255, 255, 0),      # Yellow
+    3: (255, 165, 0),      # Orange
+    4: (255, 0, 0),        # Red
+    5: (255, 0, 255),      # Magenta
+    6: (0, 0, 255),        # Blue
+    7: (0, 255, 255),      # Cyan
+    8: (0, 255, 0),        # Green
+}
+
+# Group indicator configuration
+GROUP_INDICATOR_SIZE = 4   # Size of the group indicator square (4×4 pixels)
+GROUP_INDICATOR_X = 0      # X position (bottom-left corner)
+GROUP_INDICATOR_Y = -1     # Y position (-1 = auto-calculate bottom position)
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Segments
 # ──────────────────────────────────────────────────────────────────────────────
 MAX_SEGMENTS = 4
