@@ -45,18 +45,48 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 1           # 0–4; Controls LED refresh rate
-                                      # 0 = Fastest (~1000Hz+) - BEST for reducing flicker
-                                      # 1 = Fast (~500Hz) - Good balance for Pi Zero 2 W
-                                      # 2 = Good balance (~250-300Hz)
-                                      # 3 = Slower (~200Hz) - very stable
-                                      # 4 = Slowest (~150Hz) - most stable but may appear dim
+MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
+                                      # RPi 4: Use 1-2 for best balance
+                                      # RPi Zero 2 W: Use 2 or 3 (lower power)
+                                      # 0 = Fastest (~1000Hz+) - may cause glitches
+                                      # 1 = Fast (~500Hz) - high refresh, may glitch
+                                      # 2 = Balanced (~250-300Hz) - BEST for RPi 4
+                                      # 3 = Slower (~200Hz) - maximum stability
 MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
-MATRIX_PWM_BITS        = 8           # 1-11; PWM bits for color depth (11=2048 levels, default)
+MATRIX_PWM_BITS        = 7           # 1-11; PWM bits for color depth (11=2048 levels, default)
                                       # Lower values = faster refresh but less color accuracy
                                       # 11 = Best color (slower refresh)
-                                      # 7-9 = Good compromise
-                                      # 1-6 = Faster but reduced colors
+                                      # 7-9 = Good compromise (128 levels per channel)
+                                      # 6 = Faster, less glitches, still good colors
+                                      # 5 = Fast refresh, minimal glitches, acceptable colors
+                                      # 1-4 = Very fast but visibly reduced colors
+MATRIX_SCAN_MODE        = 0           # 0 = progressive (default), 1 = interlaced
+                                      # Try 1 if you see line flickering
+MATRIX_ROW_ADDRESS_TYPE = 0           # 0-4; Different panels use different addressing
+                                      # 0 = default (direct), 1 = AB-address panels
+                                      # 2 = direct row select, 3 = ABC-addressed
+                                      # Try different values if flickering persists
+MATRIX_MULTIPLEXING     = 0           # 0-18; Panel multiplexing mode
+                                      # 0 = default (best for most panels)
+                                      # Try 1,2,3,4 if lines flicker
+                                      # Different panels use different modes
+MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother color
+                                      # Can reduce color banding with lower PWM bits
+MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
+                                      # Try if colors look wrong
+MATRIX_REFRESH_LIMIT    = 0           # Hz; 0 = no limit, 120-200 = limit refresh rate
+                                      # Use if display looks oversaturated or unstable
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Display Orientation
+# ──────────────────────────────────────────────────────────────────────────────
+ORIENTATION = "landscape"  # "landscape" (64×32) or "portrait" (32×64)
+                            # Portrait mode rotates the display 90° clockwise
+                            # Can be changed via WebUI, QSYS plugin, or UDP command
+                            # NOTE: When orientation changes, Layout 1 (fullscreen) is
+                            # automatically applied to ensure segment dimensions match
+                            # the new canvas size. Use layout presets or send new
+                            # segment configs after changing orientation.
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Segments
@@ -64,6 +94,8 @@ MATRIX_PWM_BITS        = 8           # 1-11; PWM bits for color depth (11=2048 l
 MAX_SEGMENTS = 4
 
 # Default segment layout: fullscreen on segment 0, others inactive
+# NOTE: These defaults are for LANDSCAPE mode (64×32).
+# On startup, if orientation is portrait, Layout 1 will be auto-applied.
 DEFAULT_SEGMENTS = [
     {"id": 0, "x": 0,  "y": 0, "w": MATRIX_WIDTH, "h": MATRIX_HEIGHT,
      "text": "", "color": "#FFFFFF", "bgcolor": "#000000",
@@ -144,24 +176,75 @@ LAYOUT_PRESETS = {
         (W//2,      0,         W//2,  H//2 ),                            # top-right
         (0,         H//2,      W//2,  H//2 ),                            # bottom-left
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
-    # 11-14: single-segment fullscreen — only the named segment is active
-    11: [(0, 0, W, H)],                                                  # seg 0 fullscreen
-    12: [(0, 0, W, H)],                                                  # seg 1 fullscreen
-    13: [(0, 0, W, H)],                                                  # seg 2 fullscreen
-    14: [(0, 0, W, H)],                                                  # seg 3 fullscreen
+    # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
+    # Other segments set to 1x1 to hide them (segment index matches tuple position)
+    11: [(0,        0,         W,     H    )],                           # segment 0 fullscreen only
+    12: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         W,     H    )],                           # segment 1 fullscreen
+    13: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
+         (0,        0,         W,     H    )],                           # segment 2 fullscreen
+    14: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
+         (0,        0,         W,     H    )],                           # segment 3 fullscreen
 }
 
-# Map preset numbers 11-14 to the segment index that should be active
-LAYOUT_SINGLE_SEG = {11: 0, 12: 1, 13: 2, 14: 3}
+# Portrait layout presets (32×64 virtual canvas)
+# Coordinates: (x, y, w, h) for 32 wide × 64 tall display
+#  Layout 1 — Fullscreen         [seg0: full 32×64]
+#  Layout 2 — Top/Bottom halves  [seg0: top, seg1: bottom]
+#  Layout 3 — Left/Right halves  [seg0: left, seg1: right]
+#  Layout 4 — Triple top         [seg0: top half, seg1: bottom-left, seg2: bottom-right]
+#  Layout 5 — Triple bottom      [seg0: top-left, seg1: top-right, seg2: bottom half]
+#  Layout 6 — Thirds horizontal  [seg0 — seg1 — seg2]
+#  Layout 7 — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+PW = MATRIX_HEIGHT  # Portrait width = 32
+PH = MATRIX_WIDTH   # Portrait height = 64
+
+LAYOUT_PRESETS_PORTRAIT = {
+    1: [(0,          0,         PW,     PH    )],                        # fullscreen
+    2: [(0,          0,         PW,     PH//2 ),                         # top half
+        (0,          PH//2,     PW,     PH//2 )],                        # bottom half
+    3: [(0,          0,         PW//2,  PH    ),                         # left half
+        (PW//2,      0,         PW//2,  PH    )],                        # right half
+    4: [(0,          0,         PW,     PH//2 ),                         # top half
+        (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left quarter
+        (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right quarter
+    5: [(0,          0,         PW//2,  PH//2 ),                         # top-left quarter
+        (PW//2,      0,         PW//2,  PH//2 ),                         # top-right quarter
+        (0,          PH//2,     PW,     PH//2 )],                        # bottom half
+    6: [(0,          0,         PW,     PH//3      ),                    # top third  (21px)
+        (0,          PH//3,     PW,     PH//3      ),                    # middle third (21px)
+        (0,          2*(PH//3), PW,     PH-2*(PH//3))],                  # bottom third  (22px)
+    7: [(0,          0,         PW//2,  PH//2 ),                         # top-left
+        (PW//2,      0,         PW//2,  PH//2 ),                         # top-right
+        (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left
+        (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right
+    # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
+    # Other segments set to 1x1 to hide them (segment index matches tuple position)
+    11: [(0,         0,         PW,     PH    )],                        # segment 0 fullscreen only
+    12: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         PW,     PH    )],                        # segment 1 fullscreen
+    13: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
+         (0,         0,         PW,     PH    )],                        # segment 2 fullscreen
+    14: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
+         (0,         0,         PW,     PH    )],                        # segment 3 fullscreen
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────────────────────────────────────
-LOG_LEVEL = "INFO"   # DEBUG | INFO | WARNING | ERROR
+LOG_LEVEL = "WARNING"   # DEBUG | INFO | WARNING | ERROR
+                        # Use WARNING or ERROR to reduce CPU overhead from logging
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display refresh rate
 # ──────────────────────────────────────────────────────────────────────────────
-EFFECT_INTERVAL = 0.05   # seconds (≈ 20 fps; matrix library itself runs at ~120Hz)
+EFFECT_INTERVAL = 0.1   # seconds (10 fps for reduced CPU load)
                         # Increase to reduce CPU usage, decrease for smoother animations
-                        # Recommended: 0.05 (20fps) to 0.1 (10fps)
+                        # Recommended: 0.05 (20fps) to 0.15 (7fps)
+                        # Lower = less flicker from CPU interruptions

@@ -19,8 +19,9 @@ import socket
 import json
 import threading
 import logging
+import os
 
-from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, LAYOUT_SINGLE_SEG, MAX_SEGMENTS
+from config import UDP_PORT, UDP_BIND_ADDR, MAX_TEXT_LENGTH, LAYOUT_PRESETS, LAYOUT_PRESETS_PORTRAIT, MAX_SEGMENTS, CONFIG_FILE, ORIENTATION
 from segment_manager import SegmentManager
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,10 @@ logger = logging.getLogger(__name__)
 # We convert to 0-100 for the rpi-rgb-led-matrix library when applying it.
 _brightness = 128  # default
 _brightness_lock = threading.Lock()
+
+# Orientation is "landscape" or "portrait"
+_orientation = ORIENTATION
+_orientation_lock = threading.Lock()
 
 
 def get_brightness() -> int:
@@ -42,6 +47,70 @@ def _set_brightness(value: int):
         _brightness = max(0, min(255, int(value)))
 
 
+def get_orientation() -> str:
+    """Get current orientation: 'landscape' or 'portrait'"""
+    with _orientation_lock:
+        return _orientation
+
+
+def get_canvas_dimensions() -> tuple[int, int]:
+    """Get current canvas width and height based on orientation.
+    Returns (width, height) for the virtual canvas.
+    """
+    from config import MATRIX_WIDTH, MATRIX_HEIGHT
+    orientation = get_orientation()
+    if orientation == "portrait":
+        # Portrait: 32 wide × 64 tall
+        return (MATRIX_HEIGHT, MATRIX_WIDTH)
+    else:
+        # Landscape: 64 wide × 32 tall
+        return (MATRIX_WIDTH, MATRIX_HEIGHT)
+
+
+def set_orientation(value: str):
+    """Set orientation and persist to config file"""
+    global _orientation
+    value = value.lower()
+    if value not in ("landscape", "portrait"):
+        logger.warning(f"[ORIENTATION] Invalid value: {value}")
+        return False
+    
+    with _orientation_lock:
+        _orientation = value
+    
+    # Persist to config file
+    _save_config()
+    logger.info(f"[ORIENTATION] Set to: {value}")
+    return True
+
+
+def _save_config():
+    """Save current orientation to JSON config file"""
+    try:
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        config_data = {"orientation": get_orientation()}
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config_data, f)
+        logger.debug(f"[CONFIG] Saved to {CONFIG_FILE}")
+    except Exception as e:
+        logger.error(f"[CONFIG] Failed to save: {e}")
+
+
+def _load_config():
+    """Load orientation from JSON config file"""
+    global _orientation
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r") as f:
+                config_data = json.load(f)
+                orientation = config_data.get("orientation", "landscape")
+                with _orientation_lock:
+                    _orientation = orientation
+                logger.info(f"[CONFIG] Loaded orientation: {orientation}")
+    except Exception as e:
+        logger.warning(f"[CONFIG] Failed to load: {e}, using default")
+
+
 class UDPHandler:
     """
     Receives JSON UDP packets and updates the SegmentManager.
@@ -51,17 +120,23 @@ class UDPHandler:
     """
 
     def __init__(self, segment_manager: SegmentManager,
-                 brightness_callback=None):
+                 brightness_callback=None,
+                 orientation_callback=None):
         """
         :param segment_manager: shared SegmentManager instance
         :param brightness_callback: optional callable(int 0-255) invoked when
                brightness changes so the display can be updated immediately.
+        :param orientation_callback: optional callable(str) invoked when
+               orientation changes ('landscape' or 'portrait').
         """
         self._sm   = segment_manager
         self._sock = None
         self._running = False
         self._thread  = None
         self._brightness_callback = brightness_callback
+        self._orientation_callback = orientation_callback
+        self._orientation = get_orientation()  # Track current orientation for layout presets
+        self._current_layout = 1  # Track current layout preset number (applies to both orientations)
         # Set to True on the first successfully dispatched command so
         # main.py can dismiss the IP splash screen.
         self._first_command_received = False
@@ -89,6 +164,10 @@ class UDPHandler:
     def has_received_command(self) -> bool:
         """True once the first command has been dispatched (UDP or web)."""
         return self._first_command_received
+    
+    def get_current_layout(self) -> int:
+        """Return the current layout preset number."""
+        return self._current_layout
 
     def dispatch(self, raw: str):
         """Parse a raw JSON string and apply the command (thread-safe)."""
@@ -133,6 +212,13 @@ class UDPHandler:
                 if self._brightness_callback:
                     self._brightness_callback(int(val))
 
+        elif cmd == "orientation":
+            value = str(doc.get("value", "landscape"))
+            if set_orientation(value):
+                self._orientation = value  # Update instance variable for layout presets
+                if self._orientation_callback:
+                    self._orientation_callback(value)
+
         elif cmd == "config":
             seg = int(doc.get("seg", 0))
             x   = int(doc.get("x", 0))
@@ -147,37 +233,28 @@ class UDPHandler:
     # ─── Layout presets ────────────────────────────────────────────────────
 
     def _apply_layout(self, preset: int):
-        """Apply a numbered layout preset from config.LAYOUT_PRESETS.
-
-        Presets 1-7: standard multi-segment layouts.
-        Presets 11-14: single segment fullscreen — only seg N is active,
-                       all others are deactivated.
-        """
-        zones = LAYOUT_PRESETS.get(preset)
+        """Apply a numbered layout preset from config.LAYOUT_PRESETS or LAYOUT_PRESETS_PORTRAIT."""
+        # Use portrait layouts if in portrait mode
+        if self._orientation == "portrait":
+            zones = LAYOUT_PRESETS_PORTRAIT.get(preset)
+        else:
+            zones = LAYOUT_PRESETS.get(preset)
+        
         if zones is None:
             logger.warning(f"[UDP] Unknown layout preset {preset}")
             return
-        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} zone(s))")
-
-        single_seg = LAYOUT_SINGLE_SEG.get(preset)  # None for presets 1-7
-
+        
+        # Remember the current layout preset number
+        self._current_layout = preset
+        
+        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s)) in {self._orientation} mode")
         for i in range(MAX_SEGMENTS):
-            if single_seg is not None:
-                # Presets 11-14: only the named segment gets fullscreen
-                if i == single_seg:
-                    x, y, w, h = zones[0]
-                    self._sm.configure(i, x, y, w, h)
-                    self._sm.activate(i, True)
-                else:
-                    self._sm.activate(i, False)
+            if i < len(zones):
+                x, y, w, h = zones[i]
+                self._sm.configure(i, x, y, w, h)
+                self._sm.activate(i, True)
             else:
-                # Presets 1-7: zones list maps directly to seg indices
-                if i < len(zones):
-                    x, y, w, h = zones[i]
-                    self._sm.configure(i, x, y, w, h)
-                    self._sm.activate(i, True)
-                else:
-                    self._sm.activate(i, False)
+                self._sm.activate(i, False)
 
     # ─── Internal ──────────────────────────────────────────────────────────
 

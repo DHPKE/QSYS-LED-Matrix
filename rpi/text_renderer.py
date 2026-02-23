@@ -7,6 +7,8 @@ copies the pixels into the matrix's FrameCanvas.
 
 Font sizes are auto-fitted to the segment bounding box, mirroring
 the ESP32 firmware's `autoSize` behaviour.
+
+Supports landscape and portrait orientation modes.
 """
 
 import os
@@ -19,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 from config import (MATRIX_WIDTH, MATRIX_HEIGHT,
                     FONT_PATH, FONT_PATH_FALLBACK)
 from segment_manager import SegmentManager, TextAlign, TextEffect
+import udp_handler
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +69,7 @@ def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     return rgb
 
 
-def _fit_text(text: str, max_w: int, max_h: int) -> tuple[ImageFont.ImageFont, int]:
+def _fit_text(text: str, max_w: int, max_h: int, debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
     """Return (font, font_size) for the largest size that fits within max_w × max_h.
     Uses cached measurements for performance."""
     
@@ -86,9 +89,13 @@ def _fit_text(text: str, max_w: int, max_h: int) -> tuple[ImageFont.ImageFont, i
         
         # Return first (largest) size that fits
         if tw <= max_w and th <= max_h:
+            if debug_seg_id >= 0:
+                logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → size {size} ({tw}×{th} in {max_w}×{max_h})")
             return _load_font(size), size
     
     # Fallback: smallest size
+    if debug_seg_id >= 0:
+        logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {_FONT_SIZES[-1]} (text too long)")
     return _load_font(_FONT_SIZES[-1]), _FONT_SIZES[-1]
 
 
@@ -112,28 +119,50 @@ class TextRenderer:
         self._matrix  = matrix
         self._canvas  = canvas
         self._sm      = segment_manager
-        # Off-screen PIL image for compositing
+        # Off-screen PIL image for compositing - size depends on orientation
+        # Always matches the physical matrix dimensions (64×32)
         self._image   = Image.new("RGB", (MATRIX_WIDTH, MATRIX_HEIGHT), (0, 0, 0))
         self._draw    = ImageDraw.Draw(self._image)
         self._render_count = 0
+        self._current_orientation = "landscape"
 
     def render_all(self):
         """Composite all active segments and push to the matrix canvas."""
         
-        # Check if any segments are dirty before rendering
-        needs_render = False
-        with self._sm._lock:
-            for seg in self._sm._segments:
-                if seg.is_dirty:
-                    needs_render = True
-                    break
+        # Fast dirty check without lock for initial test
+        needs_render = any(seg.is_dirty for seg in self._sm._segments)
         
-        # Skip rendering if nothing changed
+        # Skip rendering entirely if nothing changed
         if not needs_render:
             return
         
+        # Get current orientation and check if we need to recreate the image
+        orientation = udp_handler.get_orientation()
+        
+        # Determine virtual canvas dimensions based on orientation
+        if orientation == "portrait":
+            # Portrait mode: 32 wide × 64 tall virtual space
+            canvas_width = MATRIX_HEIGHT  # 32
+            canvas_height = MATRIX_WIDTH  # 64
+        else:
+            # Landscape mode: 64 wide × 32 tall
+            canvas_width = MATRIX_WIDTH
+            canvas_height = MATRIX_HEIGHT
+        
+        # Recreate image if orientation changed
+        if orientation != self._current_orientation:
+            self._image = Image.new("RGB", (canvas_width, canvas_height), (0, 0, 0))
+            self._draw = ImageDraw.Draw(self._image)
+            self._current_orientation = orientation
+            logger.info(f"[RENDER] Canvas resized to {canvas_width}×{canvas_height} for {orientation} mode")
+            # Log active segment dimensions for debugging
+            with self._sm._lock:
+                for seg in self._sm._segments:
+                    if seg.is_active:
+                        logger.debug(f"[RENDER]   Segment {seg.id}: ({seg.x},{seg.y}) {seg.width}×{seg.height}")
+        
         # Clear full framebuffer to black (fast operation)
-        self._image.paste(0, [0, 0, MATRIX_WIDTH, MATRIX_HEIGHT])
+        self._image.paste(0, [0, 0, canvas_width, canvas_height])
 
         rendered_count = 0
         # Render ALL active segments when anything is dirty
@@ -149,13 +178,22 @@ class TextRenderer:
                 seg.is_dirty = False
                 rendered_count += 1
         
-        # Reduce logging frequency
+        # Reduce logging frequency to every 500 renders (minimize overhead)
         self._render_count += 1
-        if self._render_count % 50 == 0:
+        if self._render_count % 500 == 0:
             logger.debug(f"[RENDER] Rendered {rendered_count} segments (count: {self._render_count})")
 
-        # Push the PIL image to the matrix canvas (outside lock)
-        self._canvas.SetImage(self._image)
+        # Apply rotation if in portrait mode to convert virtual 32×64 to physical 64×32
+        if orientation == "portrait":
+            # Rotate 270 degrees clockwise (= -90 degrees) to convert 32×64 to 64×32
+            # This maps virtual (0,0) at top-left to physical top-left corner
+            rotated_img = self._image.rotate(-90, expand=True)
+            self._canvas.SetImage(rotated_img)
+        else:
+            # Landscape mode - use image as-is
+            self._canvas.SetImage(self._image)
+        
+        # Swap canvas
         self._canvas = self._matrix.SwapOnVSync(self._canvas)
 
     # ─── Private ───────────────────────────────────────────────────────────
@@ -181,7 +219,7 @@ class TextRenderer:
         # Auto-fit font with 1px margin on all borders
         avail_w = max(1, seg.width  - 2)  # 1px margin left and right
         avail_h = max(1, seg.height - 2)  # 1px margin top and bottom
-        font, font_size = _fit_text(text, avail_w, avail_h)
+        font, font_size = _fit_text(text, avail_w, avail_h, debug_seg_id=seg.id)
 
         # Measure text
         try:
@@ -211,52 +249,46 @@ class TextRenderer:
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 
-        # Optimized rendering using NumPy for threshold operations
+        # SHARP NO-ALIAS RENDERING: Binary threshold for crisp edges
+        # Render on grayscale then convert to pure black/white
         if seg.effect == TextEffect.SCROLL:
-            # Create temporary grayscale image for scrolling text
+            # For scrolling text, render on larger canvas
             tmp_gray = Image.new("L", (MATRIX_WIDTH + tw, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
                           text, font=font, fill=255)
             
-            # Fast threshold using point() with lookup table
-            tmp_gray = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+            # Binary threshold: > 128 becomes white (pixels > 50% gray)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
             
             # Crop to segment width
-            tmp_crop = tmp_gray.crop((0, 0, seg.width, seg.height))
+            tmp_crop = tmp_binary.crop((0, 0, seg.width, seg.height))
             
-            # Use NumPy for fast pixel operations
+            # Convert to RGB with pure colors (no anti-aliasing)
             mask_array = np.array(tmp_crop, dtype=np.uint8)
-            mask_bool = mask_array > 128
+            mask_bool = mask_array == 255
             
-            # Create RGB region
-            region_array = np.zeros((seg.height, seg.width, 3), dtype=np.uint8)
+            region_array = np.full((seg.height, seg.width, 3), bg, dtype=np.uint8)
             region_array[mask_bool] = fg
-            region_array[~mask_bool] = bg
             
-            # Paste back to main image
             region = Image.fromarray(region_array, 'RGB')
             self._image.paste(region, (seg.x, seg.y))
         else:
-            # Optimized non-scrolling text with NumPy threshold
-            # Create temporary segment-sized grayscale image
+            # For static text
             tmp_gray = Image.new("L", (seg.width, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
             tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
             
-            # Fast threshold
-            tmp_gray = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+            # Binary threshold: > 128 becomes white (pixels > 50% gray)
+            tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
             
-            # Use NumPy for fast colorization
-            mask_array = np.array(tmp_gray, dtype=np.uint8)
-            mask_bool = mask_array > 128
+            # Convert to RGB with pure colors (no anti-aliasing)
+            mask_array = np.array(tmp_binary, dtype=np.uint8)
+            mask_bool = mask_array == 255
             
-            # Create RGB segment
-            segment_array = np.zeros((seg.height, seg.width, 3), dtype=np.uint8)
+            segment_array = np.full((seg.height, seg.width, 3), bg, dtype=np.uint8)
             segment_array[mask_bool] = fg
-            segment_array[~mask_bool] = bg
             
-            # Paste to main image (fast C operation)
             segment_img = Image.fromarray(segment_array, 'RGB')
             self._image.paste(segment_img, (seg.x, seg.y))
 

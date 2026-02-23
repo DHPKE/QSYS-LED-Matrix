@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 10
+set password "node"
+
+# Change LOG_LEVEL to INFO
+spawn ssh node@10.1.1.22 "sudo sed -i 's/LOG_LEVEL = \"WARNING\"/LOG_LEVEL = \"INFO\"/' /home/node/led-matrix/config.py && sudo systemctl restart led-matrix.service"
+expect "password:" { send "${password}\r" }
+expect eof
+
+puts "\n\nLOG_LEVEL changed to INFO and service restarted."
+puts "Now test changing orientation in the WebUI, then check logs with:"
+puts "ssh node@10.1.1.22 'sudo journalctl -u led-matrix -f'"

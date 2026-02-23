@@ -33,12 +33,14 @@ import time
 from config import (
     MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_CHAIN, MATRIX_PARALLEL,
     MATRIX_HARDWARE_MAPPING, MATRIX_GPIO_SLOWDOWN, MATRIX_BRIGHTNESS,
-    MATRIX_PWM_BITS, LOG_LEVEL, UDP_PORT, WEB_PORT, EFFECT_INTERVAL,
+    MATRIX_PWM_BITS, MATRIX_SCAN_MODE, MATRIX_ROW_ADDRESS_TYPE,
+    MATRIX_MULTIPLEXING, MATRIX_PWM_DITHER_BITS, MATRIX_LED_RGB_SEQUENCE,
+    MATRIX_REFRESH_LIMIT, LOG_LEVEL, UDP_PORT, WEB_PORT, EFFECT_INTERVAL,
     FALLBACK_IP, FALLBACK_NETMASK, FALLBACK_GATEWAY, FALLBACK_IFACE,
     DHCP_TIMEOUT_S,
 )
 from segment_manager import SegmentManager
-from udp_handler import UDPHandler
+from udp_handler import UDPHandler, _load_config
 from web_server import WebServer
 
 # ─── Logging ────────────────────────────────────────────────────────────────
@@ -174,12 +176,20 @@ def main():
         options.gpio_slowdown       = MATRIX_GPIO_SLOWDOWN
         options.brightness          = MATRIX_BRIGHTNESS
         options.pwm_bits            = MATRIX_PWM_BITS
-        options.pwm_lsb_nanoseconds = 200
+        options.pwm_lsb_nanoseconds = 200  # Original stable timing
+        options.scan_mode           = MATRIX_SCAN_MODE
+        options.row_address_type    = MATRIX_ROW_ADDRESS_TYPE
+        options.multiplexing        = MATRIX_MULTIPLEXING
+        options.pwm_dither_bits     = MATRIX_PWM_DITHER_BITS
+        options.led_rgb_sequence    = MATRIX_LED_RGB_SEQUENCE
+        options.limit_refresh_rate_hz = MATRIX_REFRESH_LIMIT
         # Software PWM — avoids conflict with snd_bcm2835 BCM PWM peripheral.
         # To use hardware pulsing: blacklist snd_bcm2835 in /etc/modprobe.d/
         options.disable_hardware_pulsing = True
         options.show_refresh_rate   = False
-        options.limit_refresh_rate_hz = 0
+        # Additional stability options
+        options.inverse_colors      = False
+        options.daemon              = 0   # 0 = don't drop privileges
 
         matrix = RGBMatrix(options=options)
         canvas = matrix.CreateFrameCanvas()
@@ -195,21 +205,45 @@ def main():
     except Exception as exc:
         logger.error(f"⚠  LED matrix init failed: {exc} — falling back to NO_DISPLAY mode")
 
-    # ── 4. Brightness callback ────────────────────────────────────────────
+    # ── 4. Brightness and orientation callbacks ──────────────────────────
     def on_brightness_change(value_255: int):
         if matrix:
             matrix.brightness = _brightness_255_to_pct(value_255)
             logger.info(f"[MAIN] Brightness → {matrix.brightness}%")
+    
+    def on_orientation_change(orientation: str):
+        logger.info(f"[MAIN] Orientation → {orientation}")
+        # Reapply the same layout preset for the new orientation
+        # This ensures segment dimensions match the new canvas size while preserving layout choice
+        if udp:
+            current_layout = udp.get_current_layout()
+            udp._apply_layout(current_layout)
+            logger.info(f"[MAIN] Reapplied Layout {current_layout} for {orientation} mode")
+        else:
+            # During startup, just mark dirty
+            sm.mark_all_dirty()
 
-    # ── 5. Start UDP listener ────────────────────────────────────────────
-    udp = UDPHandler(sm, brightness_callback=on_brightness_change)
+    # ── 5. Load saved configuration ───────────────────────────────────────
+    _load_config()
+
+    # ── 6. Start UDP listener ────────────────────────────────────────────
+    udp = UDPHandler(sm, 
+                     brightness_callback=on_brightness_change,
+                     orientation_callback=on_orientation_change)
     udp.start()
+    
+    # Apply the correct layout based on loaded orientation
+    # This ensures segments match the canvas dimensions on startup
+    from udp_handler import get_orientation
+    initial_orientation = get_orientation()
+    logger.info(f"[MAIN] Initial orientation: {initial_orientation}")
+    udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for current orientation
 
-    # ── 6. Start web server ──────────────────────────────────────────────
+    # ── 7. Start web server ──────────────────────────────────────────────
     web = WebServer(sm, udp)
     web.start()
 
-    # ── 7. IP address splash screen ──────────────────────────────────────
+    # ── 8. IP address splash screen ──────────────────────────────────────
     # Display the device IP on segment 0 (full-screen, white on black) until
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
     ip_splash_active = True
@@ -220,7 +254,7 @@ def main():
     logger.info("System ready — press Ctrl+C to stop")
     logger.info("=" * 50)
 
-    # ── 8. Shutdown handler ──────────────────────────────────────────────
+    # ── 9. Shutdown handler ──────────────────────────────────────────────
     def _shutdown(sig, frame):
         logger.info("\nShutting down…")
         udp.stop()
@@ -232,7 +266,7 @@ def main():
     signal.signal(signal.SIGINT,  _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
-    # ── 9. Main render loop ──────────────────────────────────────────────
+    # ── 10. Main render loop ──────────────────────────────────────────────
     last_effect = time.monotonic()
 
     while True:
@@ -257,10 +291,8 @@ def main():
                 except Exception as exc:
                     logger.error(f"[RENDER] Exception: {exc}")
 
-        # Adaptive sleep to maintain framerate without busy-waiting
-        elapsed = time.monotonic() - now
-        sleep_for = max(0.001, EFFECT_INTERVAL - elapsed)
-        time.sleep(sleep_for)
+        # Longer sleep to reduce CPU load and give matrix library uninterrupted time
+        time.sleep(0.05)  # 50ms sleep reduces CPU load significantly
 
 
 if __name__ == "__main__":
