@@ -203,6 +203,7 @@ class UDPHandler:
 
     def dispatch(self, raw: str):
         """Parse a raw JSON string and apply the command (thread-safe)."""
+        logger.info(f"[UDP] Received: {raw}")
         try:
             doc = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -220,8 +221,10 @@ class UDPHandler:
         
         if cmd_group != 0 and my_group != 0 and cmd_group != my_group:
             # Command is for a different group, ignore it
-            logger.debug(f"[UDP] Ignoring command for group {cmd_group} (this panel is group {my_group})")
+            logger.info(f"[UDP] Ignoring command for group {cmd_group} (this panel is group {my_group})")
             return
+        
+        logger.info(f"[UDP] Executing command: {cmd} (group={cmd_group}, my_group={my_group})")
 
         cmd = doc.get("cmd", "")
 
@@ -233,22 +236,27 @@ class UDPHandler:
             align   = str(doc.get("align",   "C"))
             effect  = str(doc.get("effect",  "none"))
             intens  = int(doc.get("intensity", 255))
+            logger.info(f"[UDP] Text command -> seg={seg}, text='{text}', color={color}, bgcolor={bgcolor}, align={align}, effect={effect}, intensity={intens}")
             self._sm.update_text(seg, text, color=color, bgcolor=bgcolor,
                                  align=align, effect=effect, intensity=intens)
 
         elif cmd == "layout":
             preset = int(doc.get("preset", 1))
+            logger.info(f"[UDP] Layout command -> preset={preset}")
             self._apply_layout(preset)
 
         elif cmd == "clear":
             seg = int(doc.get("seg", 0))
+            logger.info(f"[UDP] Clear command -> seg={seg}")
             self._sm.clear_segment(seg)
 
         elif cmd == "clear_all":
+            logger.info(f"[UDP] Clear all command")
             self._sm.clear_all()
 
         elif cmd == "brightness":
             val = doc.get("value", -1)
+            logger.info(f"[UDP] Brightness command -> value={val}")
             if 0 <= int(val) <= 255:
                 _set_brightness(int(val))
                 if self._brightness_callback:
@@ -256,6 +264,7 @@ class UDPHandler:
 
         elif cmd == "orientation":
             value = str(doc.get("value", "landscape"))
+            logger.info(f"[UDP] Orientation command -> value={value}")
             if set_orientation(value):
                 self._orientation = value  # Update instance variable for layout presets
                 if self._orientation_callback:
@@ -264,6 +273,7 @@ class UDPHandler:
         elif cmd == "group":
             # Set this panel's group ID
             value = int(doc.get("value", 0))
+            logger.info(f"[UDP] Group command -> value={value}")
             set_group_id(value)
 
         elif cmd == "config":
@@ -272,6 +282,7 @@ class UDPHandler:
             y   = int(doc.get("y", 0))
             w   = int(doc.get("w", 64))
             h   = int(doc.get("h", 32))
+            logger.info(f"[UDP] Config command -> seg={seg}, x={x}, y={y}, w={w}, h={h}")
             self._sm.configure(seg, x, y, w, h)
 
         elif cmd == "frame":
@@ -279,6 +290,7 @@ class UDPHandler:
             enabled = bool(doc.get("enabled", False))
             color   = str(doc.get("color", "FFFFFF"))
             width   = int(doc.get("width", 2))
+            logger.info(f"[UDP] Frame command -> seg={seg}, enabled={enabled}, color={color}, width={width}")
             self._sm.set_frame(seg, enabled, color, width)
 
         else:
