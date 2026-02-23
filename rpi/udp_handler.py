@@ -224,9 +224,8 @@ class UDPHandler:
             logger.info(f"[UDP] Ignoring command for group {cmd_group} (this panel is group {my_group})")
             return
         
-        logger.info(f"[UDP] Executing command: {cmd} (group={cmd_group}, my_group={my_group})")
-
         cmd = doc.get("cmd", "")
+        logger.info(f"[UDP] Executing command: {cmd} (group={cmd_group}, my_group={my_group})")
 
         if cmd == "text":
             seg     = int(doc.get("seg", 0))
