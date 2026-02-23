@@ -274,6 +274,13 @@ class UDPHandler:
             h   = int(doc.get("h", 32))
             self._sm.configure(seg, x, y, w, h)
 
+        elif cmd == "frame":
+            seg     = int(doc.get("seg", 0))
+            enabled = bool(doc.get("enabled", False))
+            color   = str(doc.get("color", "FFFFFF"))
+            width   = int(doc.get("width", 2))
+            self._sm.set_frame(seg, enabled, color, width)
+
         else:
             logger.warning(f"[UDP] Unknown cmd: {cmd}")
 

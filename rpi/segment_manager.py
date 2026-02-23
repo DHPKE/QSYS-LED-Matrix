@@ -52,6 +52,7 @@ class Segment:
         "scroll_offset", "last_scroll_update",
         "blink_state", "last_blink_update",
         "is_active", "is_dirty",
+        "frame_enabled", "frame_color", "frame_width",
     )
 
     def __init__(self, seg_id: int, x: int, y: int, w: int, h: int):
@@ -72,6 +73,9 @@ class Segment:
         self.last_blink_update = 0.0
         self.is_active = False
         self.is_dirty  = False
+        self.frame_enabled = False
+        self.frame_color = "#FFFFFF"
+        self.frame_width = 2
 
     def to_dict(self) -> dict:
         return {
@@ -86,6 +90,8 @@ class Segment:
             "align":   self.align.value,
             "effect":  self.effect.value,
             "active":  self.is_active,
+            "frame":   self.frame_enabled,
+            "frame_color": self.frame_color,
         }
 
 
@@ -188,6 +194,17 @@ class SegmentManager:
                 # Mark ALL segments as dirty to force full redraw when activating/deactivating
                 for s in self._segments:
                     s.is_dirty = True
+
+    def set_frame(self, seg_id: int, enabled: bool, color: str = "#FFFFFF", width: int = 2):
+        """Enable or disable frame around a segment"""
+        with self._lock:
+            seg = self.get_segment(seg_id)
+            if seg:
+                seg.frame_enabled = enabled
+                if color is not None:
+                    seg.frame_color = f"#{color.lstrip('#')}"
+                seg.frame_width = max(1, min(width, 10))  # Clamp between 1-10 pixels
+                seg.is_dirty = True
 
     # ─── Effect tick (call from render loop) ──────────────────────────────
 

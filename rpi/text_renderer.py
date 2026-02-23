@@ -321,6 +321,37 @@ class TextRenderer:
             segment_img = Image.fromarray(segment_array, 'RGB')
             self._image.paste(segment_img, (seg.x, seg.y))
 
+        # Render frame if enabled (draw after text so it appears on top)
+        if seg.frame_enabled:
+            frame_color = _hex_to_rgb(seg.frame_color)
+            frame_w = seg.frame_width
+            # Draw frame as rectangles
+            for offset in range(frame_w):
+                # Top edge
+                self._draw.line(
+                    [(seg.x + offset, seg.y + offset),
+                     (seg.x + seg.width - 1 - offset, seg.y + offset)],
+                    fill=frame_color
+                )
+                # Bottom edge
+                self._draw.line(
+                    [(seg.x + offset, seg.y + seg.height - 1 - offset),
+                     (seg.x + seg.width - 1 - offset, seg.y + seg.height - 1 - offset)],
+                    fill=frame_color
+                )
+                # Left edge
+                self._draw.line(
+                    [(seg.x + offset, seg.y + offset),
+                     (seg.x + offset, seg.y + seg.height - 1 - offset)],
+                    fill=frame_color
+                )
+                # Right edge
+                self._draw.line(
+                    [(seg.x + seg.width - 1 - offset, seg.y + offset),
+                     (seg.x + seg.width - 1 - offset, seg.y + seg.height - 1 - offset)],
+                    fill=frame_color
+                )
+
     @property
     def canvas(self):
         return self._canvas

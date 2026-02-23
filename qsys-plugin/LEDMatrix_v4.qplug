@@ -72,6 +72,7 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("seg%d_send",   n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_clear",  n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_frame",  n), ControlType="Button", ButtonType="Toggle",  Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, {
             Name=string.format("seg%d_active", n),
             ControlType="Indicator", IndicatorType="LED",
@@ -90,10 +91,7 @@ function GetControls(props)
     table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Both" })
 
     -- Global
-    table.insert(controls, {
-        Name="brightness", ControlType="Knob", ControlUnit="Integer",
-        Min=0, Max=255, Count=1, UserPin=true, PinStyle="Both"
-    })
+    table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="orientation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
@@ -188,7 +186,7 @@ function GetControlLayout(props)
         {0,255,0}      -- 8: Green
     }
     
-    local GBW = 62  -- group button width (matches thumbnail width)
+    local GBW = 56  -- group button width (reduced by 10% from 62)
     local GBH = 24  -- group button height
     local GBX = 6   -- left margin
     local GBG = 6   -- gap between buttons
@@ -361,9 +359,10 @@ function GetControlLayout(props)
     --   Row 1 at +20: Active LED | Text field | [Display][Invert][Clear] buttons
     --   Row 2 at +58: 6 ComboBoxes with labels above (height 24px, ends at sy+82)
     --   Row 3 at +100: Intensity fader (label at sy+85, 3px gap after ComboBoxes)
-    --   GroupBox height = 100 + 22 + 4 = 126
+    --   Row 4 at +126: Frame toggle button
+    --   GroupBox height = 126 + 28 + 4 = 158
     y = y + 166
-    local SEG_H = 126
+    local SEG_H = 158
 
     -- 6 combo columns: widths must sum to W-12 minus 5 gaps of 6px
     -- W=600: W-12=588; 5 gaps=30; net=558
@@ -418,14 +417,20 @@ function GetControlLayout(props)
         Lbl("Intensity  (0=off  255=full)", 6, r3-15, 260)
         layout[sn.."intensity"] = { PrettyName=grp.."~Intensity", Style="Fader",
             Position={6, r3}, Size={W-14, 22} }
+        
+        -- Row 4: Frame toggle button
+        local r4 = sy + 130
+        layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
+            ButtonStyle="Toggle", Legend="Frame (2px)", Color={120,120,120},
+            Position={6, r4}, Size={120, BH} }
     end
 
     -- ── Global Controls ─────────────────────────────────────────────
     y = y + 4 * (SEG_H + 4) + 4
     GBox(0, y, W, 74, "Global Controls")
-    Lbl("Brightness", 6, y+16, 80)
-    layout["brightness"] = { PrettyName="Global~Bright",   Style="Fader",
-        Position={6, y+30}, Size={220, 36} }
+    Lbl("Brightness (0-255)", 6, y+16, 120)
+    layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
+        Position={6, y+30}, Size={100, 36} }
     Lbl("Orientation", 232, y+16, 100)
     layout["orientation"] = { PrettyName="Global~Orient", Style="ComboBox",
         Position={232, y+30}, Size={122, 36} }
@@ -608,8 +613,8 @@ if Controls then
         if Controls.orientation.String == "" then
             Controls.orientation.String = "landscape"
         end
-        if Controls.brightness.Value == 0 then
-            Controls.brightness.Value = 128
+        if Controls.brightness.String == "" then
+            Controls.brightness.String = "128"
         end
         if Controls.last_command.String == "" then
             Controls.last_command.String = "Ready"
@@ -770,6 +775,16 @@ if Controls then
             end
         end
 
+        Controls[s.."frame"].EventHandler = function(ctl)
+            local group = tonumber(Controls.active_group.String) or 0
+            local enabled = ctl.Boolean
+            SendCommand(buildJson({
+                cmd="frame", seg=seg, enabled=enabled,
+                color="FFFFFF", width=2, group=group
+            }))
+            print(string.format("Frame %s for segment %d", enabled and "enabled" or "disabled", seg))
+        end
+
         local function AutoSend()
             if not activeLayoutSegments[seg] then return end
             local _, cmd = BuildTextCommand(seg)
@@ -805,7 +820,9 @@ if Controls then
     end
 
     Controls.brightness.EventHandler = function(ctl)
-        local value = math.floor(ctl.Value)
+        local value = tonumber(ctl.String) or 128
+        if value < 0 then value = 0 elseif value > 255 then value = 255 end
+        ctl.String = tostring(value)  -- Clamp and update display
         local group = tonumber(Controls.active_group.String) or 0
         Debounce("brightness", 0.5, function()
             SendCommand(buildJson({cmd="brightness", value=value, group=group}))
