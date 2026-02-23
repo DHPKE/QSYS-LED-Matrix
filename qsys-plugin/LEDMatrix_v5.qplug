@@ -309,7 +309,8 @@ function GetControlLayout(props)
             Position={6, r4}, Size={80, BH} }
         Lbl("Color", 92, r4-12, 50)
         layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
-            IsReadOnly=false, Position={92, r4}, Size={110, BH} }
+            IsReadOnly=false,
+            Position={92, r4}, Size={110, CH} }
     end
 
     -- ── Global Controls ─────────────────────────────────────────────
