@@ -248,7 +248,7 @@ def main():
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
     ip_splash_active = True
     sm.update_text(0, device_ip, color="FFFFFF", bgcolor="000000", align="C")
-    sm.set_frame(0, enabled=True, color="FFFFFF", width=2)  # Add frame to IP splash
+    sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
     logger.info(f"[SPLASH] Showing IP address: {device_ip}")
 
     logger.info("=" * 50)
