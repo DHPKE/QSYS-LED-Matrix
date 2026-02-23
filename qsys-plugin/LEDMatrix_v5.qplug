@@ -87,6 +87,8 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("seg%d_send",   n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_clear",  n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_frame",  n), ControlType="Button", ButtonType="Toggle",  Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_frame_color", n), ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, {
             Name=string.format("seg%d_active", n),
             ControlType="Indicator", IndicatorType="LED",
@@ -95,10 +97,7 @@ function GetControls(props)
     end
 
     -- Global
-    table.insert(controls, {
-        Name="brightness", ControlType="Knob", ControlUnit="Integer",
-        Min=0, Max=255, Count=1, UserPin=true, PinStyle="Both"
-    })
+    table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="orientation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
@@ -179,8 +178,8 @@ function GetControlLayout(props)
     GBox(0, y, W, 72, "Group Routing")
     Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+5, W-12)
     
-    -- Group buttons: 9 buttons (All + 1-8), each 62px wide with 6px gap
-    local btnW = 62
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap (reduced 10%)
+    local btnW = 56
     local btnGap = 6
     local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
     for grp = 0, 8 do
@@ -253,7 +252,7 @@ function GetControlLayout(props)
 
     -- ── Segment rows ────────────────────────────────────────────────
     y = y + 166
-    local SEG_H = 126
+    local SEG_H = 180  -- Increased for frame controls (was 126)
 
     local comboCols = {
         {"Text Color", "text_color", "TxtColor", 110},
@@ -302,13 +301,23 @@ function GetControlLayout(props)
         Lbl("Intensity", 6, r3-15, 260)
         layout[sn.."intensity"] = { PrettyName=grp.."~Intensity", Style="Fader",
             Position={6, r3}, Size={W-14, 22} }
+        
+        -- Row 4: Frame controls
+        local r4 = sy + 130
+        layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
+            ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
+            Position={6, r4}, Size={80, BH} }
+        Lbl("Color", 92, r4-12, 50)
+        layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
+            IsReadOnly=false, Position={92, r4}, Size={110, BH} }
     end
 
     -- ── Global Controls ─────────────────────────────────────────────
     y = y + 4 * (SEG_H + 4) + 4
     GBox(0, y, W, 74, "Global Controls")
-    Lbl("Brightness", 6, y+16, 80)
-    layout["brightness"] = { PrettyName="Global~Bright",   Style="Fader",
+    Lbl("Brightness (0-255)", 6, y+16, 120)
+    layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
+        Position={6, y+30}, Size={100, 36} }
         Position={6, y+30}, Size={220, 36} }
     Lbl("Orientation", 232, y+16, 100)
     layout["orientation"] = { PrettyName="Global~Orient", Style="ComboBox",
@@ -520,6 +529,11 @@ if Controls then
             if Controls[s.."effect"].String == "" then
                 Controls[s.."effect"].String = "none"
             end
+            Controls[s.."frame"].Boolean = Controls[s.."frame"].Boolean or false
+            if Controls[s.."frame_color"].String == "" then
+                Controls[s.."frame_color"].String = "White"
+            end
+            Controls[s.."frame_color"].Choices = colorChoices
         end
 
         activeLayoutSegments = activeLayoutSegments or {[0]=true}
@@ -534,13 +548,16 @@ if Controls then
     -- Group selection handlers
     for grp = 0, 8 do
         Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
             if ctl.Boolean then
+                updatingGroups = true
                 -- Turn off all other group buttons
                 for g = 0, 8 do
                     if g ~= grp then
                         Controls[string.format("group%d_select", g)].Boolean = false
                     end
                 end
+                updatingGroups = false
                 activeGroup = grp
                 local groupName = grp == 0 and "All" or tostring(grp)
                 Controls.active_group.String = groupName
@@ -655,6 +672,23 @@ if Controls then
                 SendCommand(cmd)
             end)
         end
+        
+        Controls[s.."frame"].EventHandler = function(ctl)
+            local enabled = ctl.Boolean
+            local color = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+            SendCommand(buildJson({
+                cmd="frame", seg=seg, enabled=enabled, color=color, width=2, group=activeGroup
+            }))
+        end
+        
+        Controls[s.."frame_color"].EventHandler = function(ctl)
+            if Controls[s.."frame"].Boolean then
+                local color = ColorNames[ctl.String] or "FFFFFF"
+                SendCommand(buildJson({
+                    cmd="frame", seg=seg, enabled=true, color=color, width=2, group=activeGroup
+                }))
+            end
+        end
     end
 
     Controls.clear_all.EventHandler = function()
@@ -667,7 +701,9 @@ if Controls then
     end
 
     Controls.brightness.EventHandler = function(ctl)
-        local value = math.floor(ctl.Value)
+        local value = tonumber(ctl.String) or 128
+        value = math.max(0, math.min(255, math.floor(value)))  -- Clamp to 0-255
+        ctl.String = tostring(value)
         Debounce("brightness", 0.5, function()
             SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
         end)
