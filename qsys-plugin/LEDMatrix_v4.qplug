@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 4.0.1 - Persist layout_preset across Edit→Run (no reset on re-init)
+-- Version 4.1.0 - Group selector: 8 groups shown as 3x3 colour grid
 -- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -25,9 +25,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "4.0.1",
-    Id = "dhpke.olimex.led.matrix.4.0.1",
-    Description = "RPi 64x32 LED Matrix - orientation, persistent params, 7+4 presets",
+    Version = "4.1.0",
+    Id = "dhpke.olimex.led.matrix.4.1.0",
+    Description = "RPi 64x32 LED Matrix - group selector (8 groups), orientation, persistent params",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -86,6 +86,9 @@ function GetControls(props)
     table.insert(controls, { Name="orientation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
+    -- Group selector (1-8 groups, shown as 3x3 colour grid + ComboBox)
+    table.insert(controls, { Name="group", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+
     return controls
 end
 
@@ -126,7 +129,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v4.0.0",
+        Type="Text", Text="LED Matrix Controller  v4.1.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -354,7 +357,7 @@ function GetControlLayout(props)
 
     -- ── Global Controls ─────────────────────────────────────────────
     y = y + 4 * (SEG_H + 4) + 4
-    GBox(0, y, W, 74, "Global Controls")
+    GBox(0, y, W, 122, "Global Controls")
     Lbl("Brightness", 6, y+16, 80)
     layout["brightness"] = { PrettyName="Global~Bright",   Style="Fader",
         Position={6, y+30}, Size={220, 36} }
@@ -364,6 +367,61 @@ function GetControlLayout(props)
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All Segments", Color=C_BTN_R,
         Position={360, y+30}, Size={W-366, 36} }
+
+    -- ── Group selector ──────────────────────────────────────────────
+    -- 3x3 grid of coloured squares in bottom-left corner.
+    -- Groups 1-8 each get a distinct colour; cell 9 (row3,col3) is unused/dark.
+    -- Square size: GS=22px, gap=2px  → 3*(22+2)-2 = 70px total width
+    -- Positioned at x=6, y+74 (inside the Global Controls GBox)
+    local GS   = 22   -- square size
+    local GGAP = 2    -- gap between squares
+    local GX   = 6    -- left origin
+    local GY   = y + 74
+
+    -- 8 group colours + 1 empty (index 9)
+    local groupColors = {
+        {220,  50,  50},  -- 1 Red
+        { 50, 180,  50},  -- 2 Green
+        { 50, 100, 220},  -- 3 Blue
+        {220, 200,  40},  -- 4 Yellow
+        {200,  80, 200},  -- 5 Magenta
+        { 40, 200, 200},  -- 6 Cyan
+        {220, 130,  40},  -- 7 Orange
+        {130,  50, 200},  -- 8 Purple
+        { 30,  30,  30},  -- 9 unused (dark)
+    }
+    local groupNames = {
+        "1 - Red","2 - Green","3 - Blue","4 - Yellow",
+        "5 - Magenta","6 - Cyan","7 - Orange","8 - Purple"
+    }
+
+    for i = 0, 8 do
+        local col = i % 3
+        local row = math.floor(i / 3)
+        local sx  = GX  + col * (GS + GGAP)
+        local sy  = GY  + row * (GS + GGAP)
+        table.insert(graphics, {
+            Type="GroupBox", Text="", Fill=groupColors[i+1],
+            StrokeWidth=(i < 8 and 1 or 0), CornerRadius=3,
+            Position={sx, sy}, Size={GS, GS}
+        })
+        if i < 8 then
+            -- group number label centred in the square
+            table.insert(graphics, {
+                Type="Text", Text=tostring(i+1),
+                Font="Roboto", FontSize=9, FontStyle="Bold",
+                HTextAlign="Center", Color={255,255,255},
+                Position={sx, sy+5}, Size={GS, 12}
+            })
+        end
+    end
+
+    -- Group ComboBox + label to the right of the 3x3 grid
+    local GCX = GX + 3*(GS+GGAP) + 4   -- x = 6 + 72 + 4 = 82
+    Lbl("Display Group  (1-8, 0 = none)", GCX, GY, 220)
+    layout["group"] = { PrettyName="Global~Group", Style="ComboBox",
+        IsReadOnly=false,
+        Position={GCX, GY+14}, Size={220, CH} }
 
     return layout, graphics
 end
@@ -524,6 +582,9 @@ if Controls then
         -- Set choices (always needed)
         Controls.orientation.Choices = {"landscape", "portrait"}
         Controls.layout_preset.Choices = LayoutChoices
+        Controls.group.Choices = {"0 - None","1 - Red","2 - Green","3 - Blue",
+                                   "4 - Yellow","5 - Magenta","6 - Cyan",
+                                   "7 - Orange","8 - Purple"}
         
         -- Only set defaults if empty (first run)
         if Controls.orientation.String == "" then
@@ -538,6 +599,9 @@ if Controls then
         -- Persist layout preset across Edit→Run; only seed on first run
         if Controls.layout_preset.String == "" then
             Controls.layout_preset.String = LayoutChoices[1]
+        end
+        if Controls.group.String == "" then
+            Controls.group.String = "0 - None"
         end
 
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
@@ -735,6 +799,15 @@ if Controls then
         local orient = ctl.String
         if SendCommand(buildJson({cmd="orientation", value=orient})) then
             print("Orientation set to: " .. orient)
+        end
+    end
+
+    Controls.group.EventHandler = function(ctl)
+        -- Extract leading number from e.g. "3 - Blue" → 3, or "0 - None" → 0
+        local num = tonumber(ctl.String:match("^(%d+)"))
+        if num ~= nil then
+            SendCommand(buildJson({cmd="group", value=num}))
+            print("Group set to: " .. tostring(num))
         end
     end
 
