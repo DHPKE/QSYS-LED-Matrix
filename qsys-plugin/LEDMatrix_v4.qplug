@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 4.1.0 - Group selector: 8 groups shown as 3x3 colour grid
+-- Version 4.2.0 - Group routing: 8 group input pins, routed to display when group matches
 -- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -25,9 +25,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "4.1.0",
-    Id = "dhpke.olimex.led.matrix.4.1.0",
-    Description = "RPi 64x32 LED Matrix - group selector (8 groups), orientation, persistent params",
+    Version = "4.2.0",
+    Id = "dhpke.olimex.led.matrix.4.2.0",
+    Description = "RPi 64x32 LED Matrix - group routing (8 inputs), orientation, persistent params",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -89,6 +89,28 @@ function GetControls(props)
     -- Group selector (1-8 groups, shown as 3x3 colour grid + ComboBox)
     table.insert(controls, { Name="group", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
 
+    -- 8 group input pins — routed to this display when its group matches
+    -- Each pin accepts a text string (message to display on seg 0).
+    -- Extended format: "text|color|bgcolor|font|size|align|effect|intensity"
+    for g = 1, 8 do
+        table.insert(controls, {
+            Name = "group"..g.."_in",
+            ControlType = "Text",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Input"
+        })
+        -- Active indicator: lit when this group input is the current group
+        table.insert(controls, {
+            Name = "group"..g.."_active",
+            ControlType = "Indicator",
+            IndicatorType = "LED",
+            Count = 1,
+            UserPin = true,
+            PinStyle = "Output"
+        })
+    end
+
     return controls
 end
 
@@ -129,7 +151,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v4.1.0",
+        Type="Text", Text="LED Matrix Controller  v4.2.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -390,10 +412,6 @@ function GetControlLayout(props)
         {130,  50, 200},  -- 8 Purple
         { 30,  30,  30},  -- 9 unused (dark)
     }
-    local groupNames = {
-        "1 - Red","2 - Green","3 - Blue","4 - Yellow",
-        "5 - Magenta","6 - Cyan","7 - Orange","8 - Purple"
-    }
 
     for i = 0, 8 do
         local col = i % 3
@@ -413,15 +431,51 @@ function GetControlLayout(props)
                 HTextAlign="Center", Color={255,255,255},
                 Position={sx, sy+5}, Size={GS, 12}
             })
+            -- active LED indicator in top-right corner of square
+            layout["group"..tostring(i+1).."_active"] = {
+                PrettyName="Group~G"..tostring(i+1).."Active",
+                Style="Led",
+                Position={sx+GS-10, sy+2}, Size={8, 8}
+            }
         end
     end
 
     -- Group ComboBox + label to the right of the 3x3 grid
     local GCX = GX + 3*(GS+GGAP) + 4   -- x = 6 + 72 + 4 = 82
-    Lbl("Display Group  (1-8, 0 = none)", GCX, GY, 220)
+    Lbl("Display Group  (0=none, 1-8)", GCX, GY, 220)
     layout["group"] = { PrettyName="Global~Group", Style="ComboBox",
         IsReadOnly=false,
         Position={GCX, GY+14}, Size={220, CH} }
+
+    -- ── Group Inputs ────────────────────────────────────────────────
+    -- 8 input pins (one per group). When this display's group matches,
+    -- the incoming text is sent to the display (seg 0 by default).
+    -- Format: "text" or "text|color|bgcolor|font|size|align|effect|intensity"
+    y = y + 130
+    GBox(0, y, W, 54, "Group Inputs  (routed to display when group matches)")
+
+    -- Two rows of 4, each input pin labelled with its group colour swatch
+    local gpColors = {
+        C_BTN_R,                -- 1 Red   (reuse palette)
+        {50,180,50},            -- 2 Green
+        C_BTN_B,                -- 3 Blue
+        {200,180,0},            -- 4 Yellow
+        {180,60,180},           -- 5 Magenta
+        {0,180,180},            -- 6 Cyan
+        C_BTN_O,                -- 7 Orange
+        {110,40,180},           -- 8 Purple
+    }
+    local gpW = math.floor((W - 12 - 7*6) / 8)   -- 8 equal columns with 6px gaps
+    -- gpW = (600-12-42)/8 = 546/8 = 68
+    for g = 1, 8 do
+        local gx = 6 + (g-1)*(gpW+6)
+        Lbl("G"..g, gx, y+6, gpW)
+        layout["group"..g.."_in"] = {
+            PrettyName="GroupIn~G"..g,
+            Style="Text",
+            Position={gx, y+18}, Size={gpW, CH}
+        }
+    end
 
     return layout, graphics
 end
@@ -585,6 +639,11 @@ if Controls then
         Controls.group.Choices = {"0 - None","1 - Red","2 - Green","3 - Blue",
                                    "4 - Yellow","5 - Magenta","6 - Cyan",
                                    "7 - Orange","8 - Purple"}
+
+        -- Clear all group active LEDs on init; they light up when a signal arrives
+        for g = 1, 8 do
+            Controls["group"..g.."_active"].Boolean = false
+        end
         
         -- Only set defaults if empty (first run)
         if Controls.orientation.String == "" then
@@ -808,6 +867,69 @@ if Controls then
         if num ~= nil then
             SendCommand(buildJson({cmd="group", value=num}))
             print("Group set to: " .. tostring(num))
+        end
+    end
+
+    -- ── Group input routing ─────────────────────────────────────────
+    -- Each group1_in..group8_in carries a text message (and optional style
+    -- overrides) that gets routed to this display only when its assigned
+    -- group number matches. Format: "message" or
+    -- "message|color|bgcolor|font|size|align|effect|intensity"
+    local function ParseGroupInput(raw)
+        local parts = {}
+        for p in (raw .. "|"):gmatch("([^|]*)|") do
+            table.insert(parts, p)
+        end
+        return {
+            text    = parts[1] or "",
+            color   = ColorNames[parts[2]] or nil,
+            bgcolor = ColorNames[parts[3]] or nil,
+            font    = FontMap[parts[4]]    or nil,
+            size    = (parts[5] ~= "" and parts[5]) or nil,
+            align   = AlignMap[parts[6]]   or nil,
+            effect  = (parts[7] ~= "" and parts[7]) or nil,
+            intens  = tonumber(parts[8])   or nil,
+        }
+    end
+
+    local function GetMyGroupNumber()
+        return tonumber(Controls.group.String:match("^(%d+)")) or 0
+    end
+
+    for g = 1, 8 do
+        local groupNum = g   -- capture for closure
+        Controls["group"..g.."_in"].EventHandler = function(ctl)
+            -- Light the active LED for this group input
+            Controls["group"..g.."_active"].Boolean = (ctl.String ~= "")
+
+            -- Only route if this display is assigned to this group
+            if GetMyGroupNumber() ~= groupNum then return end
+            if ctl.String == "" then return end
+
+            local p = ParseGroupInput(ctl.String)
+
+            -- Build command for all active segments, using parsed overrides
+            -- where provided, falling back to each segment's own settings
+            for seg = 0, 3 do
+                if activeLayoutSegments[seg] then
+                    local s       = "seg"..(seg+1).."_"
+                    local color   = p.color   or ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+                    local bgcolor = p.bgcolor or ColorNames[Controls[s.."bg_color"].String]   or "000000"
+                    local font    = p.font    or FontMap[Controls[s.."font"].String]          or "arial"
+                    local size    = p.size    or Controls[s.."size"].String                   or "auto"
+                    local align   = p.align   or AlignMap[Controls[s.."align"].String]        or "C"
+                    local effect  = p.effect  or Controls[s.."effect"].String                 or "none"
+                    local intens  = p.intens  or math.floor(Controls[s.."intensity"].Value)
+                    local cmd = buildJson({
+                        cmd="text", seg=seg, text=p.text,
+                        color=color, bgcolor=bgcolor,
+                        font=font, size=size, align=align,
+                        effect=effect, intensity=intens
+                    })
+                    SendCommand(cmd)
+                end
+            end
+            print("Group "..groupNum.." routed: "..ctl.String)
         end
     end
 
