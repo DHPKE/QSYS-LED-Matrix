@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 4.0.0 - Added portrait/landscape orientation control
+-- Version 4.0.1 - Persist layout_preset across Edit→Run (no reset on re-init)
 -- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -25,9 +25,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "4.0.0",
-    Id = "dhpke.olimex.led.matrix.4.0.0",
-    Description = "RPi 64x32 LED Matrix - portrait/landscape orientation, 7+4 presets",
+    Version = "4.0.1",
+    Id = "dhpke.olimex.led.matrix.4.0.1",
+    Description = "RPi 64x32 LED Matrix - orientation, persistent params, 7+4 presets",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -535,8 +535,10 @@ if Controls then
         if Controls.last_command.String == "" then
             Controls.last_command.String = "Ready"
         end
-        -- Always reset layout preset to default (don't persist layout selection)
-        Controls.layout_preset.String = LayoutChoices[1]
+        -- Persist layout preset across Edit→Run; only seed on first run
+        if Controls.layout_preset.String == "" then
+            Controls.layout_preset.String = LayoutChoices[1]
+        end
 
         local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
                                "Orange","Purple","Green","Gold","Gray","Black"}
