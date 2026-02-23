@@ -93,6 +93,27 @@ class Segment:
             "frame":   self.frame_enabled,
             "frame_color": self.frame_color,
         }
+    
+    def create_render_snapshot(self):
+        """Create a lightweight snapshot for rendering (called with lock held)."""
+        return {
+            'id': self.id,
+            'x': self.x,
+            'y': self.y,
+            'width': self.width,
+            'height': self.height,
+            'text': self.text,
+            'color': self.color,
+            'bgcolor': self.bgcolor,
+            'align': self.align,
+            'effect': self.effect,
+            'blink_state': self.blink_state,
+            'scroll_offset': self.scroll_offset,
+            'is_active': self.is_active,
+            'frame_enabled': self.frame_enabled,
+            'frame_color': self.frame_color,
+            'frame_width': self.frame_width,
+        }
 
 
 class SegmentManager:
@@ -130,6 +151,26 @@ class SegmentManager:
         """Return a JSON-serialisable copy of all segments (no lock held by caller)."""
         with self._lock:
             return [copy.deepcopy(s.to_dict()) for s in self._segments]
+
+    def get_render_snapshot(self):
+        """Get atomic snapshot for rendering. Returns (snapshots, any_dirty, brightness, group_id)."""
+        with self._lock:
+            # Quickly copy all active/dirty segment data
+            snapshots = []
+            any_dirty = False
+            for seg in self._segments:
+                # Include all active segments or dirty segments
+                if seg.is_active or seg.is_dirty:
+                    snapshots.append(seg.create_render_snapshot())
+                    if seg.is_dirty:
+                        any_dirty = True
+            return snapshots, any_dirty
+    
+    def clear_dirty_flags(self):
+        """Clear dirty flags after successful render (minimal lock time)."""
+        with self._lock:
+            for seg in self._segments:
+                seg.is_dirty = False
 
     # ─── Write access (all take the lock) ─────────────────────────────────
 

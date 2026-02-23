@@ -131,27 +131,30 @@ class TextRenderer:
         self._cached_group_color = GROUP_COLORS.get(self._cached_group_id, (0, 0, 0))
 
     def render_all(self):
-        """Composite all active segments and push to the matrix canvas."""
+        """Composite all active segments and push to the matrix canvas.
         
-        # Fast dirty check without lock for initial test
-        needs_render = any(seg.is_dirty for seg in self._sm._segments)
+        Uses snapshot-based rendering to eliminate race conditions:
+        1. Take atomic snapshot of segment data (with lock)
+        2. Render from snapshot (without lock)
+        3. Clear dirty flags (with lock)
+        """
+        
+        # Step 1: Take atomic snapshot (minimal lock time)
+        segment_snapshots, any_dirty = self._sm.get_render_snapshot()
         
         # Skip rendering entirely if nothing changed
-        if not needs_render:
+        if not any_dirty:
             return
         
-        # Get current orientation and check if we need to recreate the image
+        # Get current orientation and canvas dimensions
         orientation = udp_handler.get_orientation()
         
-        # Determine virtual canvas dimensions based on orientation
         if orientation == "portrait":
-            # Portrait mode: 32 wide × 64 tall virtual space
             canvas_width = MATRIX_HEIGHT  # 32
             canvas_height = MATRIX_WIDTH  # 64
         else:
-            # Landscape mode: 64 wide × 32 tall
-            canvas_width = MATRIX_WIDTH
-            canvas_height = MATRIX_HEIGHT
+            canvas_width = MATRIX_WIDTH   # 64
+            canvas_height = MATRIX_HEIGHT # 32
         
         # Recreate image if orientation changed
         if orientation != self._current_orientation:
@@ -159,49 +162,41 @@ class TextRenderer:
             self._draw = ImageDraw.Draw(self._image)
             self._current_orientation = orientation
             logger.info(f"[RENDER] Canvas resized to {canvas_width}×{canvas_height} for {orientation} mode")
-            # Log active segment dimensions for debugging
-            with self._sm._lock:
-                for seg in self._sm._segments:
-                    if seg.is_active:
-                        logger.debug(f"[RENDER]   Segment {seg.id}: ({seg.x},{seg.y}) {seg.width}×{seg.height}")
         
-        # Clear full framebuffer to black (fast operation)
+        # Step 2: Clear canvas to black
         self._image.paste(0, [0, 0, canvas_width, canvas_height])
-
-        rendered_count = 0
-        # Render ALL active segments when anything is dirty
-        with self._sm._lock:
-            for seg in self._sm._segments:
-                if not seg.is_active:
-                    seg.is_dirty = False
-                    continue
-                if seg.width <= 0 or seg.height <= 0:
-                    seg.is_dirty = False
-                    continue
-                self._render_segment(seg)
-                seg.is_dirty = False
-                rendered_count += 1
         
-        # Reduce logging frequency to every 500 renders (minimize overhead)
-        self._render_count += 1
-        if self._render_count % 500 == 0:
-            logger.debug(f"[RENDER] Rendered {rendered_count} segments (count: {self._render_count})")
-
-        # Render group indicator (always visible on top of everything)
+        # Step 3: Render all segments from snapshots (NO LOCK - fully thread-safe)
+        rendered_count = 0
+        for snap in segment_snapshots:
+            if not snap['is_active']:
+                continue
+            if snap['width'] <= 0 or snap['height'] <= 0:
+                continue
+            # Render this segment from snapshot data
+            self._render_segment_from_snapshot(snap)
+            rendered_count += 1
+        
+        # Step 4: Render group indicator on top
         self._render_group_indicator(canvas_width, canvas_height)
-
-        # Apply rotation if in portrait mode to convert virtual 32×64 to physical 64×32
+        
+        # Step 5: Apply rotation if needed and push to matrix
         if orientation == "portrait":
-            # Rotate 270 degrees clockwise (= -90 degrees) to convert 32×64 to 64×32
-            # This maps virtual (0,0) at top-left to physical top-left corner
             rotated_img = self._image.rotate(-90, expand=True)
             self._canvas.SetImage(rotated_img)
         else:
-            # Landscape mode - use image as-is
             self._canvas.SetImage(self._image)
         
-        # Swap canvas
+        # Step 6: Swap canvas (vsync)
         self._canvas = self._matrix.SwapOnVSync(self._canvas)
+        
+        # Step 7: Clear dirty flags after successful render
+        self._sm.clear_dirty_flags()
+        
+        # Logging (throttled)
+        self._render_count += 1
+        if self._render_count % 500 == 0:
+            logger.debug(f"[RENDER] Rendered {rendered_count} segments (count: {self._render_count})")
 
     # ─── Private ───────────────────────────────────────────────────────────
 
@@ -231,6 +226,100 @@ class TextRenderer:
         
         # Draw the colored square using cached color
         self._draw.rectangle([x1, y1, x2, y2], fill=self._cached_group_color)
+
+    def _render_segment_from_snapshot(self, snap):
+        """Render a segment from snapshot data (no Segment object needed)."""
+        fg = _hex_to_rgb(snap['color'])
+        bg = _hex_to_rgb(snap['bgcolor'])
+
+        # Fill background
+        self._draw.rectangle(
+            [snap['x'], snap['y'], snap['x'] + snap['width'] - 1, snap['y'] + snap['height'] - 1],
+            fill=bg
+        )
+
+        text = snap['text']
+        if not text:
+            return
+
+        # Handle blink effect
+        if snap['effect'] == TextEffect.BLINK and not snap['blink_state']:
+            return
+
+        # Auto-fit font with 1px margin on all borders
+        avail_w = max(1, snap['width']  - 2)  # 1px margin left and right
+        avail_h = max(1, snap['height'] - 2)  # 1px margin top and bottom
+
+        font, font_size = _fit_text(text, avail_w, avail_h, snap['id'])
+        if not font:
+            return
+
+        # Render text to temporary image with anti-aliasing
+        tmp = Image.new('RGB', (snap['width'], snap['height']), bg)
+        tmp_draw = ImageDraw.Draw(tmp)
+        
+        # Get text bounding box
+        bbox = tmp_draw.textbbox((0, 0), text, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        
+        # Calculate position based on alignment
+        if snap['align'] == TextAlign.LEFT:
+            tx = 1
+        elif snap['align'] == TextAlign.RIGHT:
+            tx = snap['width'] - tw - 1
+        else:  # CENTER
+            tx = (snap['width'] - tw) // 2
+        
+        ty = (snap['height'] - th) // 2
+        
+        # Draw text with anti-aliasing
+        tmp_draw.text((tx, ty), text, font=font, fill=fg)
+        
+        # Convert to binary (no anti-aliasing on LED display)
+        tmp_gray = tmp.convert('L')
+        tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
+        
+        # Convert to RGB with pure colors
+        mask_array = np.array(tmp_binary, dtype=np.uint8)
+        mask_bool = mask_array == 255
+        
+        segment_array = np.full((snap['height'], snap['width'], 3), bg, dtype=np.uint8)
+        segment_array[mask_bool] = fg
+        
+        segment_img = Image.fromarray(segment_array, 'RGB')
+        self._image.paste(segment_img, (snap['x'], snap['y']))
+
+        # Render frame if enabled (draw after text so it appears on top)
+        if snap['frame_enabled']:
+            frame_color = _hex_to_rgb(snap['frame_color'])
+            frame_w = snap['frame_width']
+            # Draw frame as rectangles
+            for offset in range(frame_w):
+                # Top edge
+                self._draw.line(
+                    [(snap['x'] + offset, snap['y'] + offset),
+                     (snap['x'] + snap['width'] - 1 - offset, snap['y'] + offset)],
+                    fill=frame_color
+                )
+                # Bottom edge
+                self._draw.line(
+                    [(snap['x'] + offset, snap['y'] + snap['height'] - 1 - offset),
+                     (snap['x'] + snap['width'] - 1 - offset, snap['y'] + snap['height'] - 1 - offset)],
+                    fill=frame_color
+                )
+                # Left edge
+                self._draw.line(
+                    [(snap['x'] + offset, snap['y'] + offset),
+                     (snap['x'] + offset, snap['y'] + snap['height'] - 1 - offset)],
+                    fill=frame_color
+                )
+                # Right edge
+                self._draw.line(
+                    [(snap['x'] + snap['width'] - 1 - offset, snap['y'] + offset),
+                     (snap['x'] + snap['width'] - 1 - offset, snap['y'] + snap['height'] - 1 - offset)],
+                    fill=frame_color
+                )
 
     def _render_segment(self, seg):
         fg = _hex_to_rgb(seg.color)
