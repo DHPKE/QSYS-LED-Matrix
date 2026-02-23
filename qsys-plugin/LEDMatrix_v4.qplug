@@ -1,14 +1,15 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 4.0.0 - Added portrait/landscape orientation control
+-- Version 4.1.0 - Added 8-group LED panel management with visual indicators
 -- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
 --   {"cmd":"text","seg":0,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
---    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
---   {"cmd":"clear","seg":0}  |  {"cmd":"clear_all"}
---   {"cmd":"brightness","value":200}
---   {"cmd":"orientation","value":"landscape"}  -- "landscape" or "portrait"
---   {"cmd":"layout","preset":N}   -- N = 1..7 or 11..14
+--    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255,"group":0}
+--   {"cmd":"clear","seg":0,"group":0}  |  {"cmd":"clear_all","group":0}
+--   {"cmd":"brightness","value":200,"group":0}
+--   {"cmd":"orientation","value":"landscape","group":0}  -- "landscape" or "portrait"
+--   {"cmd":"layout","preset":N,"group":0}   -- N = 1..7 or 11..14
+--   group: 0=broadcast to all, 1-8=specific group only
 --
 -- LAYOUT PRESETS:
 --   1  = Fullscreen
@@ -25,9 +26,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display",
-    Version = "4.0.0",
-    Id = "dhpke.olimex.led.matrix.4.0.0",
-    Description = "RPi 64x32 LED Matrix - portrait/landscape orientation, 7+4 presets",
+    Version = "4.1.0",
+    Id = "dhpke.olimex.led.matrix.4.1.0",
+    Description = "RPi 64x32 LED Matrix - 8 group routing, visual indicators, portrait/landscape, 7+4 presets",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -821,17 +822,22 @@ if Controls then
 
     -- ── Group Selection handlers ────────────────────────────────────
     for g = 0, 8 do
-        local gName = string.format("group%d_select", g)
+        local groupNum = g  -- Capture loop variable
+        local gName = string.format("group%d_select", groupNum)
         Controls[gName].EventHandler = function(ctl)
             if ctl.Boolean then
                 -- Set this as active, deactivate all others
-                Controls.active_group.String = tostring(g)
+                Controls.active_group.String = tostring(groupNum)
                 for otherG = 0, 8 do
-                    if otherG ~= g then
+                    if otherG ~= groupNum then
                         Controls[string.format("group%d_select", otherG)].Boolean = false
                     end
                 end
-                print(string.format("Group selected: %d", g))
+                
+                -- Send command to Pi to set its group ID (configures which group this Pi belongs to)
+                SendCommand(buildJson({cmd="group", value=groupNum}))
+                
+                print(string.format("Group selected: %d", groupNum))
             else
                 -- Prevent deselection - at least one must be active
                 ctl.Boolean = true
