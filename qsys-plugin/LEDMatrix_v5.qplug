@@ -318,7 +318,6 @@ function GetControlLayout(props)
     Lbl("Brightness (0-255)", 6, y+16, 120)
     layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
         Position={6, y+30}, Size={100, 36} }
-        Position={6, y+30}, Size={220, 36} }
     Lbl("Orientation", 232, y+16, 100)
     layout["orientation"] = { PrettyName="Global~Orient", Style="ComboBox",
         Position={232, y+30}, Size={122, 36} }
