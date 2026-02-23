@@ -271,7 +271,8 @@ class TextRenderer:
         else:  # CENTER
             tx = (snap['width'] - tw) // 2
         
-        ty = (snap['height'] - th) // 2
+        # Adjust vertical position to account for bbox offset
+        ty = (snap['height'] - th) // 2 - bbox[1]
         
         # Draw text with anti-aliasing
         tmp_draw.text((tx, ty), text, font=font, fill=fg)
