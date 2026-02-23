@@ -578,6 +578,7 @@ if Controls then
         end
         print("Applying layout: " .. p.name .. " to group " .. (activeGroup == 0 and "All" or activeGroup))
 
+        currentLayoutPreset = key  -- Update current layout for frame width calculation
         SendCommand(buildJson({cmd="layout", preset=p.preset, group=activeGroup}))
 
         activeLayoutSegments = {}
@@ -593,6 +594,15 @@ if Controls then
             for _, seg in ipairs(p.activeSegments) do
                 local _, cmd = BuildTextCommand(seg)
                 SendCommand(cmd)
+                -- Resend frame commands with correct width for new layout
+                local s = "seg" .. (seg+1) .. "_"
+                if Controls[s.."frame"].Boolean then
+                    local color = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+                    local frameWidth = GetFrameWidth()
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=frameWidth, group=activeGroup
+                    }))
+                end
             end
         end, 0.3)
 
@@ -603,6 +613,15 @@ if Controls then
         local num = tonumber(input)
         if num then return math.floor(num) end
         return LayoutNameToKey[input]
+    end
+    
+    local function IsFullscreenLayout(presetKey)
+        -- Fullscreen layouts: 1, 11, 12, 13, 14
+        return presetKey == 1 or (presetKey >= 11 and presetKey <= 14)
+    end
+    
+    local function GetFrameWidth()
+        return IsFullscreenLayout(currentLayoutPreset) and 2 or 1
     end
 
     Controls.reconnect.EventHandler = function()
@@ -676,16 +695,18 @@ if Controls then
         Controls[s.."frame"].EventHandler = function(ctl)
             local enabled = ctl.Boolean
             local color = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+            local frameWidth = GetFrameWidth()
             SendCommand(buildJson({
-                cmd="frame", seg=seg, enabled=enabled, color=color, width=2, group=activeGroup
+                cmd="frame", seg=seg, enabled=enabled, color=color, width=frameWidth, group=activeGroup
             }))
         end
         
         Controls[s.."frame_color"].EventHandler = function(ctl)
             if Controls[s.."frame"].Boolean then
                 local color = ColorNames[ctl.String] or "FFFFFF"
+                local frameWidth = GetFrameWidth()
                 SendCommand(buildJson({
-                    cmd="frame", seg=seg, enabled=true, color=color, width=2, group=activeGroup
+                    cmd="frame", seg=seg, enabled=true, color=color, width=frameWidth, group=activeGroup
                 }))
             end
         end
