@@ -1,0 +1,1061 @@
+-- Q-SYS LED Display Controller Plugin (T/E/A/C Series Cards)
+-- Version 2.0.0 - Controls LED displays via SDK protocol over TCP/UDP/Serial
+--
+-- SUPPORTED HARDWARE:
+--   T-series: T2, T4, T8, T16 (single/dual color)
+--   E-series: E1, E2, E3, E5, E6 (single/dual color)
+--   A-series: A4 (single/dual color)
+--   C-series: C2M, C4M, C2W, C4W, C2S, C4A, C8 (full color RGB)
+--
+-- COMMUNICATION METHODS:
+--   TCP/IP (Fixed IP), UDP Broadcast, Serial (RS232/RS485)
+--
+-- FEATURES:
+--   - 4 Text areas with scrolling effects (16+ transition styles)
+--   - Frame and background colors for each text area
+--   - Digital clock display
+--   - Countdown timer
+--   - Curtain overlay (show/hide colored rectangle)
+--   - 8 Groups + Broadcast routing
+--   - Multiple colors (single/dual/full RGB)
+--   - Program scheduling
+--   - Display rotation (0°, 90°, 180°, 270°)
+--   - Flash/RAM storage selection
+--   - Real-time connection status feedback
+
+PluginInfo = {
+    Name = "LED~Display Controller SDK v2",
+    Version = "2.0.0",
+    Id = "pke.led.controller.sdk.2.0.0",
+    Description = "T/E/A/C Series LED Controller with Groups, Frames & Curtain",
+    ShowDebug = true,
+    Author = "DHPKE"
+}
+
+function GetProperties()
+    return {
+        { Name = "LED Type",         Type = "enum",    Choices = {"T/A/XC Series (6th Gen)", "E Series (6th Gen)", "X1/X2", "C Series (7th Gen)", "E5/E6/C8"}, Value = "T/A/XC Series (6th Gen)" },
+        { Name = "IP Address",       Type = "string",  Value = "192.168.1.100" },
+        { Name = "Port",             Type = "integer", Min = 1, Max = 65535, Value = 5005 },
+        { Name = "Communication",    Type = "enum",    Choices = {"TCP (Fixed IP)", "UDP Broadcast", "Serial"}, Value = "TCP (Fixed IP)" },
+        { Name = "Screen Width",     Type = "integer", Min = 8, Max = 2048, Value = 128 },
+        { Name = "Screen Height",    Type = "integer", Min = 8, Max = 2048, Value = 32 },
+        { Name = "Color Type",       Type = "enum",    Choices = {"Monochrome", "Dual Color", "Full RGB"}, Value = "Full RGB" },
+        { Name = "Storage Mode",     Type = "enum",    Choices = {"RAM (Real-time)", "Flash (Persistent)"}, Value = "RAM (Real-time)" }
+    }
+end
+
+function GetControls(props)
+    local controls = {}
+    
+    -- Connection
+    table.insert(controls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="port",              ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="connect",           ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
+    table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
+    
+    -- Screen Parameters
+    table.insert(controls, { Name="screen_width",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="screen_height",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="send_screen_params", ControlType="Button",   ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    
+    -- Display Rotation
+    table.insert(controls, { Name="rotation",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_rotation",    ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    
+    -- Group routing controls (8 groups + broadcast)
+    table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })
+    for grp = 0, 8 do
+        table.insert(controls, { Name=string.format("group%d_select", grp), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
+    end
+    
+    -- Program Controls (4 programs)
+    for prog = 1, 4 do
+        table.insert(controls, { Name=string.format("prog%d_enable", prog),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("prog%d_send", prog),       ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("prog%d_delete", prog),     ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("prog%d_status", prog),     ControlType="Indicator", IndicatorType="LED", Count=1, UserPin=true, PinStyle="Output" })
+    end
+    
+    -- Text Area Controls (4 text areas per program)
+    for area = 1, 4 do
+        table.insert(controls, { Name=string.format("area%d_text", area),       ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_x", area),          ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_y", area),          ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_width", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_height", area),     ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_color", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_bg_color", area),   ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_font_size", area),  ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_effect", area),     ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_speed", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_dwell", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_frame", area),      ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_frame_color", area), ControlType="Text",  Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_frame_link", area), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_enable", area),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    end
+    
+    -- Clock Controls
+    table.insert(controls, { Name="clock_enable",      ControlType="Button",    ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clock_x",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clock_y",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clock_width",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clock_height",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clock_format",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clock_color",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    
+    -- Countdown Timer Controls
+    table.insert(controls, { Name="timer_enable",      ControlType="Button",    ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_x",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_y",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_width",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_height",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_end_date",    ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_end_time",    ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_text",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="timer_color",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    
+    -- Curtain Controls (overlay area)
+    table.insert(controls, { Name="curtain_state",     ControlType="Button",    ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_x",         ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_y",         ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_width",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_height",    ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_color",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    
+    -- Global Controls
+    table.insert(controls, { Name="brightness",        ControlType="Knob",      Count=1, UserPin=true, PinStyle="Both", ControlUnit="Integer", Min=0, Max=255 })
+    table.insert(controls, { Name="clear_screen",      ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="power",             ControlType="Button",    ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    
+    return controls
+end
+
+function GetControlLayout(props)
+    local layout   = {}
+    local graphics = {}
+    
+    local W  = 800
+    local CH = 24
+    local BH = 28
+    
+    local C_GRP   = {62,  62,  62 }
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55 }
+    local C_BTN_R = {165, 38,  38 }
+    local C_BTN_B = {45,  105, 195}
+    local C_BTN_O = {200, 110, 0  }
+    
+    -- Group colors for buttons
+    local C_GRP_COLORS = {
+        [0] = {128, 128, 128},  -- Gray (All/Broadcast)
+        [1] = {255, 255, 255},  -- White
+        [2] = {255, 255, 0},    -- Yellow
+        [3] = {255, 165, 0},    -- Orange
+        [4] = {255, 0, 0},      -- Red
+        [5] = {255, 0, 255},    -- Magenta
+        [6] = {0, 0, 255},      -- Blue
+        [7] = {0, 255, 255},    -- Cyan
+        [8] = {0, 255, 0},      -- Green
+    }
+    
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, {
+            Type="GroupBox", Text=title or "", Fill=C_GRP,
+            StrokeWidth=1, CornerRadius=4,
+            Position={x, y}, Size={w, h}
+        })
+    end
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, {
+            Type="Text", Text=text, Font="Roboto", FontSize=9,
+            HTextAlign="Left", Color=C_LBL,
+            Position={x, y}, Size={w, 12}
+        })
+    end
+    
+    -- ── Title bar ──────────────────────────────────────────────────
+    table.insert(graphics, {
+        Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5,
+        Position={0,0}, Size={W,36}
+    })
+    table.insert(graphics, {
+        Type="Text", Text="LED Display Controller SDK  v1.0.0",
+        Font="Roboto", FontSize=14, FontStyle="Bold",
+        HTextAlign="Center", Color={255,255,255},
+        Position={0,9}, Size={W,20}
+    })
+    
+    -- ── Connection ─────────────────────────────────────────────────
+    local y = 42
+    GBox(0, y, W, 110, "Connection & Screen Parameters")
+    
+    Lbl("IP Address", 6, y+20, 160)
+    Lbl("Port", 174, y+20, 80)
+    Lbl("Status", 262, y+20, 80)
+    layout["ip_address"] = { PrettyName="Conn~IP", Style="Text", Position={6, y+33}, Size={160, CH} }
+    layout["port"] = { PrettyName="Conn~Port", Style="Text", Position={174, y+33}, Size={80, CH} }
+    layout["connect"] = { PrettyName="Conn~Connect", Style="Button", ButtonStyle="Trigger", Legend="Connect", Color=C_BTN_B, Position={350, y+33}, Size={90, BH} }
+    layout["connection_status"] = { PrettyName="Conn~Status", Style="Indicator", Position={262, y+33}, Size={80, CH} }
+    
+    Lbl("Screen Width", 6, y+63, 100)
+    Lbl("Height", 114, y+63, 100)
+    layout["screen_width"] = { PrettyName="Screen~Width", Style="Text", Position={6, y+76}, Size={100, CH} }
+    layout["screen_height"] = { PrettyName="Screen~Height", Style="Text", Position={114, y+76}, Size={100, CH} }
+    layout["send_screen_params"] = { PrettyName="Screen~Send", Style="Button", ButtonStyle="Trigger", Legend="Set Parameters", Color=C_BTN_G, Position={222, y+76}, Size={140, BH} }
+    
+    Lbl("Last Command", 450, y+20, W-456)
+    layout["last_command"] = { PrettyName="Conn~LastCmd", Style="Text", Position={450, y+33}, Size={W-456, 70} }
+    
+    -- ── Display Rotation ──────────────────────────────────────────
+    y = y + 116
+    GBox(0, y, W, 74, "Display Rotation")
+    
+    Lbl("Rotation", 6, y+20, 200)
+    layout["rotation"] = {
+        PrettyName="Rotation~Angle",
+        Style="ComboBox", IsReadOnly=false,
+        Position={6, y+33}, Size={220, CH}
+    }
+    layout["apply_rotation"] = {
+        PrettyName="Rotation~Apply",
+        Style="Button", ButtonStyle="Trigger",
+        Legend="Apply Rotation", Color=C_BTN_O,
+        Position={234, y+33}, Size={140, BH}
+    }
+    
+    -- ── Group Selection ─────────────────────────────────────────────
+    y = y + 80
+    GBox(0, y, W, 80, "Group Routing")
+    Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+20, W-12)
+    
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap
+    local btnW = 56
+    local btnGap = 6
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
+    for grp = 0, 8 do
+        local bx = 6 + grp * (btnW + btnGap)
+        layout[string.format("group%d_select", grp)] = {
+            PrettyName="Group~"..groupLabels[grp+1],
+            Style="Button", ButtonStyle="Toggle",
+            Legend=groupLabels[grp+1],
+            Color=C_GRP_COLORS[grp],
+            Position={bx, y+38}, Size={btnW, 36}
+        }
+    end
+    layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+78}, Size={0, 0} }
+    
+    -- ── Program Controls ───────────────────────────────────────────
+    y = y + 86
+    GBox(0, y, W, 100, "Programs (1-4)")
+    
+    for prog = 1, 4 do
+        local px = 6 + (prog-1) * 195
+        local py = y + 18
+        
+        Lbl("Program " .. prog, px, py-13, 100)
+        layout[string.format("prog%d_enable", prog)] = {
+            PrettyName="Prog"..prog.."~Enable",
+            Style="Button", ButtonStyle="Toggle",
+            Legend="Enable",
+            Color=C_BTN_B,
+            Position={px, py}, Size={90, BH}
+        }
+        layout[string.format("prog%d_send", prog)] = {
+            PrettyName="Prog"..prog.."~Send",
+            Style="Button", ButtonStyle="Trigger",
+            Legend="Send",
+            Color=C_BTN_G,
+            Position={px, py+34}, Size={90, BH}
+        }
+        layout[string.format("prog%d_delete", prog)] = {
+            PrettyName="Prog"..prog.."~Delete",
+            Style="Button", ButtonStyle="Trigger",
+            Legend="Delete",
+            Color=C_BTN_R,
+            Position={px+96, py+34}, Size={90, BH}
+        }
+        layout[string.format("prog%d_status", prog)] = {
+            PrettyName="Prog"..prog.."~Status",
+            Style="Led",
+            Position={px+96, py+5}, Size={20, 20}
+        }
+    end
+    
+    -- ── Text Areas ─────────────────────────────────────────────────
+    y = y + 106
+    local AREA_H = 158  -- Reduced from 180 since frame controls moved to top row
+    
+    for area = 1, 4 do
+        local ay = y + (area-1) * (AREA_H + 6)
+        GBox(0, ay, W, AREA_H, "Text Area " .. area)
+        
+        -- Row 1: Text input (narrower) + Enable, Frame, Frame Color, Link buttons
+        Lbl("Text", 6, ay+20, W-450)
+        layout[string.format("area%d_text", area)] = {
+            PrettyName="Area"..area.."~Text",
+            Style="Text",
+            Position={6, ay+33}, Size={W-462, CH}
+        }
+        
+        -- Right side buttons: Enable, Frame, Frame Color dropdown, Link toggle
+        local btnX = W-450
+        Lbl("Enable", btnX, ay+20, 60)
+        layout[string.format("area%d_enable", area)] = {
+            PrettyName="Area"..area.."~Enable",
+            Style="Button", ButtonStyle="Toggle",
+            Legend="Enable",
+            Color=C_BTN_B,
+            Position={btnX, ay+33}, Size={70, BH}
+        }
+        
+        btnX = btnX + 76
+        Lbl("Frame", btnX, ay+20, 50)
+        layout[string.format("area%d_frame", area)] = {
+            PrettyName="Area"..area.."~Frame",
+            Style="Button", ButtonStyle="Toggle",
+            Legend="Frame",
+            Color={120,120,120},
+            Position={btnX, ay+33}, Size={70, BH}
+        }
+        
+        btnX = btnX + 76
+        Lbl("F.Color", btnX, ay+20, 80)
+        layout[string.format("area%d_frame_color", area)] = {
+            PrettyName="Area"..area.."~FrameColor",
+            Style="ComboBox", IsReadOnly=false,
+            Position={btnX, ay+33}, Size={90, CH}
+        }
+        
+        btnX = btnX + 96
+        Lbl("Link", btnX, ay+20, 40)
+        layout[string.format("area%d_frame_link", area)] = {
+            PrettyName="Area"..area.."~LinkColor",
+            Style="Button", ButtonStyle="Toggle",
+            Legend="↔",
+            Color={80,120,180},
+            Position={btnX, ay+33}, Size={40, BH},
+            FontSize=16
+        }
+        
+        -- Row 2: Position & Size
+        local r2 = ay + 70
+        Lbl("X", 6, r2, 50)
+        Lbl("Y", 64, r2, 50)
+        Lbl("Width", 122, r2, 60)
+        Lbl("Height", 190, r2, 60)
+        layout[string.format("area%d_x", area)] = { PrettyName="Area"..area.."~X", Style="Text", Position={6, r2+13}, Size={50, CH} }
+        layout[string.format("area%d_y", area)] = { PrettyName="Area"..area.."~Y", Style="Text", Position={64, r2+13}, Size={50, CH} }
+        layout[string.format("area%d_width", area)] = { PrettyName="Area"..area.."~Width", Style="Text", Position={122, r2+13}, Size={60, CH} }
+        layout[string.format("area%d_height", area)] = { PrettyName="Area"..area.."~Height", Style="Text", Position={190, r2+13}, Size={60, CH} }
+        
+        Lbl("Text Color", 258, r2, 90)
+        Lbl("BG Color", 356, r2, 90)
+        Lbl("Font", 454, r2, 70)
+        layout[string.format("area%d_color", area)] = { PrettyName="Area"..area.."~Color", Style="ComboBox", Position={258, r2+13}, Size={90, CH} }
+        layout[string.format("area%d_bg_color", area)] = { PrettyName="Area"..area.."~BgColor", Style="ComboBox", Position={356, r2+13}, Size={90, CH} }
+        layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={454, r2+13}, Size={70, CH} }
+        
+        -- Row 3: Effects (with more spacing from group border)
+        local r3 = ay + 118
+        Lbl("Effect", 6, r3, 120)
+        Lbl("Speed", 134, r3, 60)
+        Lbl("Dwell (s)", 202, r3, 80)
+        layout[string.format("area%d_effect", area)] = { PrettyName="Area"..area.."~Effect", Style="ComboBox", Position={6, r3+13}, Size={120, CH} }
+        layout[string.format("area%d_speed", area)] = { PrettyName="Area"..area.."~Speed", Style="Text", Position={134, r3+13}, Size={60, CH} }
+        layout[string.format("area%d_dwell", area)] = { PrettyName="Area"..area.."~Dwell", Style="Text", Position={202, r3+13}, Size={80, CH} }
+    end
+    
+    -- ── Clock & Timer ──────────────────────────────────────────────
+    y = y + 4 * (AREA_H + 6) + 6
+    GBox(0, y, W/2-2, 160, "Digital Clock")
+    GBox(W/2+2, y, W/2-2, 160, "Countdown Timer")
+    
+    -- Clock
+    layout["clock_enable"] = { PrettyName="Clock~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+20}, Size={90, BH} }
+    Lbl("X", 6, y+56, 50)
+    Lbl("Y", 64, y+56, 50)
+    Lbl("Width", 122, y+56, 60)
+    Lbl("Height", 190, y+56, 60)
+    layout["clock_x"] = { PrettyName="Clock~X", Style="Text", Position={6, y+69}, Size={50, CH} }
+    layout["clock_y"] = { PrettyName="Clock~Y", Style="Text", Position={64, y+69}, Size={50, CH} }
+    layout["clock_width"] = { PrettyName="Clock~Width", Style="Text", Position={122, y+69}, Size={60, CH} }
+    layout["clock_height"] = { PrettyName="Clock~Height", Style="Text", Position={190, y+69}, Size={60, CH} }
+    
+    Lbl("Format", 6, y+104, 120)
+    Lbl("Color", 134, y+104, 80)
+    layout["clock_format"] = { PrettyName="Clock~Format", Style="ComboBox", Position={6, y+117}, Size={120, CH} }
+    layout["clock_color"] = { PrettyName="Clock~Color", Style="ComboBox", Position={134, y+117}, Size={80, CH} }
+    
+    -- Timer
+    local tx = W/2+8
+    layout["timer_enable"] = { PrettyName="Timer~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={tx, y+20}, Size={90, BH} }
+    Lbl("X", tx, y+56, 50)
+    Lbl("Y", tx+58, y+56, 50)
+    Lbl("Width", tx+116, y+56, 60)
+    layout["timer_x"] = { PrettyName="Timer~X", Style="Text", Position={tx, y+69}, Size={50, CH} }
+    layout["timer_y"] = { PrettyName="Timer~Y", Style="Text", Position={tx+58, y+69}, Size={50, CH} }
+    layout["timer_width"] = { PrettyName="Timer~Width", Style="Text", Position={tx+116, y+69}, Size={60, CH} }
+    
+    Lbl("End Date", tx, y+104, 100)
+    Lbl("Time", tx+108, y+104, 100)
+    layout["timer_end_date"] = { PrettyName="Timer~EndDate", Style="Text", Position={tx, y+117}, Size={100, CH} }
+    layout["timer_end_time"] = { PrettyName="Timer~EndTime", Style="Text", Position={tx+108, y+117}, Size={100, CH} }
+    
+    -- ── Curtain ────────────────────────────────────────────────────
+    y = y + 166
+    GBox(0, y, W, 68, "Curtain (Overlay Area)")
+    
+    layout["curtain_state"] = { PrettyName="Curtain~State", Style="Button", ButtonStyle="Toggle", Legend="Show", Color=C_BTN_O, Position={6, y+20}, Size={90, BH} }
+    
+    Lbl("X", 104, y+20, 50)
+    Lbl("Y", 162, y+20, 50)
+    Lbl("Width", 220, y+20, 60)
+    Lbl("Height", 288, y+20, 60)
+    Lbl("Color", 356, y+20, 80)
+    layout["curtain_x"] = { PrettyName="Curtain~X", Style="Text", Position={104, y+33}, Size={50, CH} }
+    layout["curtain_y"] = { PrettyName="Curtain~Y", Style="Text", Position={162, y+33}, Size={50, CH} }
+    layout["curtain_width"] = { PrettyName="Curtain~Width", Style="Text", Position={220, y+33}, Size={60, CH} }
+    layout["curtain_height"] = { PrettyName="Curtain~Height", Style="Text", Position={288, y+33}, Size={60, CH} }
+    layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox", Position={356, y+33}, Size={120, CH} }
+    
+    -- ── Global Controls ────────────────────────────────────────────
+    y = y + 74
+    GBox(0, y, W, 80, "Global Controls")
+    
+    Lbl("Brightness", 6, y+18, 100)
+    layout["brightness"] = { PrettyName="Global~Brightness", Style="Knob", Position={6, y+31}, Size={80, 36} }
+    
+    layout["power"] = { PrettyName="Global~Power", Style="Button", ButtonStyle="Toggle", Legend="Power", Color=C_BTN_B, Position={120, y+31}, Size={100, 36} }
+    layout["clear_screen"] = { PrettyName="Global~Clear", Style="Button", ButtonStyle="Trigger", Legend="Clear Screen", Color=C_BTN_R, Position={228, y+31}, Size={140, 36} }
+    
+    return layout, graphics
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- Runtime
+-- ══════════════════════════════════════════════════════════════════
+if Controls then
+    local socket = nil
+    local ip_addr = Properties["IP Address"].Value
+    local port = Properties["Port"].Value
+    local led_type = 0  -- 0=T/A/XC, 1=E, 2=X1/X2, 3=C, 4=E5/E6/C8
+    local comm_type = 0  -- 0=TCP, 1=UDP, 2=Serial
+    local screen_width = Properties["Screen Width"].Value
+    local screen_height = Properties["Screen Height"].Value
+    local color_type = 0  -- 0=Mono, 1=Dual, 2=RGB
+    local rotation = 0  -- 0, 90, 180, 270 degrees
+    local activeGroup = 0  -- 0 = All (broadcast), 1-8 = specific group
+    local updatingGroups = false  -- Flag to prevent group button event loops
+    
+    -- Map LED Type
+    local led_type_map = {
+        ["T/A/XC Series (6th Gen)"] = 0,
+        ["E Series (6th Gen)"] = 1,
+        ["X1/X2"] = 2,
+        ["C Series (7th Gen)"] = 3,
+        ["E5/E6/C8"] = 4
+    }
+    led_type = led_type_map[Properties["LED Type"].Value] or 0
+    
+    -- Map Communication Type
+    local comm_type_map = {
+        ["TCP (Fixed IP)"] = 0,
+        ["UDP Broadcast"] = 1,
+        ["Serial"] = 2
+    }
+    comm_type = comm_type_map[Properties["Communication"].Value] or 0
+    
+    -- Map Color Type
+    local color_type_map = {
+        ["Monochrome"] = 0,
+        ["Dual Color"] = 1,
+        ["Full RGB"] = 2
+    }
+    color_type = color_type_map[Properties["Color Type"].Value] or 0
+    
+    -- Color definitions
+    local ColorNames = {
+        ["White"]   = 0xFFFFFF, ["Red"]     = 0xFF0000, ["Green"]   = 0x00FF00,
+        ["Blue"]    = 0x0000FF, ["Yellow"]  = 0xFFFF00, ["Magenta"] = 0xFF00FF,
+        ["Cyan"]    = 0x00FFFF, ["Orange"]  = 0xFFA500, ["Purple"]  = 0x800080,
+        ["Gold"]    = 0xFFD700, ["Black"]   = 0x000000
+    }
+    
+    -- Transition effects (0-38)
+    local EffectNames = {
+        ["Static"] = 0,
+        ["Scroll Left"] = 1,
+        ["Scroll Right"] = 2,
+        ["Scroll Up"] = 3,
+        ["Scroll Down"] = 4,
+        ["Continuous Left"] = 5,
+        ["Continuous Right"] = 6,
+        ["Continuous Up"] = 7,
+        ["Continuous Down"] = 8,
+        ["Fade In"] = 9,
+        ["Flash"] = 10,
+        ["Curtain Open"] = 11,
+        ["Curtain Close"] = 12,
+        ["Wipe Left"] = 13,
+        ["Wipe Right"] = 14,
+        ["Wipe Up"] = 15,
+        ["Wipe Down"] = 16
+    }
+    
+    local ClockFormats = {
+        ["HH:MM:SS"] = 0,
+        ["HH:MM"] = 1,
+        ["YYYY-MM-DD HH:MM"] = 2,
+        ["MM/DD/YYYY HH:MM"] = 3,
+        ["DD.MM.YYYY HH:MM"] = 4
+    }
+    
+    local function BytesToHex(bytes)
+        local hex = ""
+        for i = 1, #bytes do
+            hex = hex .. string.format("%02X", string.byte(bytes, i))
+        end
+        return hex
+    end
+    
+    local function PackU16(val)
+        -- Little-endian 16-bit unsigned
+        return string.char(val % 256, math.floor(val / 256) % 256)
+    end
+    
+    local function PackU32(val)
+        -- Little-endian 32-bit unsigned
+        return string.char(
+            val % 256,
+            math.floor(val / 256) % 256,
+            math.floor(val / 65536) % 256,
+            math.floor(val / 16777216) % 256
+        )
+    end
+    
+    local function BuildProtocolPacket(cmd, data)
+        -- Simplified protocol packet builder
+        -- Format: [Header][Command][Length][Data][Checksum]
+        local header = string.char(0xA5, 0x5A)  -- Magic header
+        local cmd_byte = string.char(cmd)
+        local len = PackU16(#data)
+        local packet = header .. cmd_byte .. len .. data
+        
+        -- Calculate checksum (XOR of all bytes)
+        local checksum = 0
+        for i = 1, #packet do
+            checksum = checksum ~ string.byte(packet, i)
+        end
+        packet = packet .. string.char(checksum)
+        
+        return packet
+    end
+    
+    local function OpenSocket()
+        if socket then pcall(function() socket:Close() end) end
+        
+        Controls.connection_status.Value = 5  -- Connecting (orange)
+        Controls.last_command.String = "Connecting..."
+        
+        local ok, err = pcall(function()
+            if comm_type == 0 then  -- TCP
+                socket = TcpSocket.New()
+                socket.ReadTimeout = 2
+                socket.WriteTimeout = 2
+                socket.ReconnectTimeout = 5
+                
+                -- Event handlers for TCP connection
+                socket.Connected = function(sock)
+                    Controls.connection_status.Value = 0  -- OK (green)
+                    Controls.last_command.String = "Connected"
+                    print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
+                end
+                
+                socket.Reconnected = function(sock)
+                    Controls.connection_status.Value = 0  -- OK (green)
+                    Controls.last_command.String = "Reconnected"
+                    print("✓ TCP Reconnected")
+                end
+                
+                socket.Closed = function(sock)
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "Connection closed"
+                    print("✗ TCP Connection closed")
+                end
+                
+                socket.Error = function(sock, err)
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "ERROR: " .. tostring(err)
+                    print("✗ TCP Error: " .. tostring(err))
+                end
+                
+                socket.Timeout = function(sock, err)
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "ERROR: Connection timeout"
+                    print("✗ TCP Timeout")
+                end
+                
+                socket:Connect(ip_addr, port)
+                
+            elseif comm_type == 1 then  -- UDP
+                socket = UdpSocket.New()
+                socket:Open(ip_addr, port)
+                -- UDP is connectionless, so we assume OK but mark as compromised (yellow)
+                Controls.connection_status.Value = 4  -- Compromised (yellow)
+                Controls.last_command.String = "UDP socket open (connectionless)"
+                print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(port))
+            end
+        end)
+        
+        if not ok then
+            Controls.connection_status.Value = 2  -- Fault (red)
+            Controls.last_command.String = "ERROR: " .. tostring(err)
+            print("✗ Socket error: " .. tostring(err))
+            return false
+        end
+        
+        return true
+    end
+    
+    local function SendData(data)
+        if not socket then
+            Controls.connection_status.Value = 2  -- Fault (red)
+            Controls.last_command.String = "ERROR: Not connected"
+            return false
+        end
+        
+        local ok, err = pcall(function()
+            if comm_type == 0 then  -- TCP
+                socket:Write(data)
+            elseif comm_type == 1 then  -- UDP
+                socket:Send(ip_addr, port, data)
+            end
+        end)
+        
+        if ok then
+            Controls.last_command.String = "Sent: " .. BytesToHex(data:sub(1, 20))
+            if comm_type == 0 then
+                Controls.connection_status.Value = 0  -- OK (green) - TCP connection active
+            else
+                Controls.connection_status.Value = 4  -- Compromised (yellow) - UDP no confirmation
+            end
+            print("-> Sent " .. #data .. " bytes")
+            return true
+        else
+            Controls.last_command.String = "ERROR: " .. tostring(err)
+            Controls.connection_status.Value = 2  -- Fault (red)
+            print("✗ Send error: " .. tostring(err))
+            return false
+        end
+    end
+    
+    local function SendScreenParameters()
+        -- Command to set screen parameters
+        local data = string.char(led_type, comm_type, color_type)
+        data = data .. PackU16(screen_width) .. PackU16(screen_height)
+        data = data .. string.char(rotation)  -- Add rotation byte
+        
+        local packet = BuildProtocolPacket(0x01, data)  -- Command 0x01 = Set Screen Params
+        return SendData(packet)
+    end
+    
+    local function SetRotation(angle)
+        rotation = angle
+        local data = string.char(angle)
+        local packet = BuildProtocolPacket(0x08, data)  -- Command 0x08 = Set Rotation
+        if SendData(packet) then
+            print("✓ Display rotation set to " .. angle .. " degrees")
+            return true
+        end
+        return false
+    end
+    
+    local function SendTextArea(area_num)
+        local a = "area" .. area_num .. "_"
+        if not Controls[a .. "enable"].Boolean then return end
+        
+        local text = Controls[a .. "text"].String
+        local x = tonumber(Controls[a .. "x"].String) or 0
+        local y = tonumber(Controls[a .. "y"].String) or 0
+        local w = tonumber(Controls[a .. "width"].String) or screen_width
+        local h = tonumber(Controls[a .. "height"].String) or 16
+        local color = ColorNames[Controls[a .. "color"].String] or 0xFFFFFF
+        local bgcolor = ColorNames[Controls[a .. "bg_color"].String] or 0x000000
+        local font_size = tonumber(Controls[a .. "font_size"].String) or 12
+        local effect = EffectNames[Controls[a .. "effect"].String] or 0
+        local speed = tonumber(Controls[a .. "speed"].String) or 0
+        local dwell = tonumber(Controls[a .. "dwell"].String) or 5
+        local frame_enabled = Controls[a .. "frame"].Boolean and 1 or 0
+        local frame_color = ColorNames[Controls[a .. "frame_color"].String] or 0xFFFFFF
+        
+        -- Build text area data packet
+        local data = string.char(area_num - 1)  -- Area index
+        data = data .. PackU16(x) .. PackU16(y)
+        data = data .. PackU16(w) .. PackU16(h)
+        data = data .. PackU32(color)
+        data = data .. PackU32(bgcolor)
+        data = data .. string.char(font_size, effect, speed)
+        data = data .. PackU16(dwell)
+        data = data .. string.char(frame_enabled)
+        data = data .. PackU32(frame_color)
+        data = data .. string.char(activeGroup)  -- Add group routing
+        data = data .. PackU16(#text) .. text
+        
+        local packet = BuildProtocolPacket(0x10, data)  -- Command 0x10 = Add Text Area
+        return SendData(packet)
+    end
+    
+    local function SendClock()
+        if not Controls.clock_enable.Boolean then return end
+        
+        local x = tonumber(Controls.clock_x.String) or 0
+        local y = tonumber(Controls.clock_y.String) or 0
+        local w = tonumber(Controls.clock_width.String) or 128
+        local h = tonumber(Controls.clock_height.String) or 16
+        local format = ClockFormats[Controls.clock_format.String] or 0
+        local color = ColorNames[Controls.clock_color.String] or 0xFFFFFF
+        
+        local data = PackU16(x) .. PackU16(y)
+        data = data .. PackU16(w) .. PackU16(h)
+        data = data .. string.char(format)
+        data = data .. PackU32(color)
+        
+        local packet = BuildProtocolPacket(0x20, data)  -- Command 0x20 = Add Clock
+        return SendData(packet)
+    end
+    
+    local function SendTimer()
+        if not Controls.timer_enable.Boolean then return end
+        
+        local x = tonumber(Controls.timer_x.String) or 0
+        local y = tonumber(Controls.timer_y.String) or 0
+        local w = tonumber(Controls.timer_width.String) or 128
+        local end_date = Controls.timer_end_date.String  -- Format: YYYY-MM-DD
+        local end_time = Controls.timer_end_time.String  -- Format: HH:MM:SS
+        local text = Controls.timer_text.String
+        local color = ColorNames[Controls.timer_color.String] or 0xFFFFFF
+        
+        -- Parse date/time (simplified)
+        local data = PackU16(x) .. PackU16(y) .. PackU16(w)
+        data = data .. PackU16(#end_date) .. end_date
+        data = data .. PackU16(#end_time) .. end_time
+        data = data .. PackU16(#text) .. text
+        data = data .. PackU32(color)
+        
+        local packet = BuildProtocolPacket(0x21, data)  -- Command 0x21 = Add Timer
+        return SendData(packet)
+    end
+    
+    local function SendCurtain()
+        if not Controls.curtain_state.Boolean then
+            -- Curtain OFF: send command to clear curtain area (could be a clear command or transparent overlay)
+            print("✓ Curtain hidden")
+            return
+        end
+        
+        local x = tonumber(Controls.curtain_x.String) or 0
+        local y = tonumber(Controls.curtain_y.String) or 0
+        local w = tonumber(Controls.curtain_width.String) or screen_width
+        local h = tonumber(Controls.curtain_height.String) or screen_height
+        local color = ColorNames[Controls.curtain_color.String] or 0x000000
+        
+        -- Build curtain data packet (using text area command with empty text as a colored rectangle)
+        local data = string.char(254)  -- Special area index for curtain overlay
+        data = data .. PackU16(x) .. PackU16(y)
+        data = data .. PackU16(w) .. PackU16(h)
+        data = data .. PackU32(color)  -- Foreground color
+        data = data .. PackU32(color)  -- Background color (same = solid fill)
+        data = data .. string.char(0, 0, 0)  -- font_size=0, effect=0, speed=0
+        data = data .. PackU16(0)  -- dwell=0
+        data = data .. string.char(0)  -- frame=0
+        data = data .. PackU32(0)  -- frame_color
+        data = data .. string.char(activeGroup)  -- group routing
+        data = data .. PackU16(0)  -- text length = 0 (no text, just colored rectangle)
+        
+        local packet = BuildProtocolPacket(0x10, data)  -- Command 0x10 = Add Text Area
+        if SendData(packet) then
+            print("✓ Curtain shown at (" .. x .. "," .. y .. ") size " .. w .. "x" .. h)
+        end
+    end
+    
+    local function SendProgram(prog_num)
+        if not Controls["prog" .. prog_num .. "_enable"].Boolean then return end
+        
+        -- Send program start
+        local data = string.char(prog_num - 1, 0x00)  -- Program index, RAM mode
+        local packet = BuildProtocolPacket(0x02, data)  -- Command 0x02 = Create Program
+        if not SendData(packet) then return false end
+        
+        Timer.CallAfter(function()
+            -- Send all enabled text areas
+            for area = 1, 4 do
+                if Controls["area" .. area .. "_enable"].Boolean then
+                    SendTextArea(area)
+                    Timer.CallAfter(function() end, 0.1)
+                end
+            end
+            
+            -- Send clock if enabled
+            if Controls.clock_enable.Boolean then
+                SendClock()
+            end
+            
+            -- Send timer if enabled
+            if Controls.timer_enable.Boolean then
+                SendTimer()
+            end
+            
+            -- Send program complete
+            Timer.CallAfter(function()
+                local end_packet = BuildProtocolPacket(0x03, string.char(prog_num - 1))  -- Command 0x03 = Send Program
+                if SendData(end_packet) then
+                    Controls["prog" .. prog_num .. "_status"].Boolean = true
+                    print("✓ Program " .. prog_num .. " sent successfully")
+                end
+            end, 0.5)
+        end, 0.2)
+        
+        return true
+    end
+    
+    local function DeleteProgram(prog_num)
+        local data = string.char(prog_num - 1)
+        local packet = BuildProtocolPacket(0x04, data)  -- Command 0x04 = Delete Program
+        if SendData(packet) then
+            Controls["prog" .. prog_num .. "_status"].Boolean = false
+            print("✓ Program " .. prog_num .. " deleted")
+        end
+    end
+    
+    local function ClearScreen()
+        local packet = BuildProtocolPacket(0x05, "")  -- Command 0x05 = Clear Screen
+        if SendData(packet) then
+            for prog = 1, 4 do
+                Controls["prog" .. prog .. "_status"].Boolean = false
+            end
+            print("✓ Screen cleared")
+        end
+    end
+    
+    local function SetBrightness(value)
+        local data = string.char(math.floor(value))
+        local packet = BuildProtocolPacket(0x06, data)  -- Command 0x06 = Set Brightness
+        SendData(packet)
+    end
+    
+    local function SetPower(on)
+        local data = string.char(on and 0x01 or 0x00)
+        local packet = BuildProtocolPacket(0x07, data)  -- Command 0x07 = Power Control
+        SendData(packet)
+    end
+    
+    local function Initialize()
+        print("=== LED Display Controller SDK v2.0.0 Initializing ===")
+        
+        -- Initialize connection fields
+        Controls.ip_address.String = ip_addr
+        Controls.port.String = tostring(port)
+        Controls.screen_width.String = tostring(screen_width)
+        Controls.screen_height.String = tostring(screen_height)
+        Controls.last_command.String = "Not connected"
+        Controls.connection_status.Value = 2  -- Start with Fault (red) - not connected
+        
+        -- Initialize rotation choices
+        Controls.rotation.Choices = {"0° (Normal)", "90° (Clockwise)", "180° (Upside Down)", "270° (Counter-Clockwise)"}
+        Controls.rotation.String = "0° (Normal)"
+        
+        -- Initialize color choices
+        local colorChoices = {"White", "Red", "Green", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Gold", "Black"}
+        for area = 1, 4 do
+            Controls["area" .. area .. "_color"].Choices = colorChoices
+            if Controls["area" .. area .. "_color"].String == "" then
+                Controls["area" .. area .. "_color"].String = "White"
+            end
+            if Controls["area" .. area .. "_effect"].String == "" then
+                Controls["area" .. area .. "_effect"].String = "Scroll Left"
+            end
+            -- Set default values
+            if Controls["area" .. area .. "_x"].String == "" then Controls["area" .. area .. "_x"].String = "0" end
+            if Controls["area" .. area .. "_y"].String == "" then Controls["area" .. area .. "_y"].String = tostring((area-1) * 8) end
+            if Controls["area" .. area .. "_width"].String == "" then Controls["area" .. area .. "_width"].String = tostring(screen_width) end
+            if Controls["area" .. area .. "_height"].String == "" then Controls["area" .. area .. "_height"].String = "8" end
+            if Controls["area" .. area .. "_font_size"].String == "" then Controls["area" .. area .. "_font_size"].String = "12" end
+            if Controls["area" .. area .. "_speed"].String == "" then Controls["area" .. area .. "_speed"].String = "50" end
+            if Controls["area" .. area .. "_dwell"].String == "" then Controls["area" .. area .. "_dwell"].String = "5" end
+        end
+        
+        -- Initialize effect choices
+        local effectChoices = {"Immediate", "Scroll Left", "Scroll Right", "Scroll Up", "Scroll Down", 
+                               "Continuous Left", "Continuous Right", "Continuous Up", "Continuous Down",
+                               "Fade In", "Flash", "Curtain Open", "Curtain Close"}
+        for area = 1, 4 do
+            Controls["area" .. area .. "_effect"].Choices = effectChoices
+        end
+        
+        -- Initialize clock
+        Controls.clock_format.Choices = {"HH:MM:SS", "HH:MM", "YYYY-MM-DD HH:MM", "MM/DD/YYYY HH:MM", "DD.MM.YYYY HH:MM"}
+        Controls.clock_color.Choices = colorChoices
+        if Controls.clock_format.String == "" then Controls.clock_format.String = "HH:MM:SS" end
+        if Controls.clock_color.String == "" then Controls.clock_color.String = "White" end
+        if Controls.clock_x.String == "" then Controls.clock_x.String = "0" end
+        if Controls.clock_y.String == "" then Controls.clock_y.String = "0" end
+        if Controls.clock_width.String == "" then Controls.clock_width.String = tostring(screen_width) end
+        if Controls.clock_height.String == "" then Controls.clock_height.String = "16" end
+        
+        -- Initialize timer
+        Controls.timer_color.Choices = colorChoices
+        if Controls.timer_color.String == "" then Controls.timer_color.String = "Yellow" end
+        if Controls.timer_x.String == "" then Controls.timer_x.String = "0" end
+        if Controls.timer_y.String == "" then Controls.timer_y.String = "16" end
+        if Controls.timer_width.String == "" then Controls.timer_width.String = tostring(screen_width) end
+        
+        -- Initialize curtain
+        Controls.curtain_color.Choices = colorChoices
+        if Controls.curtain_color.String == "" then Controls.curtain_color.String = "Black" end
+        if Controls.curtain_x.String == "" then Controls.curtain_x.String = "0" end
+        if Controls.curtain_y.String == "" then Controls.curtain_y.String = "0" end
+        if Controls.curtain_width.String == "" then Controls.curtain_width.String = tostring(screen_width) end
+        if Controls.curtain_height.String == "" then Controls.curtain_height.String = tostring(screen_height) end
+        
+        -- Initialize brightness
+        if Controls.brightness.Value == 0 then
+            Controls.brightness.Value = 128
+        end
+        
+        print("=== Ready ===")
+    end
+    
+    -- Event Handlers
+    Controls.connect.EventHandler = function()
+        print("=== Connecting ===")
+        ip_addr = Controls.ip_address.String
+        port = tonumber(Controls.port.String) or 5005
+        OpenSocket()
+    end
+    
+    Controls.send_screen_params.EventHandler = function()
+        screen_width = tonumber(Controls.screen_width.String) or 128
+        screen_height = tonumber(Controls.screen_height.String) or 32
+        SendScreenParameters()
+    end
+    
+    Controls.apply_rotation.EventHandler = function()
+        local rotation_map = {
+            ["0° (Normal)"] = 0,
+            ["90° (Clockwise)"] = 90,
+            ["180° (Upside Down)"] = 180,
+            ["270° (Counter-Clockwise)"] = 270
+        }
+        local angle = rotation_map[Controls.rotation.String] or 0
+        SetRotation(angle)
+    end
+    
+    Controls.rotation.EventHandler = function(ctl)
+        -- Auto-apply when selection changes
+        local rotation_map = {
+            ["0° (Normal)"] = 0,
+            ["90° (Clockwise)"] = 90,
+            ["180° (Upside Down)"] = 180,
+            ["270° (Counter-Clockwise)"] = 270
+        }
+        local angle = rotation_map[ctl.String] or 0
+        SetRotation(angle)
+    end
+    
+    for prog = 1, 4 do
+        Controls["prog" .. prog .. "_send"].EventHandler = function()
+            SendProgram(prog)
+        end
+        
+        Controls["prog" .. prog .. "_delete"].EventHandler = function()
+            DeleteProgram(prog)
+        end
+    end
+    
+    -- Frame and text color link handlers for each area
+    for area = 1, 4 do
+        local a = "area" .. area .. "_"
+        
+        -- When link is toggled ON, copy text color to frame color and keep synced
+        Controls[a .. "frame_link"].EventHandler = function(ctl)
+            if ctl.Boolean then
+                -- Link enabled: copy text color to frame color
+                Controls[a .. "frame_color"].String = Controls[a .. "color"].String
+                print("Area " .. area .. ": Frame color linked to text color")
+            else
+                print("Area " .. area .. ": Frame color unlinked")
+            end
+        end
+        
+        -- When text color changes and link is on, update frame color
+        Controls[a .. "color"].EventHandler = function(ctl)
+            if Controls[a .. "frame_link"].Boolean then
+                Controls[a .. "frame_color"].String = ctl.String
+            end
+        end
+    end
+    
+    -- Group selection handlers - ensure only one group is active at a time
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            
+            if ctl.Boolean then
+                -- This group was turned ON
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    -- Turn off all other groups
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("✓ Active group set to: " .. groupName)
+                end, 0.05)
+            else
+                -- Prevent turning off the active group (always need one active)
+                ctl.Boolean = true
+            end
+        end
+    end
+    
+    -- Curtain state handler
+    Controls.curtain_state.EventHandler = function(ctl)
+        SendCurtain()
+    end
+    
+    Controls.clear_screen.EventHandler = function()
+        ClearScreen()
+    end
+    
+    Controls.brightness.EventHandler = function(ctl)
+        SetBrightness(ctl.Value)
+    end
+    
+    Controls.power.EventHandler = function(ctl)
+        SetPower(ctl.Boolean)
+    end
+    
+    Controls.ip_address.EventHandler = function(ctl)
+        ip_addr = ctl.String
+    end
+    
+    Controls.port.EventHandler = function(ctl)
+        port = tonumber(ctl.String) or 5005
+    end
+    
+    function Cleanup()
+        if socket then pcall(function() socket:Close() end) end
+    end
+    
+    Initialize()
+end
