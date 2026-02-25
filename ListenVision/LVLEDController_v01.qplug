@@ -56,6 +56,10 @@ function GetControls(props)
     table.insert(controls, { Name="screen_height",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="send_screen_params", ControlType="Button",   ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     
+    -- Display Rotation
+    table.insert(controls, { Name="rotation",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_rotation",    ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    
     -- Program Controls (4 programs)
     for prog = 1, 4 do
         table.insert(controls, { Name=string.format("prog%d_enable", prog),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
@@ -179,8 +183,25 @@ function GetControlLayout(props)
     Lbl("Last Command", 450, y+20, W-456)
     layout["last_command"] = { PrettyName="Conn~LastCmd", Style="Text", Position={450, y+33}, Size={W-456, 70} }
     
-    -- ── Program Controls ───────────────────────────────────────────
+    -- ── Display Rotation ──────────────────────────────────────────
     y = y + 116
+    GBox(0, y, W, 60, "Display Rotation")
+    
+    Lbl("Rotation", 6, y+18, 200)
+    layout["rotation"] = {
+        PrettyName="Rotation~Angle",
+        Style="ComboBox", IsReadOnly=false,
+        Position={6, y+31}, Size={200, CH}
+    }
+    layout["apply_rotation"] = {
+        PrettyName="Rotation~Apply",
+        Style="Button", ButtonStyle="Trigger",
+        Legend="Apply Rotation", Color=C_BTN_O,
+        Position={214, y+31}, Size={140, BH}
+    }
+    
+    -- ── Program Controls ───────────────────────────────────────────
+    y = y + 66
     GBox(0, y, W, 100, "Programs (1-4)")
     
     for prog = 1, 4 do
@@ -192,7 +213,7 @@ function GetControlLayout(props)
             PrettyName="Prog"..prog.."~Enable",
             Style="Button", ButtonStyle="Toggle",
             Legend="Enable",
-            Color={100, 100, 100},
+            Color=C_BTN_B,
             Position={px, py}, Size={90, BH}
         }
         layout[string.format("prog%d_send", prog)] = {
@@ -236,7 +257,7 @@ function GetControlLayout(props)
             PrettyName="Area"..area.."~Enable",
             Style="Button", ButtonStyle="Toggle",
             Legend="Enable",
-            Color={100, 100, 100},
+            Color=C_BTN_B,
             Position={W-300, ay+31}, Size={90, BH}
         }
         
@@ -272,7 +293,7 @@ function GetControlLayout(props)
     GBox(W/2+2, y, W/2-2, 140, "Countdown Timer")
     
     -- Clock
-    layout["clock_enable"] = { PrettyName="Clock~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color={100,100,100}, Position={6, y+18}, Size={90, BH} }
+    layout["clock_enable"] = { PrettyName="Clock~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+18}, Size={90, BH} }
     Lbl("X", 6, y+52, 50)
     Lbl("Y", 64, y+52, 50)
     Lbl("Width", 122, y+52, 60)
@@ -289,7 +310,7 @@ function GetControlLayout(props)
     
     -- Timer
     local tx = W/2+8
-    layout["timer_enable"] = { PrettyName="Timer~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color={100,100,100}, Position={tx, y+18}, Size={90, BH} }
+    layout["timer_enable"] = { PrettyName="Timer~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={tx, y+18}, Size={90, BH} }
     Lbl("X", tx, y+52, 50)
     Lbl("Y", tx+58, y+52, 50)
     Lbl("Width", tx+116, y+52, 60)
@@ -306,7 +327,7 @@ function GetControlLayout(props)
     y = y + 146
     GBox(0, y, W, 90, "QR Code (C-series only)")
     
-    layout["qr_enable"] = { PrettyName="QR~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color={100,100,100}, Position={6, y+18}, Size={90, BH} }
+    layout["qr_enable"] = { PrettyName="QR~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+18}, Size={90, BH} }
     Lbl("X", 104, y+18, 50)
     Lbl("Y", 162, y+18, 50)
     Lbl("Size", 220, y+18, 60)
@@ -343,6 +364,7 @@ if Controls then
     local screen_width = Properties["Screen Width"].Value
     local screen_height = Properties["Screen Height"].Value
     local color_type = 0  -- 0=Mono, 1=Dual, 2=RGB
+    local rotation = 0  -- 0, 90, 180, 270 degrees
     
     -- Map LED Type
     local led_type_map = {
@@ -507,9 +529,21 @@ if Controls then
         -- Command to set screen parameters
         local data = string.char(led_type, comm_type, color_type)
         data = data .. PackU16(screen_width) .. PackU16(screen_height)
+        data = data .. string.char(rotation)  -- Add rotation byte
         
         local packet = BuildProtocolPacket(0x01, data)  -- Command 0x01 = Set Screen Params
         return SendData(packet)
+    end
+    
+    local function SetRotation(angle)
+        rotation = angle
+        local data = string.char(angle)
+        local packet = BuildProtocolPacket(0x08, data)  -- Command 0x08 = Set Rotation
+        if SendData(packet) then
+            print("✓ Display rotation set to " .. angle .. " degrees")
+            return true
+        end
+        return false
     end
     
     local function SendTextArea(area_num)
@@ -686,6 +720,10 @@ if Controls then
         Controls.screen_height.String = tostring(screen_height)
         Controls.last_command.String = "Ready"
         
+        -- Initialize rotation choices
+        Controls.rotation.Choices = {"0° (Normal)", "90° (Clockwise)", "180° (Upside Down)", "270° (Counter-Clockwise)"}
+        Controls.rotation.String = "0° (Normal)"
+        
         -- Initialize color choices
         local colorChoices = {"White", "Red", "Green", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Gold", "Black"}
         for area = 1, 4 do
@@ -756,6 +794,29 @@ if Controls then
         screen_width = tonumber(Controls.screen_width.String) or 128
         screen_height = tonumber(Controls.screen_height.String) or 32
         SendScreenParameters()
+    end
+    
+    Controls.apply_rotation.EventHandler = function()
+        local rotation_map = {
+            ["0° (Normal)"] = 0,
+            ["90° (Clockwise)"] = 90,
+            ["180° (Upside Down)"] = 180,
+            ["270° (Counter-Clockwise)"] = 270
+        }
+        local angle = rotation_map[Controls.rotation.String] or 0
+        SetRotation(angle)
+    end
+    
+    Controls.rotation.EventHandler = function(ctl)
+        -- Auto-apply when selection changes
+        local rotation_map = {
+            ["0° (Normal)"] = 0,
+            ["90° (Clockwise)"] = 90,
+            ["180° (Upside Down)"] = 180,
+            ["270° (Counter-Clockwise)"] = 270
+        }
+        local angle = rotation_map[ctl.String] or 0
+        SetRotation(angle)
     end
     
     for prog = 1, 4 do
