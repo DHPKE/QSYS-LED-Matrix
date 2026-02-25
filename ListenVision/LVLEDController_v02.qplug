@@ -884,16 +884,19 @@ if Controls then
             if Controls["area" .. area .. "_width"].String == "" then Controls["area" .. area .. "_width"].String = tostring(screen_width) end
             if Controls["area" .. area .. "_height"].String == "" then Controls["area" .. area .. "_height"].String = "8" end
             if Controls["area" .. area .. "_font_size"].String == "" then Controls["area" .. area .. "_font_size"].String = "12" end
-            if Controls["area" .. area .. "_speed"].String == "" then Controls["area" .. area .. "_speed"].String = "50" end
+            if Controls["area" .. area .. "_speed"].String == "" then Controls["area" .. area .. "_speed"].String = "0" end
             if Controls["area" .. area .. "_dwell"].String == "" then Controls["area" .. area .. "_dwell"].String = "5" end
         end
         
         -- Initialize effect choices
-        local effectChoices = {"Immediate", "Scroll Left", "Scroll Right", "Scroll Up", "Scroll Down", 
+        local effectChoices = {"Static", "Scroll Left", "Scroll Right", "Scroll Up", "Scroll Down", 
                                "Continuous Left", "Continuous Right", "Continuous Up", "Continuous Down",
                                "Fade In", "Flash", "Curtain Open", "Curtain Close"}
         for area = 1, 4 do
             Controls["area" .. area .. "_effect"].Choices = effectChoices
+            if Controls["area" .. area .. "_effect"].String == "" then
+                Controls["area" .. area .. "_effect"].String = "Static"
+            end
         end
         
         -- Initialize clock
@@ -926,7 +929,71 @@ if Controls then
             Controls.brightness.Value = 128
         end
         
-        print("=== Ready ===")
+        print("=== Ready - Auto-connecting ===")
+        
+        -- Auto-connect on startup
+        Timer.CallAfter(function()
+            ip_addr = Controls.ip_address.String
+            port = tonumber(Controls.port.String) or 5005
+            OpenSocket()
+            
+            -- Send initial settings after connection established
+            Timer.CallAfter(function()
+                if socket then
+                    print("=== Sending initial configuration ===")
+                    
+                    -- Send screen parameters
+                    SendScreenParameters()
+                    
+                    -- Send brightness
+                    SetBrightness(Controls.brightness.Value)
+                    
+                    -- Send rotation
+                    local rotation_map = {
+                        ["0° (Normal)"] = 0,
+                        ["90° (Clockwise)"] = 90,
+                        ["180° (Upside Down)"] = 180,
+                        ["270° (Counter-Clockwise)"] = 270
+                    }
+                    local angle = rotation_map[Controls.rotation.String] or 0
+                    if angle ~= 0 then
+                        SetRotation(angle)
+                    end
+                    
+                    -- Send all enabled text areas
+                    for area = 1, 4 do
+                        if Controls["area" .. area .. "_enable"].Boolean then
+                            Timer.CallAfter(function()
+                                SendTextArea(area)
+                            end, 0.1 * area)
+                        end
+                    end
+                    
+                    -- Send clock if enabled
+                    if Controls.clock_enable.Boolean then
+                        Timer.CallAfter(function()
+                            SendClock()
+                        end, 0.5)
+                    end
+                    
+                    -- Send timer if enabled
+                    if Controls.timer_enable.Boolean then
+                        Timer.CallAfter(function()
+                            SendTimer()
+                        end, 0.6)
+                    end
+                    
+                    -- Send curtain if enabled
+                    if Controls.curtain_state.Boolean then
+                        Timer.CallAfter(function()
+                            SendCurtain()
+                        end, 0.7)
+                    end
+                    
+                    print("✓ Initial configuration sent")
+                end
+            end, 1.0)
+        end, 0.5)
     end
     
     -- Event Handlers
@@ -995,6 +1062,37 @@ if Controls then
         Controls[a .. "color"].EventHandler = function(ctl)
             if Controls[a .. "frame_link"].Boolean then
                 Controls[a .. "frame_color"].String = ctl.String
+            end
+            -- Auto-send when any color changes
+            if Controls[a .. "enable"].Boolean and socket then
+                SendTextArea(area)
+            end
+        end
+        
+        -- Auto-send when text changes
+        Controls[a .. "text"].EventHandler = function(ctl)
+            if Controls[a .. "enable"].Boolean and socket then
+                SendTextArea(area)
+            end
+        end
+        
+        -- Auto-send when any parameter changes
+        Controls[a .. "x"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "y"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "width"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "height"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "bg_color"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "font_size"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "effect"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "speed"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "dwell"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "frame"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        Controls[a .. "frame_color"].EventHandler = function() if Controls[a .. "enable"].Boolean and socket then SendTextArea(area) end end
+        
+        -- When area is enabled, send immediately
+        Controls[a .. "enable"].EventHandler = function(ctl)
+            if ctl.Boolean and socket then
+                SendTextArea(area)
             end
         end
     end
