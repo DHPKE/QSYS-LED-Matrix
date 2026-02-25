@@ -160,27 +160,27 @@ function GetControlLayout(props)
     
     -- ── Connection ─────────────────────────────────────────────────
     local y = 42
-    GBox(0, y, W, 84, "Connection & Screen Parameters")
+    GBox(0, y, W, 110, "Connection & Screen Parameters")
     
-    Lbl("IP Address", 6, y+5, 160)
-    Lbl("Port", 174, y+5, 80)
-    Lbl("Status", 262, y+5, 80)
-    layout["ip_address"] = { PrettyName="Conn~IP", Style="Text", Position={6, y+18}, Size={160, CH} }
-    layout["port"] = { PrettyName="Conn~Port", Style="Text", Position={174, y+18}, Size={80, CH} }
-    layout["connect"] = { PrettyName="Conn~Connect", Style="Button", ButtonStyle="Trigger", Legend="Connect", Color=C_BTN_B, Position={350, y+18}, Size={90, BH} }
-    layout["connection_status"] = { PrettyName="Conn~Status", Style="Indicator", Position={262, y+18}, Size={80, CH} }
+    Lbl("IP Address", 6, y+20, 160)
+    Lbl("Port", 174, y+20, 80)
+    Lbl("Status", 262, y+20, 80)
+    layout["ip_address"] = { PrettyName="Conn~IP", Style="Text", Position={6, y+33}, Size={160, CH} }
+    layout["port"] = { PrettyName="Conn~Port", Style="Text", Position={174, y+33}, Size={80, CH} }
+    layout["connect"] = { PrettyName="Conn~Connect", Style="Button", ButtonStyle="Trigger", Legend="Connect", Color=C_BTN_B, Position={350, y+33}, Size={90, BH} }
+    layout["connection_status"] = { PrettyName="Conn~Status", Style="Indicator", Position={262, y+33}, Size={80, CH} }
     
-    Lbl("Screen Width", 6, y+48, 100)
-    Lbl("Height", 114, y+48, 100)
-    layout["screen_width"] = { PrettyName="Screen~Width", Style="Text", Position={6, y+61}, Size={100, CH} }
-    layout["screen_height"] = { PrettyName="Screen~Height", Style="Text", Position={114, y+61}, Size={100, CH} }
-    layout["send_screen_params"] = { PrettyName="Screen~Send", Style="Button", ButtonStyle="Trigger", Legend="Set Parameters", Color=C_BTN_G, Position={222, y+61}, Size={140, BH} }
+    Lbl("Screen Width", 6, y+63, 100)
+    Lbl("Height", 114, y+63, 100)
+    layout["screen_width"] = { PrettyName="Screen~Width", Style="Text", Position={6, y+76}, Size={100, CH} }
+    layout["screen_height"] = { PrettyName="Screen~Height", Style="Text", Position={114, y+76}, Size={100, CH} }
+    layout["send_screen_params"] = { PrettyName="Screen~Send", Style="Button", ButtonStyle="Trigger", Legend="Set Parameters", Color=C_BTN_G, Position={222, y+76}, Size={140, BH} }
     
-    Lbl("Last Command", 450, y+5, W-456)
-    layout["last_command"] = { PrettyName="Conn~LastCmd", Style="Text", Position={450, y+18}, Size={W-456, 66} }
+    Lbl("Last Command", 450, y+20, W-456)
+    layout["last_command"] = { PrettyName="Conn~LastCmd", Style="Text", Position={450, y+33}, Size={W-456, 70} }
     
     -- ── Program Controls ───────────────────────────────────────────
-    y = y + 90
+    y = y + 116
     GBox(0, y, W, 100, "Programs (1-4)")
     
     for prog = 1, 4 do
