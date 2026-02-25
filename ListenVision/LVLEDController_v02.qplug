@@ -81,6 +81,7 @@ function GetControls(props)
     -- Text Area Controls (4 text areas per program)
     for area = 1, 4 do
         table.insert(controls, { Name=string.format("area%d_text", area),       ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_layout_preset", area), ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })
         table.insert(controls, { Name=string.format("area%d_x", area),          ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_y", area),          ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_width", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
@@ -341,23 +342,25 @@ function GetControlLayout(props)
             FontSize=16
         }
         
-        -- Row 2: Position & Size
+        -- Row 2: Position, Size, Preset & Colors
         local r2 = ay + 70
         Lbl("X", 6, r2, 50)
         Lbl("Y", 64, r2, 50)
         Lbl("Width", 122, r2, 60)
         Lbl("Height", 190, r2, 60)
+        Lbl("Preset", 258, r2, 90)
         layout[string.format("area%d_x", area)] = { PrettyName="Area"..area.."~X", Style="Text", Position={6, r2+13}, Size={50, CH} }
         layout[string.format("area%d_y", area)] = { PrettyName="Area"..area.."~Y", Style="Text", Position={64, r2+13}, Size={50, CH} }
         layout[string.format("area%d_width", area)] = { PrettyName="Area"..area.."~Width", Style="Text", Position={122, r2+13}, Size={60, CH} }
         layout[string.format("area%d_height", area)] = { PrettyName="Area"..area.."~Height", Style="Text", Position={190, r2+13}, Size={60, CH} }
+        layout[string.format("area%d_layout_preset", area)] = { PrettyName="Area"..area.."~Preset", Style="ComboBox", Position={258, r2+13}, Size={100, CH} }
         
-        Lbl("Text Color", 258, r2, 90)
-        Lbl("BG Color", 356, r2, 90)
-        Lbl("Font", 454, r2, 70)
-        layout[string.format("area%d_color", area)] = { PrettyName="Area"..area.."~Color", Style="ComboBox", Position={258, r2+13}, Size={90, CH} }
-        layout[string.format("area%d_bg_color", area)] = { PrettyName="Area"..area.."~BgColor", Style="ComboBox", Position={356, r2+13}, Size={90, CH} }
-        layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={454, r2+13}, Size={70, CH} }
+        Lbl("Text Color", 366, r2, 80)
+        Lbl("BG Color", 454, r2, 80)
+        Lbl("Font", 542, r2, 50)
+        layout[string.format("area%d_color", area)] = { PrettyName="Area"..area.."~Color", Style="ComboBox", Position={366, r2+13}, Size={80, CH} }
+        layout[string.format("area%d_bg_color", area)] = { PrettyName="Area"..area.."~BgColor", Style="ComboBox", Position={454, r2+13}, Size={80, CH} }
+        layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={542, r2+13}, Size={50, CH} }
         
         -- Row 3: Effects (with more spacing from group border)
         local r3 = ay + 118
@@ -892,11 +895,29 @@ if Controls then
         local effectChoices = {"Static", "Scroll Left", "Scroll Right", "Scroll Up", "Scroll Down", 
                                "Continuous Left", "Continuous Right", "Continuous Up", "Continuous Down",
                                "Fade In", "Flash", "Curtain Open", "Curtain Close"}
+        local bgChoices = {"Black", "White", "Red", "Green", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Gold", "Gray"}
+        
         for area = 1, 4 do
             Controls["area" .. area .. "_effect"].Choices = effectChoices
             if Controls["area" .. area .. "_effect"].String == "" then
                 Controls["area" .. area .. "_effect"].String = "Static"
             end
+            
+            -- Initialize background color choices
+            Controls["area" .. area .. "_bg_color"].Choices = bgChoices
+            if Controls["area" .. area .. "_bg_color"].String == "" then
+                Controls["area" .. area .. "_bg_color"].String = "Black"
+            end
+            
+            -- Initialize frame color choices
+            Controls["area" .. area .. "_frame_color"].Choices = colorChoices
+            if Controls["area" .. area .. "_frame_color"].String == "" then
+                Controls["area" .. area .. "_frame_color"].String = "White"
+            end
+            
+            -- Initialize layout preset choices
+            Controls["area" .. area .. "_layout_preset"].Choices = {"Custom", "Fullscreen", "Half Left", "Half Right", "Third 1", "Third 2", "Third 3"}
+            Controls["area" .. area .. "_layout_preset"].String = "Custom"
         end
         
         -- Initialize clock
@@ -1094,6 +1115,46 @@ if Controls then
             if ctl.Boolean and socket then
                 SendTextArea(area)
             end
+        end
+        
+        -- Layout preset handler
+        Controls[a .. "layout_preset"].EventHandler = function(ctl)
+            local preset = ctl.String
+            local w = screen_width
+            local h = screen_height
+            
+            if preset == "Fullscreen" then
+                Controls[a .. "x"].String = "0"
+                Controls[a .. "y"].String = "0"
+                Controls[a .. "width"].String = tostring(w)
+                Controls[a .. "height"].String = tostring(h)
+            elseif preset == "Half Left" then
+                Controls[a .. "x"].String = "0"
+                Controls[a .. "y"].String = "0"
+                Controls[a .. "width"].String = tostring(math.floor(w / 2))
+                Controls[a .. "height"].String = tostring(h)
+            elseif preset == "Half Right" then
+                Controls[a .. "x"].String = tostring(math.floor(w / 2))
+                Controls[a .. "y"].String = "0"
+                Controls[a .. "width"].String = tostring(math.floor(w / 2))
+                Controls[a .. "height"].String = tostring(h)
+            elseif preset == "Third 1" then
+                Controls[a .. "x"].String = "0"
+                Controls[a .. "y"].String = "0"
+                Controls[a .. "width"].String = tostring(math.floor(w / 3))
+                Controls[a .. "height"].String = tostring(h)
+            elseif preset == "Third 2" then
+                Controls[a .. "x"].String = tostring(math.floor(w / 3))
+                Controls[a .. "y"].String = "0"
+                Controls[a .. "width"].String = tostring(math.floor(w / 3))
+                Controls[a .. "height"].String = tostring(h)
+            elseif preset == "Third 3" then
+                Controls[a .. "x"].String = tostring(math.floor(w / 3 * 2))
+                Controls[a .. "y"].String = "0"
+                Controls[a .. "width"].String = tostring(math.floor(w / 3))
+                Controls[a .. "height"].String = tostring(h)
+            end
+            -- Custom preset does nothing (manual control)
         end
     end
     
