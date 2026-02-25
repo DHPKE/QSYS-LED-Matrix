@@ -876,7 +876,7 @@ if Controls then
                 Controls["area" .. area .. "_color"].String = "White"
             end
             if Controls["area" .. area .. "_effect"].String == "" then
-                Controls["area" .. area .. "_effect"].String = "Scroll Left"
+                Controls["area" .. area .. "_effect"].String = "Static"
             end
             -- Set default values
             if Controls["area" .. area .. "_x"].String == "" then Controls["area" .. area .. "_x"].String = "0" end
