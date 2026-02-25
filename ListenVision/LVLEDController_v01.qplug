@@ -89,7 +89,7 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("area%d_dwell", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_frame", area),      ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_frame_color", area), ControlType="Text",  Count=1, UserPin=true, PinStyle="Both" })
-        table.insert(controls, { Name=string.format("area%d_frame_link", area), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("area%d_frame_link", area), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_enable", area),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     end
     
@@ -275,29 +275,61 @@ function GetControlLayout(props)
     
     -- ── Text Areas ─────────────────────────────────────────────────
     y = y + 106
-    local AREA_H = 180
+    local AREA_H = 158  -- Reduced from 180 since frame controls moved to top row
     
     for area = 1, 4 do
         local ay = y + (area-1) * (AREA_H + 6)
         GBox(0, ay, W, AREA_H, "Text Area " .. area)
         
-        Lbl("Text", 6, ay+20, W-300)
+        -- Row 1: Text input (narrower) + Enable, Frame, Frame Color, Link buttons
+        Lbl("Text", 6, ay+20, W-450)
         layout[string.format("area%d_text", area)] = {
             PrettyName="Area"..area.."~Text",
             Style="Text",
-            Position={6, ay+33}, Size={W-312, CH}
+            Position={6, ay+33}, Size={W-462, CH}
         }
         
-        Lbl("Enable", W-300, ay+20, 80)
+        -- Right side buttons: Enable, Frame, Frame Color dropdown, Link toggle
+        local btnX = W-450
+        Lbl("Enable", btnX, ay+20, 60)
         layout[string.format("area%d_enable", area)] = {
             PrettyName="Area"..area.."~Enable",
             Style="Button", ButtonStyle="Toggle",
             Legend="Enable",
             Color=C_BTN_B,
-            Position={W-300, ay+33}, Size={90, BH}
+            Position={btnX, ay+33}, Size={70, BH}
         }
         
-        -- Position & Size
+        btnX = btnX + 76
+        Lbl("Frame", btnX, ay+20, 50)
+        layout[string.format("area%d_frame", area)] = {
+            PrettyName="Area"..area.."~Frame",
+            Style="Button", ButtonStyle="Toggle",
+            Legend="Frame",
+            Color={120,120,120},
+            Position={btnX, ay+33}, Size={70, BH}
+        }
+        
+        btnX = btnX + 76
+        Lbl("F.Color", btnX, ay+20, 80)
+        layout[string.format("area%d_frame_color", area)] = {
+            PrettyName="Area"..area.."~FrameColor",
+            Style="ComboBox", IsReadOnly=false,
+            Position={btnX, ay+33}, Size={90, CH}
+        }
+        
+        btnX = btnX + 96
+        Lbl("Link", btnX, ay+20, 40)
+        layout[string.format("area%d_frame_link", area)] = {
+            PrettyName="Area"..area.."~LinkColor",
+            Style="Button", ButtonStyle="Toggle",
+            Legend="↔",
+            Color={80,120,180},
+            Position={btnX, ay+33}, Size={40, BH},
+            FontSize=16
+        }
+        
+        -- Row 2: Position & Size
         local r2 = ay + 70
         Lbl("X", 6, r2, 50)
         Lbl("Y", 64, r2, 50)
@@ -315,27 +347,14 @@ function GetControlLayout(props)
         layout[string.format("area%d_bg_color", area)] = { PrettyName="Area"..area.."~BgColor", Style="ComboBox", Position={356, r2+13}, Size={90, CH} }
         layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={454, r2+13}, Size={70, CH} }
         
-        -- Effects
-        local r3 = ay + 115
+        -- Row 3: Effects (with more spacing from group border)
+        local r3 = ay + 118
         Lbl("Effect", 6, r3, 120)
         Lbl("Speed", 134, r3, 60)
         Lbl("Dwell (s)", 202, r3, 80)
         layout[string.format("area%d_effect", area)] = { PrettyName="Area"..area.."~Effect", Style="ComboBox", Position={6, r3+13}, Size={120, CH} }
         layout[string.format("area%d_speed", area)] = { PrettyName="Area"..area.."~Speed", Style="Text", Position={134, r3+13}, Size={60, CH} }
         layout[string.format("area%d_dwell", area)] = { PrettyName="Area"..area.."~Dwell", Style="Text", Position={202, r3+13}, Size={80, CH} }
-        
-        -- Frame controls
-        local r4 = ay + 150
-        layout[string.format("area%d_frame", area)] = { PrettyName="Area"..area.."~Frame", Style="Button",
-            ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
-            Position={6, r4}, Size={80, BH} }
-        Lbl("Frame Color", 92, r4-2, 90)
-        layout[string.format("area%d_frame_color", area)] = { PrettyName="Area"..area.."~FrameColor", Style="ComboBox",
-            IsReadOnly=false,
-            Position={92, r4}, Size={110, CH} }
-        layout[string.format("area%d_frame_link", area)] = { PrettyName="Area"..area.."~LinkColor", Style="Button",
-            ButtonStyle="Trigger", Legend="→", Color={80,120,180},
-            Position={208, r4}, Size={32, BH}, FontSize=18 }
     end
     
     -- ── Clock & Timer ──────────────────────────────────────────────
@@ -885,6 +904,58 @@ if Controls then
         
         Controls["prog" .. prog .. "_delete"].EventHandler = function()
             DeleteProgram(prog)
+        end
+    end
+    
+    -- Frame and text color link handlers for each area
+    for area = 1, 4 do
+        local a = "area" .. area .. "_"
+        
+        -- When link is toggled ON, copy text color to frame color and keep synced
+        Controls[a .. "frame_link"].EventHandler = function(ctl)
+            if ctl.Boolean then
+                -- Link enabled: copy text color to frame color
+                Controls[a .. "frame_color"].String = Controls[a .. "color"].String
+                print("Area " .. area .. ": Frame color linked to text color")
+            else
+                print("Area " .. area .. ": Frame color unlinked")
+            end
+        end
+        
+        -- When text color changes and link is on, update frame color
+        Controls[a .. "color"].EventHandler = function(ctl)
+            if Controls[a .. "frame_link"].Boolean then
+                Controls[a .. "frame_color"].String = ctl.String
+            end
+        end
+    end
+    
+    -- Group selection handlers - ensure only one group is active at a time
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            
+            if ctl.Boolean then
+                -- This group was turned ON
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    -- Turn off all other groups
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("✓ Active group set to: " .. groupName)
+                end, 0.05)
+            else
+                -- Prevent turning off the active group (always need one active)
+                ctl.Boolean = true
+            end
         end
     end
     
