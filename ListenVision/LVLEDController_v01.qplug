@@ -113,6 +113,14 @@ function GetControls(props)
     table.insert(controls, { Name="timer_text",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="timer_color",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
     
+    -- Curtain Controls (overlay area)
+    table.insert(controls, { Name="curtain_state",     ControlType="Button",    ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_x",         ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_y",         ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_width",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_height",    ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_color",     ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
+    
     -- Global Controls
     table.insert(controls, { Name="brightness",        ControlType="Knob",      Count=1, UserPin=true, PinStyle="Both", ControlUnit="Integer", Min=0, Max=255 })
     table.insert(controls, { Name="clear_screen",      ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -393,8 +401,26 @@ function GetControlLayout(props)
     layout["timer_end_date"] = { PrettyName="Timer~EndDate", Style="Text", Position={tx, y+117}, Size={100, CH} }
     layout["timer_end_time"] = { PrettyName="Timer~EndTime", Style="Text", Position={tx+108, y+117}, Size={100, CH} }
     
-    -- ── Global Controls ────────────────────────────────────────────
+    -- ── Curtain ────────────────────────────────────────────────────
     y = y + 166
+    GBox(0, y, W, 90, "Curtain (Overlay Area)")
+    
+    layout["curtain_state"] = { PrettyName="Curtain~State", Style="Button", ButtonStyle="Toggle", Legend="Show", Color=C_BTN_O, Position={6, y+20}, Size={90, BH} }
+    
+    Lbl("X", 104, y+20, 50)
+    Lbl("Y", 162, y+20, 50)
+    Lbl("Width", 220, y+20, 60)
+    Lbl("Height", 288, y+20, 60)
+    layout["curtain_x"] = { PrettyName="Curtain~X", Style="Text", Position={104, y+33}, Size={50, CH} }
+    layout["curtain_y"] = { PrettyName="Curtain~Y", Style="Text", Position={162, y+33}, Size={50, CH} }
+    layout["curtain_width"] = { PrettyName="Curtain~Width", Style="Text", Position={220, y+33}, Size={60, CH} }
+    layout["curtain_height"] = { PrettyName="Curtain~Height", Style="Text", Position={288, y+33}, Size={60, CH} }
+    
+    Lbl("Color", 6, y+60, 80)
+    layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox", Position={6, y+73}, Size={120, CH} }
+    
+    -- ── Global Controls ────────────────────────────────────────────
+    y = y + 96
     GBox(0, y, W, 80, "Global Controls")
     
     Lbl("Brightness", 6, y+18, 100)
@@ -721,6 +747,38 @@ if Controls then
         return SendData(packet)
     end
     
+    local function SendCurtain()
+        if not Controls.curtain_state.Boolean then
+            -- Curtain OFF: send command to clear curtain area (could be a clear command or transparent overlay)
+            print("✓ Curtain hidden")
+            return
+        end
+        
+        local x = tonumber(Controls.curtain_x.String) or 0
+        local y = tonumber(Controls.curtain_y.String) or 0
+        local w = tonumber(Controls.curtain_width.String) or screen_width
+        local h = tonumber(Controls.curtain_height.String) or screen_height
+        local color = ColorNames[Controls.curtain_color.String] or 0x000000
+        
+        -- Build curtain data packet (using text area command with empty text as a colored rectangle)
+        local data = string.char(254)  -- Special area index for curtain overlay
+        data = data .. PackU16(x) .. PackU16(y)
+        data = data .. PackU16(w) .. PackU16(h)
+        data = data .. PackU32(color)  -- Foreground color
+        data = data .. PackU32(color)  -- Background color (same = solid fill)
+        data = data .. string.char(0, 0, 0)  -- font_size=0, effect=0, speed=0
+        data = data .. PackU16(0)  -- dwell=0
+        data = data .. string.char(0)  -- frame=0
+        data = data .. PackU32(0)  -- frame_color
+        data = data .. string.char(activeGroup)  -- group routing
+        data = data .. PackU16(0)  -- text length = 0 (no text, just colored rectangle)
+        
+        local packet = BuildProtocolPacket(0x10, data)  -- Command 0x10 = Add Text Area
+        if SendData(packet) then
+            print("✓ Curtain shown at (" .. x .. "," .. y .. ") size " .. w .. "x" .. h)
+        end
+    end
+    
     local function SendProgram(prog_num)
         if not Controls["prog" .. prog_num .. "_enable"].Boolean then return end
         
@@ -852,6 +910,14 @@ if Controls then
         if Controls.timer_y.String == "" then Controls.timer_y.String = "16" end
         if Controls.timer_width.String == "" then Controls.timer_width.String = tostring(screen_width) end
         
+        -- Initialize curtain
+        Controls.curtain_color.Choices = colorChoices
+        if Controls.curtain_color.String == "" then Controls.curtain_color.String = "Black" end
+        if Controls.curtain_x.String == "" then Controls.curtain_x.String = "0" end
+        if Controls.curtain_y.String == "" then Controls.curtain_y.String = "0" end
+        if Controls.curtain_width.String == "" then Controls.curtain_width.String = tostring(screen_width) end
+        if Controls.curtain_height.String == "" then Controls.curtain_height.String = tostring(screen_height) end
+        
         -- Initialize brightness
         if Controls.brightness.Value == 0 then
             Controls.brightness.Value = 128
@@ -957,6 +1023,11 @@ if Controls then
                 ctl.Boolean = true
             end
         end
+    end
+    
+    -- Curtain state handler
+    Controls.curtain_state.EventHandler = function(ctl)
+        SendCurtain()
     end
     
     Controls.clear_screen.EventHandler = function()
