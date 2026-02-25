@@ -67,6 +67,31 @@ function GetControls(props)
     end
     
     -- Program Controls (4 programs)
+    
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("Active group set to: " .. groupName)
+                end, 0.05)
+            else
+                ctl.Boolean = true
+            end
+        end
+    end
+
     for prog = 1, 4 do
         table.insert(controls, { Name=string.format("prog%d_enable", prog),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("prog%d_send", prog),       ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -240,6 +265,31 @@ function GetControlLayout(props)
     y = y + 86
     GBox(0, y, W, 100, "Programs (1-4)")
     
+    
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("Active group set to: " .. groupName)
+                end, 0.05)
+            else
+                ctl.Boolean = true
+            end
+        end
+    end
+
     for prog = 1, 4 do
         local px = 6 + (prog-1) * 195
         local py = y + 18
@@ -775,6 +825,31 @@ if Controls then
     local function ClearScreen()
         local packet = BuildProtocolPacket(0x05, "")  -- Command 0x05 = Clear Screen
         if SendData(packet) then
+    
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("Active group set to: " .. groupName)
+                end, 0.05)
+            else
+                ctl.Boolean = true
+            end
+        end
+    end
+
             for prog = 1, 4 do
                 Controls["prog" .. prog .. "_status"].Boolean = false
             end
@@ -855,6 +930,27 @@ if Controls then
         if Controls.timer_width.String == "" then Controls.timer_width.String = tostring(screen_width) end
         
         
+        
+        -- Initialize group buttons (default to "All")
+        Controls.group0_select.Boolean = true
+        for grp = 1, 8 do
+            Controls[string.format("group%d_select", grp)].Boolean = false
+        end
+        Controls.active_group.String = "All"
+        
+        -- Initialize background colors and frames
+        local bgChoices = {"Black", "White", "Red", "Green", "Blue", "Yellow", "Magenta", "Cyan", "Orange", "Purple", "Gold", "Gray"}
+        for area = 1, 4 do
+            Controls["area" .. area .. "_bg_color"].Choices = bgChoices
+            if Controls["area" .. area .. "_bg_color"].String == "" then
+                Controls["area" .. area .. "_bg_color"].String = "Black"
+            end
+            Controls["area" .. area .. "_frame_color"].Choices = colorChoices
+            if Controls["area" .. area .. "_frame_color"].String == "" then
+                Controls["area" .. area .. "_frame_color"].String = "White"
+            end
+        end
+
         -- Initialize brightness
         if Controls.brightness.Value == 0 then
             Controls.brightness.Value = 128
@@ -900,6 +996,31 @@ if Controls then
         SetRotation(angle)
     end
     
+    
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("Active group set to: " .. groupName)
+                end, 0.05)
+            else
+                ctl.Boolean = true
+            end
+        end
+    end
+
     for prog = 1, 4 do
         Controls["prog" .. prog .. "_send"].EventHandler = function()
             SendProgram(prog)
@@ -912,6 +1033,37 @@ if Controls then
     
     end
     
+    
+    -- Frame and background color handlers for each area
+    for area = 1, 4 do
+        local a = "area" .. area .. "_"
+        
+        Controls[a .. "frame"].EventHandler = function(ctl)
+            local enabled = ctl.Boolean
+            local color = ColorNames[Controls[a .. "frame_color"].String] or 0xFFFFFF
+            -- Frame command would go here
+            print("Frame " .. (enabled and "enabled" or "disabled") .. " for area " .. area)
+        end
+        
+        Controls[a .. "frame_color"].EventHandler = function(ctl)
+            if Controls[a .. "frame"].Boolean then
+                -- Update frame color
+                print("Frame color updated for area " .. area)
+            end
+        end
+        
+        Controls[a .. "frame_link"].EventHandler = function()
+            -- Copy text color to frame color
+            Controls[a .. "frame_color"].String = Controls[a .. "color"].String
+            print("Frame color linked to text color for area " .. area)
+        end
+        
+        Controls[a .. "bg_color"].EventHandler = function()
+            -- Background color change triggers re-send if area is active
+            print("Background color updated for area " .. area)
+        end
+    end
+
     Controls.clear_screen.EventHandler = function()
         ClearScreen()
     end
