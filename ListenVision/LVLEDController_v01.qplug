@@ -185,23 +185,23 @@ function GetControlLayout(props)
     
     -- ── Display Rotation ──────────────────────────────────────────
     y = y + 116
-    GBox(0, y, W, 60, "Display Rotation")
+    GBox(0, y, W, 74, "Display Rotation")
     
-    Lbl("Rotation", 6, y+18, 200)
+    Lbl("Rotation", 6, y+20, 200)
     layout["rotation"] = {
         PrettyName="Rotation~Angle",
         Style="ComboBox", IsReadOnly=false,
-        Position={6, y+31}, Size={200, CH}
+        Position={6, y+33}, Size={220, CH}
     }
     layout["apply_rotation"] = {
         PrettyName="Rotation~Apply",
         Style="Button", ButtonStyle="Trigger",
         Legend="Apply Rotation", Color=C_BTN_O,
-        Position={214, y+31}, Size={140, BH}
+        Position={234, y+33}, Size={140, BH}
     }
     
     -- ── Program Controls ───────────────────────────────────────────
-    y = y + 66
+    y = y + 80
     GBox(0, y, W, 100, "Programs (1-4)")
     
     for prog = 1, 4 do
@@ -239,30 +239,30 @@ function GetControlLayout(props)
     
     -- ── Text Areas ─────────────────────────────────────────────────
     y = y + 106
-    local AREA_H = 140
+    local AREA_H = 150
     
     for area = 1, 4 do
-        local ay = y + (area-1) * (AREA_H + 4)
+        local ay = y + (area-1) * (AREA_H + 6)
         GBox(0, ay, W, AREA_H, "Text Area " .. area)
         
-        Lbl("Text", 6, ay+18, W-300)
+        Lbl("Text", 6, ay+20, W-300)
         layout[string.format("area%d_text", area)] = {
             PrettyName="Area"..area.."~Text",
             Style="Text",
-            Position={6, ay+31}, Size={W-312, CH}
+            Position={6, ay+33}, Size={W-312, CH}
         }
         
-        Lbl("Enable", W-300, ay+18, 80)
+        Lbl("Enable", W-300, ay+20, 80)
         layout[string.format("area%d_enable", area)] = {
             PrettyName="Area"..area.."~Enable",
             Style="Button", ButtonStyle="Toggle",
             Legend="Enable",
             Color=C_BTN_B,
-            Position={W-300, ay+31}, Size={90, BH}
+            Position={W-300, ay+33}, Size={90, BH}
         }
         
         -- Position & Size
-        local r2 = ay + 65
+        local r2 = ay + 70
         Lbl("X", 6, r2, 50)
         Lbl("Y", 64, r2, 50)
         Lbl("Width", 122, r2, 60)
@@ -278,7 +278,7 @@ function GetControlLayout(props)
         layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={346, r2+13}, Size={70, CH} }
         
         -- Effects
-        local r3 = ay + 105
+        local r3 = ay + 115
         Lbl("Effect", 6, r3, 120)
         Lbl("Speed", 134, r3, 60)
         Lbl("Dwell (s)", 202, r3, 80)
@@ -288,43 +288,43 @@ function GetControlLayout(props)
     end
     
     -- ── Clock & Timer ──────────────────────────────────────────────
-    y = y + 4 * (AREA_H + 4) + 4
-    GBox(0, y, W/2-2, 140, "Digital Clock")
-    GBox(W/2+2, y, W/2-2, 140, "Countdown Timer")
+    y = y + 4 * (AREA_H + 6) + 6
+    GBox(0, y, W/2-2, 160, "Digital Clock")
+    GBox(W/2+2, y, W/2-2, 160, "Countdown Timer")
     
     -- Clock
-    layout["clock_enable"] = { PrettyName="Clock~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+18}, Size={90, BH} }
-    Lbl("X", 6, y+52, 50)
-    Lbl("Y", 64, y+52, 50)
-    Lbl("Width", 122, y+52, 60)
-    Lbl("Height", 190, y+52, 60)
-    layout["clock_x"] = { PrettyName="Clock~X", Style="Text", Position={6, y+65}, Size={50, CH} }
-    layout["clock_y"] = { PrettyName="Clock~Y", Style="Text", Position={64, y+65}, Size={50, CH} }
-    layout["clock_width"] = { PrettyName="Clock~Width", Style="Text", Position={122, y+65}, Size={60, CH} }
-    layout["clock_height"] = { PrettyName="Clock~Height", Style="Text", Position={190, y+65}, Size={60, CH} }
+    layout["clock_enable"] = { PrettyName="Clock~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+20}, Size={90, BH} }
+    Lbl("X", 6, y+56, 50)
+    Lbl("Y", 64, y+56, 50)
+    Lbl("Width", 122, y+56, 60)
+    Lbl("Height", 190, y+56, 60)
+    layout["clock_x"] = { PrettyName="Clock~X", Style="Text", Position={6, y+69}, Size={50, CH} }
+    layout["clock_y"] = { PrettyName="Clock~Y", Style="Text", Position={64, y+69}, Size={50, CH} }
+    layout["clock_width"] = { PrettyName="Clock~Width", Style="Text", Position={122, y+69}, Size={60, CH} }
+    layout["clock_height"] = { PrettyName="Clock~Height", Style="Text", Position={190, y+69}, Size={60, CH} }
     
-    Lbl("Format", 6, y+95, 120)
-    Lbl("Color", 134, y+95, 80)
-    layout["clock_format"] = { PrettyName="Clock~Format", Style="ComboBox", Position={6, y+108}, Size={120, CH} }
-    layout["clock_color"] = { PrettyName="Clock~Color", Style="ComboBox", Position={134, y+108}, Size={80, CH} }
+    Lbl("Format", 6, y+104, 120)
+    Lbl("Color", 134, y+104, 80)
+    layout["clock_format"] = { PrettyName="Clock~Format", Style="ComboBox", Position={6, y+117}, Size={120, CH} }
+    layout["clock_color"] = { PrettyName="Clock~Color", Style="ComboBox", Position={134, y+117}, Size={80, CH} }
     
     -- Timer
     local tx = W/2+8
-    layout["timer_enable"] = { PrettyName="Timer~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={tx, y+18}, Size={90, BH} }
-    Lbl("X", tx, y+52, 50)
-    Lbl("Y", tx+58, y+52, 50)
-    Lbl("Width", tx+116, y+52, 60)
-    layout["timer_x"] = { PrettyName="Timer~X", Style="Text", Position={tx, y+65}, Size={50, CH} }
-    layout["timer_y"] = { PrettyName="Timer~Y", Style="Text", Position={tx+58, y+65}, Size={50, CH} }
-    layout["timer_width"] = { PrettyName="Timer~Width", Style="Text", Position={tx+116, y+65}, Size={60, CH} }
+    layout["timer_enable"] = { PrettyName="Timer~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={tx, y+20}, Size={90, BH} }
+    Lbl("X", tx, y+56, 50)
+    Lbl("Y", tx+58, y+56, 50)
+    Lbl("Width", tx+116, y+56, 60)
+    layout["timer_x"] = { PrettyName="Timer~X", Style="Text", Position={tx, y+69}, Size={50, CH} }
+    layout["timer_y"] = { PrettyName="Timer~Y", Style="Text", Position={tx+58, y+69}, Size={50, CH} }
+    layout["timer_width"] = { PrettyName="Timer~Width", Style="Text", Position={tx+116, y+69}, Size={60, CH} }
     
-    Lbl("End Date", tx, y+95, 100)
-    Lbl("Time", tx+108, y+95, 100)
-    layout["timer_end_date"] = { PrettyName="Timer~EndDate", Style="Text", Position={tx, y+108}, Size={100, CH} }
-    layout["timer_end_time"] = { PrettyName="Timer~EndTime", Style="Text", Position={tx+108, y+108}, Size={100, CH} }
+    Lbl("End Date", tx, y+104, 100)
+    Lbl("Time", tx+108, y+104, 100)
+    layout["timer_end_date"] = { PrettyName="Timer~EndDate", Style="Text", Position={tx, y+117}, Size={100, CH} }
+    layout["timer_end_time"] = { PrettyName="Timer~EndTime", Style="Text", Position={tx+108, y+117}, Size={100, CH} }
     
     -- ── QR Code ────────────────────────────────────────────────────
-    y = y + 146
+    y = y + 166
     GBox(0, y, W, 90, "QR Code (C-series only)")
     
     layout["qr_enable"] = { PrettyName="QR~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+18}, Size={90, BH} }
