@@ -403,7 +403,7 @@ function GetControlLayout(props)
     
     -- ── Curtain ────────────────────────────────────────────────────
     y = y + 166
-    GBox(0, y, W, 90, "Curtain (Overlay Area)")
+    GBox(0, y, W, 68, "Curtain (Overlay Area)")
     
     layout["curtain_state"] = { PrettyName="Curtain~State", Style="Button", ButtonStyle="Toggle", Legend="Show", Color=C_BTN_O, Position={6, y+20}, Size={90, BH} }
     
@@ -411,16 +411,15 @@ function GetControlLayout(props)
     Lbl("Y", 162, y+20, 50)
     Lbl("Width", 220, y+20, 60)
     Lbl("Height", 288, y+20, 60)
+    Lbl("Color", 356, y+20, 80)
     layout["curtain_x"] = { PrettyName="Curtain~X", Style="Text", Position={104, y+33}, Size={50, CH} }
     layout["curtain_y"] = { PrettyName="Curtain~Y", Style="Text", Position={162, y+33}, Size={50, CH} }
     layout["curtain_width"] = { PrettyName="Curtain~Width", Style="Text", Position={220, y+33}, Size={60, CH} }
     layout["curtain_height"] = { PrettyName="Curtain~Height", Style="Text", Position={288, y+33}, Size={60, CH} }
-    
-    Lbl("Color", 6, y+60, 80)
-    layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox", Position={6, y+73}, Size={120, CH} }
+    layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox", Position={356, y+33}, Size={120, CH} }
     
     -- ── Global Controls ────────────────────────────────────────────
-    y = y + 96
+    y = y + 74
     GBox(0, y, W, 80, "Global Controls")
     
     Lbl("Brightness", 6, y+18, 100)
