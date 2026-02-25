@@ -473,33 +473,72 @@ if Controls then
     local function OpenSocket()
         if socket then pcall(function() socket:Close() end) end
         
+        Controls.connection_status.Value = 5  -- Connecting (orange)
+        Controls.last_command.String = "Connecting..."
+        
         local ok, err = pcall(function()
             if comm_type == 0 then  -- TCP
                 socket = TcpSocket.New()
                 socket.ReadTimeout = 2
                 socket.WriteTimeout = 2
                 socket.ReconnectTimeout = 5
+                
+                -- Event handlers for TCP connection
+                socket.Connected = function(sock)
+                    Controls.connection_status.Value = 0  -- OK (green)
+                    Controls.last_command.String = "Connected"
+                    print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
+                end
+                
+                socket.Reconnected = function(sock)
+                    Controls.connection_status.Value = 0  -- OK (green)
+                    Controls.last_command.String = "Reconnected"
+                    print("✓ TCP Reconnected")
+                end
+                
+                socket.Closed = function(sock)
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "Connection closed"
+                    print("✗ TCP Connection closed")
+                end
+                
+                socket.Error = function(sock, err)
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "ERROR: " .. tostring(err)
+                    print("✗ TCP Error: " .. tostring(err))
+                end
+                
+                socket.Timeout = function(sock, err)
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "ERROR: Connection timeout"
+                    print("✗ TCP Timeout")
+                end
+                
                 socket:Connect(ip_addr, port)
+                
             elseif comm_type == 1 then  -- UDP
                 socket = UdpSocket.New()
                 socket:Open(ip_addr, port)
+                -- UDP is connectionless, so we assume OK but mark as compromised (yellow)
+                Controls.connection_status.Value = 4  -- Compromised (yellow)
+                Controls.last_command.String = "UDP socket open (connectionless)"
+                print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(port))
             end
         end)
         
-        if ok then
-            Controls.connection_status.Value = 0
-            print("✓ Connected to " .. ip_addr .. ":" .. tostring(port))
-            return true
-        else
-            Controls.connection_status.Value = 2
-            print("✗ Connection error: " .. tostring(err))
+        if not ok then
+            Controls.connection_status.Value = 2  -- Fault (red)
+            Controls.last_command.String = "ERROR: " .. tostring(err)
+            print("✗ Socket error: " .. tostring(err))
             return false
         end
+        
+        return true
     end
     
     local function SendData(data)
         if not socket then
-            Controls.connection_status.Value = 2
+            Controls.connection_status.Value = 2  -- Fault (red)
             Controls.last_command.String = "ERROR: Not connected"
             return false
         end
@@ -514,12 +553,16 @@ if Controls then
         
         if ok then
             Controls.last_command.String = "Sent: " .. BytesToHex(data:sub(1, 20))
-            Controls.connection_status.Value = 0
+            if comm_type == 0 then
+                Controls.connection_status.Value = 0  -- OK (green) - TCP connection active
+            else
+                Controls.connection_status.Value = 4  -- Compromised (yellow) - UDP no confirmation
+            end
             print("-> Sent " .. #data .. " bytes")
             return true
         else
             Controls.last_command.String = "ERROR: " .. tostring(err)
-            Controls.connection_status.Value = 2
+            Controls.connection_status.Value = 2  -- Fault (red)
             print("✗ Send error: " .. tostring(err))
             return false
         end
@@ -718,7 +761,8 @@ if Controls then
         Controls.port.String = tostring(port)
         Controls.screen_width.String = tostring(screen_width)
         Controls.screen_height.String = tostring(screen_height)
-        Controls.last_command.String = "Ready"
+        Controls.last_command.String = "Not connected"
+        Controls.connection_status.Value = 2  -- Start with Fault (red) - not connected
         
         -- Initialize rotation choices
         Controls.rotation.Choices = {"0° (Normal)", "90° (Clockwise)", "180° (Upside Down)", "270° (Counter-Clockwise)"}
