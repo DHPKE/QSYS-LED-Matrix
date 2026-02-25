@@ -752,25 +752,6 @@ if Controls then
         return SendData(packet)
     end
     
-    local function SendQRCode()
-        if not Controls.qr_enable.Boolean then return end
-        if led_type ~= 3 then  -- Only C-series supports QR
-            print("QR codes only supported on C-series cards")
-            return
-        end
-        
-        local x = tonumber(Controls.qr_x.String) or 0
-        local y = tonumber(Controls.qr_y.String) or 0
-        local size = tonumber(Controls.qr_size.String) or 64
-        local qr_data = Controls.qr_data.String
-        
-        local data = PackU16(x) .. PackU16(y) .. PackU16(size)
-        data = data .. PackU16(#qr_data) .. qr_data
-        
-        local packet = BuildProtocolPacket(0x30, data)  -- Command 0x30 = Add QR Code
-        return SendData(packet)
-    end
-    
     local function SendProgram(prog_num)
         if not Controls["prog" .. prog_num .. "_enable"].Boolean then return end
         
@@ -796,8 +777,6 @@ if Controls then
             -- Send timer if enabled
             if Controls.timer_enable.Boolean then
                 SendTimer()
-            end
-            
             end
             
             -- Send program complete
