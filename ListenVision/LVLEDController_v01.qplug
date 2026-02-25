@@ -60,6 +60,12 @@ function GetControls(props)
     table.insert(controls, { Name="rotation",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_rotation",    ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     
+    -- Group routing controls (8 groups + broadcast)
+    table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })
+    for grp = 0, 8 do
+        table.insert(controls, { Name=string.format("group%d_select", grp), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
+    end
+    
     -- Program Controls (4 programs)
     for prog = 1, 4 do
         table.insert(controls, { Name=string.format("prog%d_enable", prog),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
@@ -76,10 +82,14 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("area%d_width", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_height", area),     ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_color", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_bg_color", area),   ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_font_size", area),  ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_effect", area),     ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_speed", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("area%d_dwell", area),      ControlType="Text",   Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_frame", area),      ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_frame_color", area), ControlType="Text",  Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("area%d_frame_link", area), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("area%d_enable", area),     ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     end
     
@@ -103,14 +113,6 @@ function GetControls(props)
     table.insert(controls, { Name="timer_text",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="timer_color",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
     
-    -- QR Code Controls (C-series only)
-    table.insert(controls, { Name="qr_enable",         ControlType="Button",    ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="qr_x",              ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="qr_y",              ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="qr_size",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="qr_data",           ControlType="Text",      Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="qr_send",           ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
-    
     -- Global Controls
     table.insert(controls, { Name="brightness",        ControlType="Knob",      Count=1, UserPin=true, PinStyle="Both", ControlUnit="Integer", Min=0, Max=255 })
     table.insert(controls, { Name="clear_screen",      ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -133,6 +135,19 @@ function GetControlLayout(props)
     local C_BTN_R = {165, 38,  38 }
     local C_BTN_B = {45,  105, 195}
     local C_BTN_O = {200, 110, 0  }
+    
+    -- Group colors for buttons
+    local C_GRP_COLORS = {
+        [0] = {128, 128, 128},  -- Gray (All/Broadcast)
+        [1] = {255, 255, 255},  -- White
+        [2] = {255, 255, 0},    -- Yellow
+        [3] = {255, 165, 0},    -- Orange
+        [4] = {255, 0, 0},      -- Red
+        [5] = {255, 0, 255},    -- Magenta
+        [6] = {0, 0, 255},      -- Blue
+        [7] = {0, 255, 255},    -- Cyan
+        [8] = {0, 255, 0},      -- Green
+    }
     
     local function GBox(x, y, w, h, title)
         table.insert(graphics, {
@@ -200,8 +215,29 @@ function GetControlLayout(props)
         Position={234, y+33}, Size={140, BH}
     }
     
-    -- ── Program Controls ───────────────────────────────────────────
+    -- ── Group Selection ─────────────────────────────────────────────
     y = y + 80
+    GBox(0, y, W, 80, "Group Routing")
+    Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+20, W-12)
+    
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap
+    local btnW = 56
+    local btnGap = 6
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
+    for grp = 0, 8 do
+        local bx = 6 + grp * (btnW + btnGap)
+        layout[string.format("group%d_select", grp)] = {
+            PrettyName="Group~"..groupLabels[grp+1],
+            Style="Button", ButtonStyle="Toggle",
+            Legend=groupLabels[grp+1],
+            Color=C_GRP_COLORS[grp],
+            Position={bx, y+38}, Size={btnW, 36}
+        }
+    end
+    layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+78}, Size={0, 0} }
+    
+    -- ── Program Controls ───────────────────────────────────────────
+    y = y + 86
     GBox(0, y, W, 100, "Programs (1-4)")
     
     for prog = 1, 4 do
@@ -239,7 +275,7 @@ function GetControlLayout(props)
     
     -- ── Text Areas ─────────────────────────────────────────────────
     y = y + 106
-    local AREA_H = 150
+    local AREA_H = 180
     
     for area = 1, 4 do
         local ay = y + (area-1) * (AREA_H + 6)
@@ -272,10 +308,12 @@ function GetControlLayout(props)
         layout[string.format("area%d_width", area)] = { PrettyName="Area"..area.."~Width", Style="Text", Position={122, r2+13}, Size={60, CH} }
         layout[string.format("area%d_height", area)] = { PrettyName="Area"..area.."~Height", Style="Text", Position={190, r2+13}, Size={60, CH} }
         
-        Lbl("Color", 258, r2, 80)
-        Lbl("Font Size", 346, r2, 70)
-        layout[string.format("area%d_color", area)] = { PrettyName="Area"..area.."~Color", Style="ComboBox", Position={258, r2+13}, Size={80, CH} }
-        layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={346, r2+13}, Size={70, CH} }
+        Lbl("Text Color", 258, r2, 90)
+        Lbl("BG Color", 356, r2, 90)
+        Lbl("Font", 454, r2, 70)
+        layout[string.format("area%d_color", area)] = { PrettyName="Area"..area.."~Color", Style="ComboBox", Position={258, r2+13}, Size={90, CH} }
+        layout[string.format("area%d_bg_color", area)] = { PrettyName="Area"..area.."~BgColor", Style="ComboBox", Position={356, r2+13}, Size={90, CH} }
+        layout[string.format("area%d_font_size", area)] = { PrettyName="Area"..area.."~FontSize", Style="Text", Position={454, r2+13}, Size={70, CH} }
         
         -- Effects
         local r3 = ay + 115
@@ -285,6 +323,19 @@ function GetControlLayout(props)
         layout[string.format("area%d_effect", area)] = { PrettyName="Area"..area.."~Effect", Style="ComboBox", Position={6, r3+13}, Size={120, CH} }
         layout[string.format("area%d_speed", area)] = { PrettyName="Area"..area.."~Speed", Style="Text", Position={134, r3+13}, Size={60, CH} }
         layout[string.format("area%d_dwell", area)] = { PrettyName="Area"..area.."~Dwell", Style="Text", Position={202, r3+13}, Size={80, CH} }
+        
+        -- Frame controls
+        local r4 = ay + 150
+        layout[string.format("area%d_frame", area)] = { PrettyName="Area"..area.."~Frame", Style="Button",
+            ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
+            Position={6, r4}, Size={80, BH} }
+        Lbl("Frame Color", 92, r4-2, 90)
+        layout[string.format("area%d_frame_color", area)] = { PrettyName="Area"..area.."~FrameColor", Style="ComboBox",
+            IsReadOnly=false,
+            Position={92, r4}, Size={110, CH} }
+        layout[string.format("area%d_frame_link", area)] = { PrettyName="Area"..area.."~LinkColor", Style="Button",
+            ButtonStyle="Trigger", Legend="→", Color={80,120,180},
+            Position={208, r4}, Size={32, BH}, FontSize=18 }
     end
     
     -- ── Clock & Timer ──────────────────────────────────────────────
@@ -323,24 +374,8 @@ function GetControlLayout(props)
     layout["timer_end_date"] = { PrettyName="Timer~EndDate", Style="Text", Position={tx, y+117}, Size={100, CH} }
     layout["timer_end_time"] = { PrettyName="Timer~EndTime", Style="Text", Position={tx+108, y+117}, Size={100, CH} }
     
-    -- ── QR Code ────────────────────────────────────────────────────
-    y = y + 166
-    GBox(0, y, W, 90, "QR Code (C-series only)")
-    
-    layout["qr_enable"] = { PrettyName="QR~Enable", Style="Button", ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_B, Position={6, y+18}, Size={90, BH} }
-    Lbl("X", 104, y+18, 50)
-    Lbl("Y", 162, y+18, 50)
-    Lbl("Size", 220, y+18, 60)
-    layout["qr_x"] = { PrettyName="QR~X", Style="Text", Position={104, y+31}, Size={50, CH} }
-    layout["qr_y"] = { PrettyName="QR~Y", Style="Text", Position={162, y+31}, Size={50, CH} }
-    layout["qr_size"] = { PrettyName="QR~Size", Style="Text", Position={220, y+31}, Size={60, CH} }
-    
-    Lbl("Data", 6, y+60, W-120)
-    layout["qr_data"] = { PrettyName="QR~Data", Style="Text", Position={6, y+73}, Size={W-126, CH} }
-    layout["qr_send"] = { PrettyName="QR~Send", Style="Button", ButtonStyle="Trigger", Legend="Send", Color=C_BTN_G, Position={W-114, y+73}, Size={108, BH} }
-    
     -- ── Global Controls ────────────────────────────────────────────
-    y = y + 96
+    y = y + 166
     GBox(0, y, W, 80, "Global Controls")
     
     Lbl("Brightness", 6, y+18, 100)
@@ -365,6 +400,8 @@ if Controls then
     local screen_height = Properties["Screen Height"].Value
     local color_type = 0  -- 0=Mono, 1=Dual, 2=RGB
     local rotation = 0  -- 0, 90, 180, 270 degrees
+    local activeGroup = 0  -- 0 = All (broadcast), 1-8 = specific group
+    local updatingGroups = false  -- Flag to prevent group button event loops
     
     -- Map LED Type
     local led_type_map = {
@@ -402,8 +439,8 @@ if Controls then
     
     -- Transition effects (0-38)
     local EffectNames = {
-        ["Immediate"] = 0,
-        ["Scroll Left"] = 1,
+        ["Static"] = 0,
+        ["Static"] = 1,
         ["Scroll Right"] = 2,
         ["Scroll Up"] = 3,
         ["Scroll Down"] = 4,
@@ -599,18 +636,25 @@ if Controls then
         local w = tonumber(Controls[a .. "width"].String) or screen_width
         local h = tonumber(Controls[a .. "height"].String) or 16
         local color = ColorNames[Controls[a .. "color"].String] or 0xFFFFFF
+        local bgcolor = ColorNames[Controls[a .. "bg_color"].String] or 0x000000
         local font_size = tonumber(Controls[a .. "font_size"].String) or 12
         local effect = EffectNames[Controls[a .. "effect"].String] or 0
-        local speed = tonumber(Controls[a .. "speed"].String) or 50
+        local speed = tonumber(Controls[a .. "speed"].String) or 0
         local dwell = tonumber(Controls[a .. "dwell"].String) or 5
+        local frame_enabled = Controls[a .. "frame"].Boolean and 1 or 0
+        local frame_color = ColorNames[Controls[a .. "frame_color"].String] or 0xFFFFFF
         
         -- Build text area data packet
         local data = string.char(area_num - 1)  -- Area index
         data = data .. PackU16(x) .. PackU16(y)
         data = data .. PackU16(w) .. PackU16(h)
         data = data .. PackU32(color)
+        data = data .. PackU32(bgcolor)
         data = data .. string.char(font_size, effect, speed)
         data = data .. PackU16(dwell)
+        data = data .. string.char(frame_enabled)
+        data = data .. PackU32(frame_color)
+        data = data .. string.char(activeGroup)  -- Add group routing
         data = data .. PackU16(#text) .. text
         
         local packet = BuildProtocolPacket(0x10, data)  -- Command 0x10 = Add Text Area
@@ -704,9 +748,6 @@ if Controls then
                 SendTimer()
             end
             
-            -- Send QR code if enabled
-            if Controls.qr_enable.Boolean then
-                SendQRCode()
             end
             
             -- Send program complete
@@ -776,7 +817,7 @@ if Controls then
                 Controls["area" .. area .. "_color"].String = "White"
             end
             if Controls["area" .. area .. "_effect"].String == "" then
-                Controls["area" .. area .. "_effect"].String = "Scroll Left"
+                Controls["area" .. area .. "_effect"].String = "Static"
             end
             -- Set default values
             if Controls["area" .. area .. "_x"].String == "" then Controls["area" .. area .. "_x"].String = "0" end
@@ -784,12 +825,12 @@ if Controls then
             if Controls["area" .. area .. "_width"].String == "" then Controls["area" .. area .. "_width"].String = tostring(screen_width) end
             if Controls["area" .. area .. "_height"].String == "" then Controls["area" .. area .. "_height"].String = "8" end
             if Controls["area" .. area .. "_font_size"].String == "" then Controls["area" .. area .. "_font_size"].String = "12" end
-            if Controls["area" .. area .. "_speed"].String == "" then Controls["area" .. area .. "_speed"].String = "50" end
+            if Controls["area" .. area .. "_speed"].String == "" then Controls["area" .. area .. "_speed"].String = "0" end
             if Controls["area" .. area .. "_dwell"].String == "" then Controls["area" .. area .. "_dwell"].String = "5" end
         end
         
         -- Initialize effect choices
-        local effectChoices = {"Immediate", "Scroll Left", "Scroll Right", "Scroll Up", "Scroll Down", 
+        local effectChoices = {"Static", "Static", "Scroll Right", "Scroll Up", "Scroll Down", 
                                "Continuous Left", "Continuous Right", "Continuous Up", "Continuous Down",
                                "Fade In", "Flash", "Curtain Open", "Curtain Close"}
         for area = 1, 4 do
@@ -813,10 +854,6 @@ if Controls then
         if Controls.timer_y.String == "" then Controls.timer_y.String = "16" end
         if Controls.timer_width.String == "" then Controls.timer_width.String = tostring(screen_width) end
         
-        -- Initialize QR code
-        if Controls.qr_x.String == "" then Controls.qr_x.String = "0" end
-        if Controls.qr_y.String == "" then Controls.qr_y.String = "0" end
-        if Controls.qr_size.String == "" then Controls.qr_size.String = "32" end
         
         -- Initialize brightness
         if Controls.brightness.Value == 0 then
@@ -873,8 +910,6 @@ if Controls then
         end
     end
     
-    Controls.qr_send.EventHandler = function()
-        SendQRCode()
     end
     
     Controls.clear_screen.EventHandler = function()
