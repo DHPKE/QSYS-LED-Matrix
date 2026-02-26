@@ -178,14 +178,25 @@ cd ~/rpi-rgb-led-matrix/bindings/python
 # Debug: show current directory and file structure
 echo "  Current directory: $(pwd)"
 echo "  Checking for core.cpp..."
-ls -la rgbmatrix/core.cpp || echo "  ERROR: core.cpp not found!"
+if [ -f "rgbmatrix/core.cpp" ]; then
+    echo "  ✓ core.cpp exists"
+    ls -la rgbmatrix/core.cpp
+else
+    echo "  ✗ core.cpp NOT FOUND"
+    echo "  Files in rgbmatrix/:"
+    ls -la rgbmatrix/ || echo "    Directory doesn't exist!"
+    exit 1
+fi
 
 # Clean any previous build artifacts (use sudo in case they're root-owned)
 sudo python3 setup.py clean --all 2>/dev/null || true
 sudo rm -rf build dist *.egg-info 2>/dev/null || true
 
-# Install
-sudo make install
+# Try direct setup.py install instead of make (bypasses Makefile issues)
+echo "  Building Python module..."
+sudo python3 setup.py build
+echo "  Installing Python module..."
+sudo python3 setup.py install
 echo "  ✓ Python bindings installed"
 echo ""
 
