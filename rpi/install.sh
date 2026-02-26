@@ -141,16 +141,17 @@ if [ ! -f "rgbmatrix/core.cpp" ]; then
     echo "  ERROR: Python binding source files not found"
     echo "  Attempting to reclone library..."
     cd ~
-    rm -rf rpi-rgb-led-matrix
+    # Use sudo to remove in case previous build created root-owned files
+    sudo rm -rf rpi-rgb-led-matrix
     git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
     cd ~/rpi-rgb-led-matrix
     make -j"$(nproc)"
     cd ~/rpi-rgb-led-matrix/bindings/python
 fi
 
-# Clean any previous build artifacts
+# Clean any previous build artifacts (use sudo in case they're root-owned)
 sudo python3 setup.py clean --all 2>/dev/null || true
-rm -rf build dist *.egg-info 2>/dev/null || true
+sudo rm -rf build dist *.egg-info 2>/dev/null || true
 
 # Install
 sudo make install
