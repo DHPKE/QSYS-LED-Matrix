@@ -87,6 +87,8 @@ sudo apt-get update -qq
 sudo apt-get install -y \
     python3 \
     python3-dev \
+    python3-pip \
+    python3-setuptools \
     python3-pillow \
     fonts-dejavu-core \
     git \
@@ -119,6 +121,13 @@ echo ""
 # ── 4. Compile library + Python bindings ──────────────────────────────────
 echo "[4/6] Compiling library (takes 2-3 minutes on Pi Zero 2 W)..."
 cd ~/rpi-rgb-led-matrix
+
+# Ensure we're in the right place
+if [ ! -f "lib/Makefile" ]; then
+    echo "  ERROR: Library source files not found"
+    exit 1
+fi
+
 make clean
 # Use 'regular' hardware mapping (matches MATRIX_HARDWARE_MAPPING in config.py)
 make -j"$(nproc)"
@@ -126,6 +135,24 @@ echo "  ✓ Library compiled"
 
 echo "  Installing Python bindings..."
 cd ~/rpi-rgb-led-matrix/bindings/python
+
+# Verify source files exist
+if [ ! -f "rgbmatrix/core.cpp" ]; then
+    echo "  ERROR: Python binding source files not found"
+    echo "  Attempting to reclone library..."
+    cd ~
+    rm -rf rpi-rgb-led-matrix
+    git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+    cd ~/rpi-rgb-led-matrix
+    make -j"$(nproc)"
+    cd ~/rpi-rgb-led-matrix/bindings/python
+fi
+
+# Clean any previous build artifacts
+sudo python3 setup.py clean --all 2>/dev/null || true
+rm -rf build dist *.egg-info 2>/dev/null || true
+
+# Install
 sudo make install
 echo "  ✓ Python bindings installed"
 echo ""
