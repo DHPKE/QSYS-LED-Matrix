@@ -143,6 +143,24 @@ if [ ! -f "lib/Makefile" ]; then
     exit 1
 fi
 
+# Verify Python binding sources exist BEFORE building
+if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
+    echo "  ERROR: Python binding source files not found in cloned repo"
+    echo "  This shouldn't happen - the clone may be incomplete"
+    echo "  Removing and recloning..."
+    cd ~
+    sudo rm -rf rpi-rgb-led-matrix
+    git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+    cd ~/rpi-rgb-led-matrix
+    
+    # Verify again after reclone
+    if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
+        echo "  ERROR: Python bindings still missing after reclone"
+        echo "  There may be a network issue or repository problem"
+        exit 1
+    fi
+fi
+
 make clean
 # Use 'regular' hardware mapping (matches MATRIX_HARDWARE_MAPPING in config.py)
 make -j"$(nproc)"
@@ -150,19 +168,6 @@ echo "  ✓ Library compiled"
 
 echo "  Installing Python bindings..."
 cd ~/rpi-rgb-led-matrix/bindings/python
-
-# Verify source files exist
-if [ ! -f "rgbmatrix/core.cpp" ]; then
-    echo "  ERROR: Python binding source files not found"
-    echo "  Attempting to reclone library..."
-    cd ~
-    # Use sudo to remove in case previous build created root-owned files
-    sudo rm -rf rpi-rgb-led-matrix
-    git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
-    cd ~/rpi-rgb-led-matrix
-    make -j"$(nproc)"
-    cd ~/rpi-rgb-led-matrix/bindings/python
-fi
 
 # Clean any previous build artifacts (use sudo in case they're root-owned)
 sudo python3 setup.py clean --all 2>/dev/null || true
