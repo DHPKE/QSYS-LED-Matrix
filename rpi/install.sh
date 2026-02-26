@@ -104,11 +104,26 @@ echo "[3/6] Installing rpi-rgb-led-matrix library..."
 
 if [ -d ~/rpi-rgb-led-matrix ]; then
     echo "  ℹ  Library already exists at ~/rpi-rgb-led-matrix"
-    read -p "  Update existing library? [y/N]: " UPDATE_LIB
-    if [[ "$UPDATE_LIB" =~ ^[Yy]$ ]]; then
-        cd ~/rpi-rgb-led-matrix
-        git pull
-        echo "  ✓ Library updated"
+    
+    # Check if it's a valid git repo
+    if [ -d ~/rpi-rgb-led-matrix/.git ]; then
+        read -p "  Update existing library? [y/N]: " UPDATE_LIB
+        if [[ "$UPDATE_LIB" =~ ^[Yy]$ ]]; then
+            cd ~/rpi-rgb-led-matrix
+            git pull
+            echo "  ✓ Library updated"
+        fi
+    else
+        echo "  ⚠  Directory exists but is not a git repository"
+        read -p "  Remove and reclone? [y/N]: " RECLONE
+        if [[ "$RECLONE" =~ ^[Yy]$ ]]; then
+            cd ~
+            sudo rm -rf rpi-rgb-led-matrix
+            git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+            echo "  ✓ Library cloned"
+        else
+            echo "  Keeping existing directory"
+        fi
     fi
 else
     echo "  Cloning rpi-rgb-led-matrix library..."
