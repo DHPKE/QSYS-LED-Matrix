@@ -144,9 +144,14 @@ if [ ! -f "lib/Makefile" ]; then
 fi
 
 # Verify Python binding sources exist BEFORE building
+echo "  Checking Python binding sources..."
 if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
     echo "  ERROR: Python binding source files not found in cloned repo"
-    echo "  This shouldn't happen - the clone may be incomplete"
+    echo "  Files in bindings/python/:"
+    ls -la bindings/python/ || true
+    echo "  Files in bindings/python/rgbmatrix/:"
+    ls -la bindings/python/rgbmatrix/ || true
+    echo ""
     echo "  Removing and recloning..."
     cd ~
     sudo rm -rf rpi-rgb-led-matrix
@@ -160,6 +165,7 @@ if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
         exit 1
     fi
 fi
+echo "  ✓ Python binding sources verified"
 
 make clean
 # Use 'regular' hardware mapping (matches MATRIX_HARDWARE_MAPPING in config.py)
@@ -168,6 +174,11 @@ echo "  ✓ Library compiled"
 
 echo "  Installing Python bindings..."
 cd ~/rpi-rgb-led-matrix/bindings/python
+
+# Debug: show current directory and file structure
+echo "  Current directory: $(pwd)"
+echo "  Checking for core.cpp..."
+ls -la rgbmatrix/core.cpp || echo "  ERROR: core.cpp not found!"
 
 # Clean any previous build artifacts (use sudo in case they're root-owned)
 sudo python3 setup.py clean --all 2>/dev/null || true
