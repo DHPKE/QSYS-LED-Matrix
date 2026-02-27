@@ -11,7 +11,9 @@
             bgcolor: { value: "" },
             font: { value: "" },
             align: { value: "" },
-            intensity: { value: "" }
+            intensity: { value: "" },
+            layout: { value: "" },
+            brightness: { value: "" }
         },
         inputs: 1,
         outputs: 1,
@@ -21,6 +23,41 @@
         },
         labelStyle: function() {
             return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            const node = this;
+            
+            // Initialize color pickers from node values
+            if (node.color) {
+                $('#text-color-picker').val('#' + node.color.replace('#', ''));
+            }
+            if (node.bgcolor) {
+                $('#text-bgcolor-picker').val('#' + node.bgcolor.replace('#', ''));
+            }
+            
+            // Color picker -> text input (user picks color)
+            $('#text-color-picker').on('input', function() {
+                $('#node-input-color').val($(this).val().substring(1).toUpperCase());
+            });
+            
+            $('#text-bgcolor-picker').on('input', function() {
+                $('#node-input-bgcolor').val($(this).val().substring(1).toUpperCase());
+            });
+            
+            // Text input -> color picker (user types hex)
+            $('#node-input-color').on('input', function() {
+                const val = $(this).val().replace('#', '');
+                if (val.length === 6 && /^[0-9A-Fa-f]{6}$/.test(val)) {
+                    $('#text-color-picker').val('#' + val.toUpperCase());
+                }
+            });
+            
+            $('#node-input-bgcolor').on('input', function() {
+                const val = $(this).val().replace('#', '');
+                if (val.length === 6 && /^[0-9A-Fa-f]{6}$/.test(val)) {
+                    $('#text-bgcolor-picker').val('#' + val.toUpperCase());
+                }
+            });
         }
     });
 </script>
@@ -58,13 +95,13 @@
     <div class="form-row">
         <label for="node-input-color"><i class="fa fa-tint"></i> Text Color</label>
         <input type="text" id="node-input-color" placeholder="From message or FFFFFF" style="width: 150px;">
-        <input type="color" id="text-color-picker" style="width: 60px; margin-left: 10px;">
+        <input type="color" id="text-color-picker" value="#FFFFFF" style="width: 60px; margin-left: 10px;">
     </div>
     
     <div class="form-row">
         <label for="node-input-bgcolor"><i class="fa fa-square"></i> Background</label>
         <input type="text" id="node-input-bgcolor" placeholder="From message or 000000" style="width: 150px;">
-        <input type="color" id="text-bgcolor-picker" style="width: 60px; margin-left: 10px;">
+        <input type="color" id="text-bgcolor-picker" value="#000000" style="width: 60px; margin-left: 10px;">
     </div>
     
     <div class="form-row">
@@ -89,6 +126,32 @@
     <div class="form-row">
         <label for="node-input-intensity"><i class="fa fa-adjust"></i> Intensity</label>
         <input type="number" id="node-input-intensity" min="0" max="255" placeholder="From message or 255">
+    </div>
+    
+    <hr>
+    <h4>Display Defaults (optional)</h4>
+    
+    <div class="form-row">
+        <label for="node-input-layout"><i class="fa fa-th"></i> Layout</label>
+        <select id="node-input-layout">
+            <option value="">From message</option>
+            <option value="1">1 - Fullscreen</option>
+            <option value="2">2 - Top / Bottom</option>
+            <option value="3">3 - Left / Right</option>
+            <option value="4">4 - Triple Left</option>
+            <option value="5">5 - Triple Right</option>
+            <option value="6">6 - Thirds</option>
+            <option value="7">7 - Quad View</option>
+            <option value="11">11 - Fullscreen Segment 1</option>
+            <option value="12">12 - Fullscreen Segment 2</option>
+            <option value="13">13 - Fullscreen Segment 3</option>
+            <option value="14">14 - Fullscreen Segment 4</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-brightness"><i class="fa fa-sun-o"></i> Brightness</label>
+        <input type="number" id="node-input-brightness" min="0" max="255" placeholder="From message (0-255)">
     </div>
     
     <div class="form-tips">
@@ -225,32 +288,4 @@ msg.clear = 0;
 
 // Clear everything
 msg.clear = "all";</pre>
-</script>
-
-<!-- Color picker sync -->
-<script type="text/javascript">
-    $(document).ready(function() {
-        // Sync color picker with text input
-        $('#text-color-picker').on('change', function() {
-            $('#node-input-color').val($(this).val().substring(1).toUpperCase());
-        });
-        
-        $('#text-bgcolor-picker').on('change', function() {
-            $('#node-input-bgcolor').val($(this).val().substring(1).toUpperCase());
-        });
-        
-        $('#node-input-color').on('change', function() {
-            const val = $(this).val().replace('#', '');
-            if (val.length === 6) {
-                $('#text-color-picker').val('#' + val);
-            }
-        });
-        
-        $('#node-input-bgcolor').on('change', function() {
-            const val = $(this).val().replace('#', '');
-            if (val.length === 6) {
-                $('#text-bgcolor-picker').val('#' + val);
-            }
-        });
-    });
 </script>

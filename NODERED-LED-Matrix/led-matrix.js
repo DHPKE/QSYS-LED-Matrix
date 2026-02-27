@@ -21,7 +21,9 @@ module.exports = function(RED) {
             bgcolor: config.bgcolor || null,
             font: config.font || null,
             align: config.align || null,
-            intensity: config.intensity !== "" ? parseInt(config.intensity) : null
+            intensity: config.intensity !== "" ? parseInt(config.intensity) : null,
+            layout: config.layout !== "" ? parseInt(config.layout) : null,
+            brightness: config.brightness !== "" ? parseInt(config.brightness) : null
         };
 
         // UDP client
@@ -76,17 +78,32 @@ module.exports = function(RED) {
                     intensity: getValue(msg.intensity, node.defaults.intensity, 255)
                 };
             } else if (msg.layout !== undefined || msg.preset !== undefined) {
-                // LAYOUT command
-                cmdObj = {
-                    cmd: "layout",
-                    preset: msg.layout !== undefined ? msg.layout : msg.preset
-                };
+                // LAYOUT command - use node default if message doesn't provide
+                const layoutValue = msg.layout !== undefined ? msg.layout : 
+                                   (msg.preset !== undefined ? msg.preset : node.defaults.layout);
+                
+                if (layoutValue !== null && layoutValue !== undefined) {
+                    cmdObj = {
+                        cmd: "layout",
+                        preset: layoutValue
+                    };
+                } else {
+                    node.warn("Layout command requires msg.layout or node default");
+                    return;
+                }
             } else if (msg.brightness !== undefined) {
-                // BRIGHTNESS command
-                cmdObj = {
-                    cmd: "brightness",
-                    value: msg.brightness
-                };
+                // BRIGHTNESS command - use node default if message doesn't provide
+                const brightnessValue = msg.brightness !== undefined ? msg.brightness : node.defaults.brightness;
+                
+                if (brightnessValue !== null && brightnessValue !== undefined) {
+                    cmdObj = {
+                        cmd: "brightness",
+                        value: brightnessValue
+                    };
+                } else {
+                    node.warn("Brightness command requires msg.brightness or node default");
+                    return;
+                }
             } else if (msg.clear !== undefined) {
                 // CLEAR command
                 if (msg.clear === "all" || msg.clear === true) {
