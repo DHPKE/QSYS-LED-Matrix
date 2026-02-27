@@ -156,9 +156,9 @@ WEB_PORT       = 8080      # Non-privileged port (no sudo required)
 
 # Fallback static IP applied when DHCP gives no address within DHCP_TIMEOUT_S.
 # Set FALLBACK_IP = None to disable (device stays unreachable instead).
-FALLBACK_IP      = "192.168.1.200"
+FALLBACK_IP      = "10.20.30.40"
 FALLBACK_NETMASK = "255.255.255.0"
-FALLBACK_GATEWAY = "192.168.1.1"
+FALLBACK_GATEWAY = "10.20.30.1"
 FALLBACK_IFACE   = "eth0"      # Network interface to configure
 DHCP_TIMEOUT_S   = 15          # Seconds to wait for DHCP before applying fallback
 
