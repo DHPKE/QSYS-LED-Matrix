@@ -145,6 +145,40 @@ def _ensure_network() -> str:
     return "no IP"
 
 
+def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
+    """
+    Background thread: monitor network IP and update splash screen if it changes.
+    Runs until the first UDP command is received, then exits.
+    """
+    import threading
+    last_ip = _get_ip(FALLBACK_IFACE)
+    logger.info(f"[NET-MON] Starting network monitor (current IP: {last_ip})")
+    
+    while True:
+        time.sleep(5.0)  # Check every 5 seconds
+        
+        # Stop monitoring after first command
+        if udp.has_received_command():
+            logger.info("[NET-MON] First command received, stopping network monitor")
+            break
+            
+        current_ip = _get_ip(FALLBACK_IFACE)
+        
+        # IP changed (and not empty)
+        if current_ip and current_ip != last_ip:
+            logger.info(f"[NET-MON] IP changed: {last_ip} → {current_ip}")
+            last_ip = current_ip
+            
+            # Update splash screen with new IP
+            sm.update_text(0, current_ip, color="FFFFFF", bgcolor="000000", align="C")
+            sm.set_frame(0, enabled=True, color="FFFFFF", width=1)
+            logger.info(f"[NET-MON] Updated splash screen with new IP: {current_ip}")
+            
+            # Notify callback to update device_ip variable
+            ip_splash_callback(current_ip)
+
+
+
 def main():
     logger.info("=" * 50)
     logger.info("RPi Zero 2 W — LED Matrix Controller")
@@ -154,6 +188,13 @@ def main():
 
     # ── 1. Network: wait for DHCP / apply fallback ────────────────────────
     device_ip = _ensure_network()
+    
+    # Variable to track current IP (will be updated by monitor)
+    current_ip_ref = [device_ip]  # Use list to allow updates from thread
+    
+    def update_device_ip(new_ip):
+        """Callback to update device IP from network monitor"""
+        current_ip_ref[0] = new_ip
 
     # ── 2. Shared state ──────────────────────────────────────────────────
     sm = SegmentManager()
@@ -247,9 +288,18 @@ def main():
     # Display the device IP on segment 0 (full-screen, white on black) until
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
     ip_splash_active = True
-    sm.update_text(0, device_ip, color="FFFFFF", bgcolor="000000", align="C")
+    sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
     sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
-    logger.info(f"[SPLASH] Showing IP address: {device_ip}")
+    logger.info(f"[SPLASH] Showing IP address: {current_ip_ref[0]}")
+    
+    # Start network monitor thread
+    import threading
+    net_monitor_thread = threading.Thread(
+        target=_network_monitor,
+        args=(sm, udp, update_device_ip),
+        daemon=True
+    )
+    net_monitor_thread.start()
 
     logger.info("=" * 50)
     logger.info("System ready — press Ctrl+C to stop")
