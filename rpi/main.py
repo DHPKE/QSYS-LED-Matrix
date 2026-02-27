@@ -248,6 +248,7 @@ def main():
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
     ip_splash_active = True
     sm.update_text(0, device_ip, color="FFFFFF", bgcolor="000000", align="C")
+    sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
     logger.info(f"[SPLASH] Showing IP address: {device_ip}")
 
     logger.info("=" * 50)
@@ -290,9 +291,10 @@ def main():
                     renderer.render_all()
                 except Exception as exc:
                     logger.error(f"[RENDER] Exception: {exc}")
-
-        # Longer sleep to reduce CPU load and give matrix library uninterrupted time
-        time.sleep(0.05)  # 50ms sleep reduces CPU load significantly
+        
+        # Sleep to yield CPU and allow matrix library clean refresh cycles
+        # Aligned with EFFECT_INTERVAL for consistent timing
+        time.sleep(EFFECT_INTERVAL)
 
 
 if __name__ == "__main__":

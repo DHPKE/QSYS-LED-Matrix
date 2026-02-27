@@ -87,6 +87,8 @@ sudo apt-get update -qq
 sudo apt-get install -y \
     python3 \
     python3-dev \
+    python3-pip \
+    python3-setuptools \
     python3-pillow \
     fonts-dejavu-core \
     git \
@@ -102,11 +104,26 @@ echo "[3/6] Installing rpi-rgb-led-matrix library..."
 
 if [ -d ~/rpi-rgb-led-matrix ]; then
     echo "  ℹ  Library already exists at ~/rpi-rgb-led-matrix"
-    read -p "  Update existing library? [y/N]: " UPDATE_LIB
-    if [[ "$UPDATE_LIB" =~ ^[Yy]$ ]]; then
-        cd ~/rpi-rgb-led-matrix
-        git pull
-        echo "  ✓ Library updated"
+    
+    # Check if it's a valid git repo
+    if [ -d ~/rpi-rgb-led-matrix/.git ]; then
+        read -p "  Update existing library? [y/N]: " UPDATE_LIB
+        if [[ "$UPDATE_LIB" =~ ^[Yy]$ ]]; then
+            cd ~/rpi-rgb-led-matrix
+            git pull
+            echo "  ✓ Library updated"
+        fi
+    else
+        echo "  ⚠  Directory exists but is not a git repository"
+        read -p "  Remove and reclone? [y/N]: " RECLONE
+        if [[ "$RECLONE" =~ ^[Yy]$ ]]; then
+            cd ~
+            sudo rm -rf rpi-rgb-led-matrix
+            git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+            echo "  ✓ Library cloned"
+        else
+            echo "  Keeping existing directory"
+        fi
     fi
 else
     echo "  Cloning rpi-rgb-led-matrix library..."
@@ -119,6 +136,37 @@ echo ""
 # ── 4. Compile library + Python bindings ──────────────────────────────────
 echo "[4/6] Compiling library (takes 2-3 minutes on Pi Zero 2 W)..."
 cd ~/rpi-rgb-led-matrix
+
+# Ensure we're in the right place
+if [ ! -f "lib/Makefile" ]; then
+    echo "  ERROR: Library source files not found"
+    exit 1
+fi
+
+# Verify Python binding sources exist BEFORE building
+echo "  Checking Python binding sources..."
+if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
+    echo "  ERROR: Python binding source files not found in cloned repo"
+    echo "  Files in bindings/python/:"
+    ls -la bindings/python/ || true
+    echo "  Files in bindings/python/rgbmatrix/:"
+    ls -la bindings/python/rgbmatrix/ || true
+    echo ""
+    echo "  Removing and recloning..."
+    cd ~
+    sudo rm -rf rpi-rgb-led-matrix
+    git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+    cd ~/rpi-rgb-led-matrix
+    
+    # Verify again after reclone
+    if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
+        echo "  ERROR: Python bindings still missing after reclone"
+        echo "  There may be a network issue or repository problem"
+        exit 1
+    fi
+fi
+echo "  ✓ Python binding sources verified"
+
 make clean
 # Use 'regular' hardware mapping (matches MATRIX_HARDWARE_MAPPING in config.py)
 make -j"$(nproc)"
@@ -126,7 +174,29 @@ echo "  ✓ Library compiled"
 
 echo "  Installing Python bindings..."
 cd ~/rpi-rgb-led-matrix/bindings/python
-sudo make install
+
+# Debug: show current directory and file structure
+echo "  Current directory: $(pwd)"
+echo "  Checking for core.cpp..."
+if [ -f "rgbmatrix/core.cpp" ]; then
+    echo "  ✓ core.cpp exists"
+    ls -la rgbmatrix/core.cpp
+else
+    echo "  ✗ core.cpp NOT FOUND"
+    echo "  Files in rgbmatrix/:"
+    ls -la rgbmatrix/ || echo "    Directory doesn't exist!"
+    exit 1
+fi
+
+# Clean any previous build artifacts (use sudo in case they're root-owned)
+sudo python3 setup.py clean --all 2>/dev/null || true
+sudo rm -rf build dist *.egg-info 2>/dev/null || true
+
+# Try direct setup.py install instead of make (bypasses Makefile issues)
+echo "  Building Python module..."
+sudo python3 setup.py build
+echo "  Installing Python module..."
+sudo python3 setup.py install
 echo "  ✓ Python bindings installed"
 echo ""
 

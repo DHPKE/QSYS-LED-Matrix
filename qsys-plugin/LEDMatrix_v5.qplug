@@ -1,0 +1,812 @@
+-- Q-SYS LED Matrix Controller Plugin
+-- Version 5.0.0 - Added group support for multiple panels
+-- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
+--
+-- FIRMWARE PROTOCOL (JSON over UDP):
+--   {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
+--    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
+--   {"cmd":"clear","seg":0,"group":1}  |  {"cmd":"clear_all","group":1}
+--   {"cmd":"brightness","value":200,"group":1}
+--   {"cmd":"orientation","value":"landscape","group":1}
+--   {"cmd":"layout","preset":N,"group":1}
+--   {"cmd":"group","value":3}   -- Assign panel to group 3
+--
+-- GROUPING (NEW in v5.0):
+--   Each LED panel can be assigned to a group (1-8) via the panel's WebUI or UDP command.
+--   Commands sent with "group":N will only be executed by panels assigned to that group.
+--   Commands with "group":0 are broadcast to all panels (default behavior).
+--   
+--   Group visual indicators (bottom-left corner, 4x4 pixels):
+--     Group 1 = White    Group 5 = Magenta
+--     Group 2 = Yellow   Group 6 = Blue
+--     Group 3 = Orange   Group 7 = Cyan
+--     Group 4 = Red      Group 8 = Green
+--
+-- LAYOUT PRESETS:
+--   1  = Fullscreen
+--   2  = Top / Bottom halves
+--   3  = Left / Right halves
+--   4  = Triple Left
+--   5  = Triple Right
+--   6  = Thirds
+--   7  = Quad View
+--   11-14 = Single segment fullscreen
+
+PluginInfo = {
+    Name = "PKE~LED Matrix Display (Groups)",
+    Version = "5.0.0",
+    Id = "dhpke.olimex.led.matrix.5.0.0",
+    Description = "RPi 64x32 LED Matrix with 8-group support",
+    ShowDebug = true,
+    Author = "DHPKE"
+}
+
+function GetProperties()
+    return {
+        { Name = "IP Address", Type = "string",  Value = "192.168.1.100" },
+        { Name = "UDP Port",   Type = "integer", Min = 1, Max = 65535, Value = 21324 }
+    }
+end
+
+function GetControls(props)
+    local controls = {}
+
+    -- Connection
+    table.insert(controls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="udp_port",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="reconnect",         ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
+    table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
+
+    -- Group routing controls (8 groups + broadcast)
+    table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })  -- Shows current active group
+    for grp = 0, 8 do
+        local nm = grp == 0 and "All" or tostring(grp)
+        table.insert(controls, { Name=string.format("group%d_select", grp), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
+    end
+
+    -- Layout preset
+    table.insert(controls, { Name="layout_preset", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_layout",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+
+    -- Segment controls (seg1 .. seg4)
+    for seg = 0, 3 do
+        local n = seg + 1
+        table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_text_color", n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_bg_color",   n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_align",      n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_effect",     n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_font",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_size",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_send",   n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_clear",  n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_frame",  n), ControlType="Button", ButtonType="Toggle",  Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_frame_color", n), ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_frame_link", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, {
+            Name=string.format("seg%d_active", n),
+            ControlType="Indicator", IndicatorType="LED",
+            Count=1, UserPin=true, PinStyle="Output"
+        })
+    end
+
+    -- Global
+    table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="orientation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+
+    return controls
+end
+
+function GetControlLayout(props)
+    local layout   = {}
+    local graphics = {}
+
+    local W  = 600
+    local CH = 24
+    local BH = 28
+
+    local C_GRP   = {62,  62,  62 }
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55 }
+    local C_BTN_R = {165, 38,  38 }
+    local C_BTN_B = {45,  105, 195}
+    local C_BTN_O = {200, 110, 0  }
+    
+    -- Group colors for buttons
+    local C_GRP_COLORS = {
+        [0] = {128, 128, 128},  -- Gray (All/Broadcast)
+        [1] = {255, 255, 255},  -- White
+        [2] = {255, 255, 0},    -- Yellow
+        [3] = {255, 165, 0},    -- Orange
+        [4] = {255, 0, 0},      -- Red
+        [5] = {255, 0, 255},    -- Magenta
+        [6] = {0, 0, 255},      -- Blue
+        [7] = {0, 255, 255},    -- Cyan
+        [8] = {0, 255, 0},      -- Green
+    }
+
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, {
+            Type="GroupBox", Text=title or "", Fill=C_GRP,
+            StrokeWidth=1, CornerRadius=4,
+            Position={x, y}, Size={w, h}
+        })
+    end
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, {
+            Type="Text", Text=text, Font="Roboto", FontSize=9,
+            HTextAlign="Left", Color=C_LBL,
+            Position={x, y}, Size={w, 12}
+        })
+    end
+
+    -- ── Title bar ──────────────────────────────────────────────────
+    table.insert(graphics, {
+        Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5,
+        Position={0,0}, Size={W,36}
+    })
+    table.insert(graphics, {
+        Type="Text", Text="LED Matrix Controller  v5.0.0 (Groups)",
+        Font="Roboto", FontSize=14, FontStyle="Bold",
+        HTextAlign="Center", Color={255,255,255},
+        Position={0,9}, Size={W,20}
+    })
+
+    -- ── Connection ─────────────────────────────────────────────────
+    local y = 42
+    GBox(0, y, W, 54, "Connection")
+    Lbl("IP Address",    6,   y+5, 124)
+    Lbl("Port",        138,   y+5,  62)
+    Lbl("Status",      278,   y+5,  62)
+    Lbl("Last Command",348,   y+5, W-354)
+    layout["ip_address"]        = { PrettyName="Conn~IP",       Style="Text",      Position={6,   y+18}, Size={124,   CH} }
+    layout["udp_port"]          = { PrettyName="Conn~Port",     Style="Text",      Position={138, y+18}, Size={62,    CH} }
+    layout["reconnect"]         = { PrettyName="Conn~Reconnect", Style="Button",   ButtonStyle="Trigger", Legend="Reconnect", Color=C_BTN_B, Position={208, y+18}, Size={62, BH} }
+    layout["connection_status"] = { PrettyName="Conn~Status",   Style="Indicator", Position={278, y+18}, Size={62,    CH} }
+    layout["last_command"]      = { PrettyName="Conn~LastCmd",  Style="Text",      Position={348, y+18}, Size={W-354, CH} }
+
+    -- ── Group Selection ─────────────────────────────────────────────
+    y = y + 60
+    GBox(0, y, W, 72, "Group Routing")
+    Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+5, W-12)
+    
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap (reduced 10%)
+    local btnW = 56
+    local btnGap = 6
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
+    for grp = 0, 8 do
+        local bx = 6 + grp * (btnW + btnGap)
+        layout[string.format("group%d_select", grp)] = {
+            PrettyName="Group~"..groupLabels[grp+1],
+            Style="Button", ButtonStyle="Toggle",
+            Legend=groupLabels[grp+1],
+            Color=C_GRP_COLORS[grp],
+            Position={bx, y+22}, Size={btnW, 36}
+        }
+    end
+    -- Active group display (hidden text control for status)
+    layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+62}, Size={0, 0} }
+
+    -- ── Display Layout ──────────────────────────────────────────────
+    y = y + 78
+    GBox(0, y, W, 148, "Display Layout")
+    
+    local TW  = 62
+    local TH  = 26
+    local GAP = 6
+    local TX  = 6
+
+    local function TRect(col, x, gy, w, h)
+        table.insert(graphics, {
+            Type="GroupBox", Text="", Fill=col,
+            StrokeWidth=0, CornerRadius=0,
+            Position={x, gy}, Size={w, h}
+        })
+    end
+
+    -- Thumbnails for presets (abbreviated version)
+    local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
+    for i = 0, 6 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 14
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        table.insert(graphics, {Type="Text", Text=thumbLabels[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+    
+    local thumbLabels2 = {"11 Seg1","12 Seg2","13 Seg3","14 Seg4"}
+    for i = 0, 3 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 56
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        table.insert(graphics, {Type="Text", Text=thumbLabels2[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+
+    -- Thumbnail visual fills (segment colors)
+    local cA = {70, 160,  70}   -- green   seg 0
+    local cB = {70,  80, 160}   -- blue    seg 1
+    local cC = {160, 70,  70}   -- red     seg 2
+    local cD = {160,160,  40}   -- yellow  seg 3
+
+    local HW = 31   -- half width
+    local HH = 13   -- half height
+    local T1 = 20   -- first third width
+    local T2 = 20   -- second third width
+    local T3 = 22   -- third third width
+
+    -- Preset 1 — Fullscreen
+    do local tx=TX+0*(TW+GAP); local ty=y+14
+        TRect(cA, tx, ty, TW, TH)
+    end
+    -- Preset 2 — Top/Bottom
+    do local tx=TX+1*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    TW, HH)
+        TRect(cB, tx,    ty+HH, TW, HH)
+    end
+    -- Preset 3 — Left/Right
+    do local tx=TX+2*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty, HW, TH)
+        TRect(cB, tx+HW, ty, HW, TH)
+    end
+    -- Preset 4 — Triple Left
+    do local tx=TX+3*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, TH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx+HW, ty+HH, HW, HH)
+    end
+    -- Preset 5 — Triple Right
+    do local tx=TX+4*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx,    ty+HH, HW, HH)
+        TRect(cC, tx+HW, ty,    HW, TH)
+    end
+    -- Preset 6 — Thirds
+    do local tx=TX+5*(TW+GAP); local ty=y+14
+        TRect(cA, tx,       ty, T1, TH)
+        TRect(cB, tx+T1,    ty, T2, TH)
+        TRect(cC, tx+T1+T2, ty, T3, TH)
+    end
+    -- Preset 7 — Quad
+    do local tx=TX+6*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx,    ty+HH, HW, HH)
+        TRect(cD, tx+HW, ty+HH, HW, HH)
+    end
+    
+    -- Preset 11-14 — Fullscreen per segment
+    do local tx=TX+0*(TW+GAP); local ty=y+56
+        TRect(cA, tx, ty, TW, TH)
+    end
+    do local tx=TX+1*(TW+GAP); local ty=y+56
+        TRect(cB, tx, ty, TW, TH)
+    end
+    do local tx=TX+2*(TW+GAP); local ty=y+56
+        TRect(cC, tx, ty, TW, TH)
+    end
+    do local tx=TX+3*(TW+GAP); local ty=y+56
+        TRect(cD, tx, ty, TW, TH)
+    end
+    
+    Lbl("Layout Preset", TX, y+96, 210)
+    layout["layout_preset"] = {
+        PrettyName="Layout~Preset",
+        Style="ComboBox", IsReadOnly=false,
+        Position={TX, y+110}, Size={220, CH}
+    }
+    layout["apply_layout"] = {
+        PrettyName="Layout~Apply",
+        Style="Button", ButtonStyle="Trigger",
+        Legend="Apply Layout", Color=C_BTN_O,
+        Position={234, y+110}, Size={160, CH}
+    }
+
+    -- ── Segment rows ────────────────────────────────────────────────
+    y = y + 166
+    local SEG_H = 145  -- Reduced: removed intensity fader, added frame controls
+
+    local comboCols = {
+        {"Text Color", "text_color", "TxtColor", 110},
+        {"BG Color",   "bg_color",   "BgColor",  110},
+        {"Font",       "font",       "Font",      82},
+        {"Size",       "size",       "Size",      66},
+        {"Align",      "align",      "Align",     76},
+        {"Effect",     "effect",     "Effect",   114},
+    }
+
+    for seg = 0, 3 do
+        local n   = seg + 1
+        local sn  = "seg"..n.."_"
+        local grp = "Seg"..n
+        local sy  = y + seg * (SEG_H + 4)
+
+        GBox(0, sy, W, SEG_H, grp)
+
+        local r1 = sy + 20
+        layout[sn.."active"] = { PrettyName=grp.."~Active", Style="Led",
+            Position={6, r1+5}, Size={14, 14} }
+        Lbl("Text", 26, r1-12, W-330)
+        layout[sn.."text"]   = { PrettyName=grp.."~Text",   Style="Text",
+            Position={26, r1}, Size={W-332, CH} }
+        layout[sn.."send"]   = { PrettyName=grp.."~Send",   Style="Button",
+            ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
+            Position={W-300, r1}, Size={94, BH} }
+        layout[sn.."invert"] = { PrettyName=grp.."~Invert", Style="Button",
+            ButtonStyle="Trigger", Legend="Invert",  Color=C_BTN_B,
+            Position={W-200, r1}, Size={94, BH} }
+        layout[sn.."clear"]  = { PrettyName=grp.."~Clear",  Style="Button",
+            ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R,
+            Position={W-100, r1}, Size={94, BH} }
+
+        local r2 = sy + 70
+        local cx = 6
+        for _, col in ipairs(comboCols) do
+            Lbl(col[1], cx, r2-20, col[4])
+            layout[sn..col[2]] = { PrettyName=grp.."~"..col[3], Style="ComboBox",
+                IsReadOnly=false,
+                Position={cx, r2}, Size={col[4], CH} }
+            cx = cx + col[4] + 6
+        end
+
+        -- Row 3: Frame controls
+        local r3 = sy + 107
+        layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
+            ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
+            Position={6, r3}, Size={80, BH} }
+        Lbl("Color", 92, r3-15, 50)
+        layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
+            IsReadOnly=false,
+            Position={92, r3}, Size={110, CH} }
+        layout[sn.."frame_link"] = { PrettyName=grp.."~LinkColor", Style="Button",
+            ButtonStyle="Trigger", Legend="→", Color={80,120,180},
+            Position={208, r3}, Size={32, BH}, FontSize=18 }
+    end
+
+    -- ── Global Controls ─────────────────────────────────────────────
+    y = y + 4 * (SEG_H + 4) + 4
+    GBox(0, y, W, 74, "Global Controls")
+    Lbl("Brightness (0-255)", 6, y+16, 120)
+    layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
+        Position={6, y+30}, Size={100, 36} }
+    Lbl("Orientation", 232, y+16, 100)
+    layout["orientation"] = { PrettyName="Global~Orient", Style="ComboBox",
+        Position={232, y+30}, Size={122, 36} }
+    layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
+        ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
+        Position={360, y+30}, Size={W-366, 36} }
+
+    return layout, graphics
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- Runtime
+-- ══════════════════════════════════════════════════════════════════
+if Controls then
+    local socket   = nil
+    local ip_addr  = Properties["IP Address"].Value
+    local udp_port = Properties["UDP Port"].Value
+
+    local activeLayoutSegments = {}
+    local debounceTimers = {}
+    local activeGroup = 0  -- 0 = All (broadcast), 1-8 = specific group
+    local updatingGroups = false  -- Flag to prevent group button event loops
+
+    local ColorNames = {
+        ["White"]   = "FFFFFF", ["Red"]     = "FF0000", ["Lime"]    = "00FF00",
+        ["Blue"]    = "0000FF", ["Yellow"]  = "FFFF00", ["Magenta"] = "FF00FF",
+        ["Cyan"]    = "00FFFF", ["Orange"]  = "FFA500", ["Purple"]  = "800080",
+        ["Green"]   = "008000", ["Gold"]    = "FFD700",
+        ["Gray"]    = "808080", ["Black"]   = "000000"
+    }
+    local FontMap  = { ["Arial"]="arial", ["Verdana"]="verdana", ["Digital"]="digital12", ["Mono"]="mono9" }
+    local AlignMap = { ["Left"]="L", ["Center"]="C", ["Right"]="R" }
+
+    local LayoutPresets = {
+        [1]  = { name="1 - Fullscreen",           activeSegments={0},       preset=1  },
+        [2]  = { name="2 - Top / Bottom",          activeSegments={0,1},     preset=2  },
+        [3]  = { name="3 - Left / Right",          activeSegments={0,1},     preset=3  },
+        [4]  = { name="4 - Triple Left",           activeSegments={0,1,2},   preset=4  },
+        [5]  = { name="5 - Triple Right",          activeSegments={0,1,2},   preset=5  },
+        [6]  = { name="6 - Thirds",                activeSegments={0,1,2},   preset=6  },
+        [7]  = { name="7 - Quad View",             activeSegments={0,1,2,3}, preset=7  },
+        [11] = { name="11 - Fullscreen Seg 1",     activeSegments={0},       preset=11 },
+        [12] = { name="12 - Fullscreen Seg 2",     activeSegments={1},       preset=12 },
+        [13] = { name="13 - Fullscreen Seg 3",     activeSegments={2},       preset=13 },
+        [14] = { name="14 - Fullscreen Seg 4",     activeSegments={3},       preset=14 },
+    }
+
+    local LayoutNameToKey = {}
+    for k, v in pairs(LayoutPresets) do LayoutNameToKey[v.name] = k end
+
+    local LayoutChoices = {
+        "1 - Fullscreen", "2 - Top / Bottom", "3 - Left / Right",
+        "4 - Triple Left", "5 - Triple Right", "6 - Thirds", "7 - Quad View",
+        "11 - Fullscreen Seg 1", "12 - Fullscreen Seg 2",
+        "13 - Fullscreen Seg 3", "14 - Fullscreen Seg 4",
+    }
+
+    local function Debounce(key, delay, fn)
+        if debounceTimers[key] then debounceTimers[key]:Stop() end
+        if not debounceTimers[key] then debounceTimers[key] = Timer.New() end
+        local t = debounceTimers[key]
+        t.EventHandler = function() t:Stop(); fn() end
+        t:Start(delay)
+    end
+
+    local function ReopenSocket()
+        if socket then pcall(function() socket:Close() end) end
+        local ok, err = pcall(function()
+            socket = UdpSocket.New()
+            socket:Open()
+        end)
+        if ok then
+            Controls.connection_status.Value = 0
+            print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(udp_port))
+        else
+            Controls.connection_status.Value = 2
+            print("✗ Socket error: " .. tostring(err))
+        end
+    end
+
+    local function ValidatePort(port)
+        local num = tonumber(port)
+        if num and num >= 1 and num <= 65535 then return num end
+        return nil
+    end
+
+    local function jsonStr(v)
+        if v == nil then return "null" end
+        if type(v) == "number"  then return tostring(math.floor(v)) end
+        if type(v) == "boolean" then return v and "true" or "false" end
+        v = tostring(v):gsub('\\','\\\\'):gsub('"','\\"')
+        return '"' .. v .. '"'
+    end
+    
+    local function buildJson(t)
+        local parts = {}
+        for k, v in pairs(t) do
+            table.insert(parts, jsonStr(k) .. ":" .. jsonStr(v))
+        end
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+
+    local function SendCommand(json)
+        if not socket then
+            Controls.connection_status.Value = 2
+            Controls.last_command.String = "ERROR: No socket"
+            return false
+        end
+        local ok, err = pcall(function() socket:Send(ip_addr, udp_port, json .. "\n") end)
+        if ok then
+            Controls.last_command.String = json
+            Controls.connection_status.Value = 0
+            print("-> " .. json)
+            return true
+        else
+            Controls.last_command.String = "ERROR: " .. tostring(err)
+            Controls.connection_status.Value = 2
+            print("✗ Send error: " .. tostring(err))
+            return false
+        end
+    end
+
+    local function BuildTextCommand(seg)
+        local s     = "seg" .. (seg+1) .. "_"
+        local text    = Controls[s.."text"].String
+        local color   = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+        local bgcolor = ColorNames[Controls[s.."bg_color"].String]   or "000000"
+        local font    = FontMap[Controls[s.."font"].String]          or "arial"
+        local size    = Controls[s.."size"].String                   or "auto"
+        local align   = AlignMap[Controls[s.."align"].String]        or "C"
+        local effect  = Controls[s.."effect"].String                 or "none"
+        
+        -- Add group routing
+        return text, buildJson({
+            cmd="text", seg=seg, group=activeGroup, text=text, color=color, bgcolor=bgcolor,
+            font=font, size=size, align=align, effect=effect, intensity=255
+        })
+    end
+
+    local function Initialize()
+        print("=== LED Matrix v5.0.0 (Groups) Initializing ===")
+        
+        if Controls.ip_address.String == "" then
+            Controls.ip_address.String = ip_addr
+        end
+        if Controls.udp_port.String == "" then
+            Controls.udp_port.String = tostring(udp_port)
+        end
+        
+        Controls.orientation.Choices = {"landscape", "portrait"}
+        Controls.layout_preset.Choices = LayoutChoices
+        
+        if Controls.orientation.String == "" then
+            Controls.orientation.String = "landscape"
+        end
+        if Controls.brightness.Value == 0 then
+            Controls.brightness.Value = 128
+        end
+        if Controls.last_command.String == "" then
+            Controls.last_command.String = "Ready"
+        end
+        Controls.layout_preset.String = LayoutChoices[1]
+
+        -- Initialize group buttons (default to "All")
+        Controls.group0_select.Boolean = true
+        for grp = 1, 8 do
+            Controls[string.format("group%d_select", grp)].Boolean = false
+        end
+        Controls.active_group.String = "All"
+
+        local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","Green","Gold","Gray","Black"}
+        local bgChoices     = {"Black","White","Red","Lime","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","Green","Gold","Gray"}
+        local fontChoices   = {"Arial","Verdana","Digital","Mono"}
+        local sizeChoices   = {"auto","8","12","16","24","32"}
+        local alignChoices  = {"Left","Center","Right"}
+        local effectChoices = {"none","scroll","blink","fade"}
+        local defaultColors = {"White","Lime","Red","Yellow"}
+
+        for seg = 0, 3 do
+            local s = "seg" .. (seg+1) .. "_"
+            if Controls[s.."text_color"] then Controls[s.."text_color"].Choices = colorChoices end
+            if Controls[s.."bg_color"] then Controls[s.."bg_color"].Choices   = bgChoices end
+            if Controls[s.."font"] then Controls[s.."font"].Choices       = fontChoices end
+            if Controls[s.."size"] then Controls[s.."size"].Choices       = sizeChoices end
+            if Controls[s.."align"] then Controls[s.."align"].Choices      = alignChoices end
+            if Controls[s.."effect"] then Controls[s.."effect"].Choices     = effectChoices end
+            
+            if Controls[s.."text_color"] and Controls[s.."text_color"].String == "" then
+                Controls[s.."text_color"].String = defaultColors[seg+1]
+            end
+            if Controls[s.."bg_color"] and Controls[s.."bg_color"].String == "" then
+                Controls[s.."bg_color"].String = "Black"
+            end
+            if Controls[s.."font"] and Controls[s.."font"].String == "" then
+                Controls[s.."font"].String = "Arial"
+            end
+            if Controls[s.."size"] and Controls[s.."size"].String == "" then
+                Controls[s.."size"].String = "auto"
+            end
+            if Controls[s.."align"] and Controls[s.."align"].String == "" then
+                Controls[s.."align"].String = "Center"
+            end
+            if Controls[s.."effect"] and Controls[s.."effect"].String == "" then
+                Controls[s.."effect"].String = "none"
+            end
+            if Controls[s.."frame_color"] and Controls[s.."frame_color"].String == "" then
+                Controls[s.."frame_color"].String = "White"
+            end
+            if Controls[s.."frame_color"] then Controls[s.."frame_color"].Choices = colorChoices end
+        end
+
+        activeLayoutSegments = activeLayoutSegments or {[0]=true}
+        for seg = 0, 3 do
+            Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+        end
+
+        ReopenSocket()
+        print("=== Ready ===")
+    end
+
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                -- Delay execution slightly to ensure it happens after button release
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    -- Turn off all other group buttons
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    print("Active group set to: " .. groupName)
+                    -- Send group assignment command to Pi(s)
+                    SendCommand(buildJson({cmd="group", value=grp}))
+                end, 0.05)
+            else
+                -- Don't allow deselecting - always have one selected
+                ctl.Boolean = true
+            end
+        end
+    end
+
+    local function ApplyLayoutByKey(key)
+        local p = LayoutPresets[key]
+        if not p then
+            print("✗ Unknown layout key: " .. tostring(key))
+            Controls.last_command.String = "ERROR: unknown preset"
+            return false
+        end
+        print("Applying layout: " .. p.name .. " to group " .. (activeGroup == 0 and "All" or activeGroup))
+
+        SendCommand(buildJson({cmd="layout", preset=p.preset, group=activeGroup}))
+
+        activeLayoutSegments = {}
+        for _, seg in ipairs(p.activeSegments) do
+            activeLayoutSegments[seg] = true
+        end
+
+        for seg = 0, 3 do
+            Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+        end
+
+        Timer.CallAfter(function()
+            for _, seg in ipairs(p.activeSegments) do
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
+                -- Resend frame commands with correct width for new layout
+                local s = "seg" .. (seg+1) .. "_"
+                if Controls[s.."frame"].Boolean then
+                    local color = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                    }))
+                end
+            end
+        end, 0.3)
+
+        return true
+    end
+
+    local function ResolvePreset(input)
+        local num = tonumber(input)
+        if num then return math.floor(num) end
+        return LayoutNameToKey[input]
+    end
+
+    Controls.reconnect.EventHandler = function()
+        print("=== Manual Reconnect ===")
+        ReopenSocket()
+        Controls.last_command.String = "Reconnected"
+    end
+
+    Controls.apply_layout.EventHandler = function()
+        local key = ResolvePreset(Controls.layout_preset.String)
+        if key then ApplyLayoutByKey(key) end
+    end
+
+    Controls.layout_preset.EventHandler = function(ctl)
+        local key = ResolvePreset(ctl.String)
+        if key then ApplyLayoutByKey(key) end
+    end
+
+    for seg = 0, 3 do
+        local s = "seg" .. (seg+1) .. "_"
+
+        Controls[s.."send"].EventHandler = function()
+            local _, cmd = BuildTextCommand(seg)
+            if SendCommand(cmd) then
+                Controls[s.."active"].Boolean = true
+                activeLayoutSegments[seg] = true
+            end
+        end
+
+        Controls[s.."clear"].EventHandler = function()
+            if SendCommand(buildJson({cmd="clear", seg=seg, group=activeGroup})) then
+                Controls[s.."active"].Boolean = false
+                activeLayoutSegments[seg] = nil
+            end
+        end
+
+        Controls[s.."invert"].EventHandler = function()
+            local tc  = Controls[s.."text_color"]
+            local bc  = Controls[s.."bg_color"]
+            local tmp = tc.String
+            tc.String = bc.String
+            bc.String = tmp
+            if activeLayoutSegments[seg] then
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
+            end
+        end
+
+        local function AutoSend()
+            if not activeLayoutSegments[seg] then return end
+            local _, cmd = BuildTextCommand(seg)
+            SendCommand(cmd)
+        end
+
+        Controls[s.."text"].EventHandler       = AutoSend
+        Controls[s.."text_color"].EventHandler = AutoSend
+        Controls[s.."bg_color"].EventHandler   = AutoSend
+        Controls[s.."font"].EventHandler       = AutoSend
+        Controls[s.."align"].EventHandler      = AutoSend
+        Controls[s.."size"].EventHandler       = AutoSend
+        Controls[s.."effect"].EventHandler     = AutoSend
+        
+        Controls[s.."frame"].EventHandler = function(ctl)
+            local enabled = ctl.Boolean
+            local color = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+            SendCommand(buildJson({
+                cmd="frame", seg=seg, enabled=enabled, color=color, width=1, group=activeGroup
+            }))
+        end
+        
+        Controls[s.."frame_color"].EventHandler = function(ctl)
+            if Controls[s.."frame"].Boolean then
+                local color = ColorNames[ctl.String] or "FFFFFF"
+                SendCommand(buildJson({
+                    cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                }))
+            end
+        end
+        
+        Controls[s.."frame_link"].EventHandler = function()
+            -- Copy text color to frame color
+            Controls[s.."frame_color"].String = Controls[s.."text_color"].String
+            -- If frame is enabled, send update immediately
+            if Controls[s.."frame"].Boolean then
+                local color = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+                SendCommand(buildJson({
+                    cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                }))
+            end
+        end
+    end
+
+    Controls.clear_all.EventHandler = function()
+        if SendCommand(buildJson({cmd="clear_all", group=activeGroup})) then
+            for seg = 0, 3 do
+                Controls["seg"..(seg+1).."_active"].Boolean = false
+            end
+            activeLayoutSegments = {}
+        end
+    end
+
+    Controls.brightness.EventHandler = function(ctl)
+        local value = tonumber(ctl.String) or 128
+        value = math.max(0, math.min(255, math.floor(value)))  -- Clamp to 0-255
+        ctl.String = tostring(value)
+        -- Apply immediately (no debounce)
+        SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
+    end
+
+    Controls.orientation.EventHandler = function(ctl)
+        local orient = ctl.String
+        if SendCommand(buildJson({cmd="orientation", value=orient, group=activeGroup})) then
+            print("Orientation set to: " .. orient .. " for group " .. (activeGroup == 0 and "All" or activeGroup))
+        end
+    end
+
+    Controls.ip_address.EventHandler = function(ctl)
+        ip_addr = ctl.String
+        print("IP changed to: " .. ip_addr)
+        ReopenSocket()
+    end
+
+    Controls.udp_port.EventHandler = function(ctl)
+        local v = ValidatePort(ctl.String)
+        if v then
+            udp_port = v
+            print("Port changed to: " .. udp_port)
+            ReopenSocket()
+        end
+    end
+
+    function Cleanup()
+        for _, t in pairs(debounceTimers) do
+            if t then pcall(function() t:Stop() end) end
+        end
+        if socket then pcall(function() socket:Close() end) end
+    end
+
+    Initialize()
+end
