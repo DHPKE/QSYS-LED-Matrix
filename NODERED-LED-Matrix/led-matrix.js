@@ -1,6 +1,6 @@
 /**
- * Node-RED LED Matrix Controller - Single Node, Simplified Commands
- * Flat message structure: msg.layout, msg.brightness, msg.text, etc.
+ * Node-RED LED Matrix Controller - Single Node with Optional Defaults
+ * Node properties provide defaults, message values override
  */
 
 module.exports = function(RED) {
@@ -13,6 +13,16 @@ module.exports = function(RED) {
 
         node.ip = config.ip || "10.1.1.24";
         node.port = parseInt(config.port) || 21324;
+        
+        // Default values from node config (empty string means "use message value")
+        node.defaults = {
+            segment: config.segment !== "" ? parseInt(config.segment) : null,
+            color: config.color || null,
+            bgcolor: config.bgcolor || null,
+            font: config.font || null,
+            align: config.align || null,
+            intensity: config.intensity !== "" ? parseInt(config.intensity) : null
+        };
 
         // UDP client
         const client = dgram.createSocket('udp4');
@@ -36,23 +46,34 @@ module.exports = function(RED) {
             });
         }
 
+        // Helper to get value with fallback to node default
+        function getValue(msgValue, defaultValue, finalFallback) {
+            if (msgValue !== undefined && msgValue !== null && msgValue !== "") {
+                return msgValue;
+            }
+            if (defaultValue !== undefined && defaultValue !== null && defaultValue !== "") {
+                return defaultValue;
+            }
+            return finalFallback;
+        }
+
         node.on('input', function(msg) {
             let cmdObj = null;
 
             // Detect command type from message properties
             if (msg.text !== undefined || msg.payload !== undefined) {
-                // TEXT command
+                // TEXT command - use node defaults if message doesn't provide values
                 cmdObj = {
                     cmd: "text",
-                    seg: msg.segment !== undefined ? msg.segment : (msg.seg !== undefined ? msg.seg : 0),
+                    seg: getValue(msg.segment !== undefined ? msg.segment : msg.seg, node.defaults.segment, 0),
                     text: msg.text !== undefined ? String(msg.text) : String(msg.payload || ""),
-                    color: (msg.color || "FFFFFF").replace('#', ''),
-                    bgcolor: (msg.bgcolor || "000000").replace('#', ''),
-                    font: msg.font || "arial",
+                    color: getValue(msg.color, node.defaults.color, "FFFFFF").replace('#', ''),
+                    bgcolor: getValue(msg.bgcolor, node.defaults.bgcolor, "000000").replace('#', ''),
+                    font: getValue(msg.font, node.defaults.font, "arial"),
                     size: msg.size || "auto",
-                    align: msg.align || "C",
+                    align: getValue(msg.align, node.defaults.align, "C"),
                     effect: msg.effect || "none",
-                    intensity: msg.intensity !== undefined ? msg.intensity : 255
+                    intensity: getValue(msg.intensity, node.defaults.intensity, 255)
                 };
             } else if (msg.layout !== undefined || msg.preset !== undefined) {
                 // LAYOUT command
@@ -113,7 +134,12 @@ module.exports = function(RED) {
             node.status({});
         });
 
-        node.status({fill:"yellow", shape:"ring", text:`ready @ ${node.ip}:${node.port}`});
+        // Show status with defaults info
+        let statusText = `ready @ ${node.ip}:${node.port}`;
+        if (node.defaults.segment !== null) {
+            statusText += ` | seg${node.defaults.segment}`;
+        }
+        node.status({fill:"yellow", shape:"ring", text: statusText});
     }
 
     RED.nodes.registerType("led-matrix", LEDMatrixNode);

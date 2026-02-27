@@ -5,7 +5,13 @@
         defaults: {
             name: { value: "" },
             ip: { value: "10.1.1.24", required: true },
-            port: { value: 21324, required: true, validate: RED.validators.number() }
+            port: { value: 21324, required: true, validate: RED.validators.number() },
+            segment: { value: "" },
+            color: { value: "" },
+            bgcolor: { value: "" },
+            font: { value: "" },
+            align: { value: "" },
+            intensity: { value: "" }
         },
         inputs: 1,
         outputs: 1,
@@ -34,17 +40,83 @@
         <label for="node-input-port"><i class="fa fa-plug"></i> UDP Port</label>
         <input type="number" id="node-input-port" placeholder="21324" min="1" max="65535">
     </div>
+    
+    <hr>
+    <h4>Text Defaults (optional - leave empty to use msg values)</h4>
+    
+    <div class="form-row">
+        <label for="node-input-segment"><i class="fa fa-th-large"></i> Segment</label>
+        <select id="node-input-segment">
+            <option value="">From message</option>
+            <option value="0">0 - Segment 1</option>
+            <option value="1">1 - Segment 2</option>
+            <option value="2">2 - Segment 3</option>
+            <option value="3">3 - Segment 4</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-color"><i class="fa fa-tint"></i> Text Color</label>
+        <input type="text" id="node-input-color" placeholder="From message or FFFFFF" style="width: 150px;">
+        <input type="color" id="text-color-picker" style="width: 60px; margin-left: 10px;">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-bgcolor"><i class="fa fa-square"></i> Background</label>
+        <input type="text" id="node-input-bgcolor" placeholder="From message or 000000" style="width: 150px;">
+        <input type="color" id="text-bgcolor-picker" style="width: 60px; margin-left: 10px;">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-font"><i class="fa fa-font"></i> Font</label>
+        <select id="node-input-font">
+            <option value="">From message</option>
+            <option value="arial">Arial</option>
+            <option value="mono">Monospace</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-align"><i class="fa fa-align-center"></i> Alignment</label>
+        <select id="node-input-align">
+            <option value="">From message</option>
+            <option value="L">Left</option>
+            <option value="C">Center</option>
+            <option value="R">Right</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-intensity"><i class="fa fa-adjust"></i> Intensity</label>
+        <input type="number" id="node-input-intensity" min="0" max="255" placeholder="From message or 255">
+    </div>
+    
+    <div class="form-tips">
+        <strong>Tip:</strong> Leave fields empty to use values from incoming messages. 
+        Set values here to use as defaults when message doesn't provide them.
+    </div>
 </script>
 
 <script type="text/html" data-help-name="led-matrix">
     <p>Control LED Matrix display with simplified flat message structure.</p>
     
+    <h3>Configuration</h3>
+    <p>Set default values in node properties, or leave empty to use message values.</p>
+    <ul>
+        <li><strong>Segment:</strong> Default segment (0-3) or from message</li>
+        <li><strong>Color:</strong> Default text color or from message</li>
+        <li><strong>Background:</strong> Default background or from message</li>
+        <li><strong>Font:</strong> Default font (arial/mono) or from message</li>
+        <li><strong>Alignment:</strong> Default alignment (L/C/R) or from message</li>
+        <li><strong>Intensity:</strong> Default intensity (0-255) or from message</li>
+    </ul>
+
     <h3>Text Display</h3>
     <p>Send text to a segment:</p>
     <pre>msg.text = "Hello World";
-msg.segment = 0;           // 0-3
-msg.color = "FF0000";      // Red
-msg.bgcolor = "000000";    // Black background</pre>
+msg.segment = 0;           // Optional if set in node
+msg.color = "FF0000";      // Optional if set in node
+msg.bgcolor = "000000";    // Optional if set in node</pre>
     
     <p>Or use payload:</p>
     <pre>msg.payload = "Hello";
@@ -129,11 +201,15 @@ msg.segments = [0, 1];  // Segments in group</pre>
         <dd>Config request options</dd>
     </dl>
 
+    <h3>Priority</h3>
+    <p><strong>Message values always override node configuration.</strong></p>
+    <p>Node configuration provides defaults when message values are not present.</p>
+
     <h3>Examples</h3>
-    <pre>// Simple text
+    <pre>// Simple text (uses node defaults)
 msg.payload = "Hello";
 
-// Colored text on segment 2
+// Override node settings
 msg.text = "Temp: 22°C";
 msg.segment = 2;
 msg.color = "00FF00";
@@ -149,4 +225,32 @@ msg.clear = 0;
 
 // Clear everything
 msg.clear = "all";</pre>
+</script>
+
+<!-- Color picker sync -->
+<script type="text/javascript">
+    $(document).ready(function() {
+        // Sync color picker with text input
+        $('#text-color-picker').on('change', function() {
+            $('#node-input-color').val($(this).val().substring(1).toUpperCase());
+        });
+        
+        $('#text-bgcolor-picker').on('change', function() {
+            $('#node-input-bgcolor').val($(this).val().substring(1).toUpperCase());
+        });
+        
+        $('#node-input-color').on('change', function() {
+            const val = $(this).val().replace('#', '');
+            if (val.length === 6) {
+                $('#text-color-picker').val('#' + val);
+            }
+        });
+        
+        $('#node-input-bgcolor').on('change', function() {
+            const val = $(this).val().replace('#', '');
+            if (val.length === 6) {
+                $('#text-bgcolor-picker').val('#' + val);
+            }
+        });
+    });
 </script>

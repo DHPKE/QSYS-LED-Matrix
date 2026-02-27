@@ -1,36 +1,96 @@
-# Node-RED LED Matrix Controller v2.1 🎯
+# Node-RED LED Matrix Controller v2.2 🎯
 
-**One node, flat message structure - no msg.command hierarchy!**
+**One node, flat message structure with optional defaults!**
 
-## ✨ Simplified Command Syntax
+## ✨ Flexible Configuration
 
-Send commands using simple, flat message properties:
+Set default values in the node properties, or leave them empty to use message values:
 
+- **Set in node:** Values used when message doesn't provide them
+- **Leave empty:** Always use values from incoming messages
+- **Message always wins:** Message values override node defaults
+
+Perfect for:
+- **Fixed displays:** Set segment/color once in node, just send text
+- **Dynamic displays:** Leave empty, control everything via messages
+- **Hybrid:** Set some defaults, override others per message
+
+## 🎨 Node Configuration
+
+Configure defaults in the node properties:
+
+### Connection (Required)
+- **IP Address:** LED Matrix IP (default: 10.1.1.24)
+- **UDP Port:** UDP port (default: 21324)
+
+### Text Defaults (Optional)
+- **Segment:** Default segment (0-3) or leave empty
+- **Text Color:** Default text color (hex) or leave empty
+- **Background:** Default background color or leave empty
+- **Font:** Default font (arial/mono) or leave empty
+- **Alignment:** Default alignment (L/C/R) or leave empty
+- **Intensity:** Default intensity (0-255) or leave empty
+
+**Leave any field empty to always use message values.**
+
+---
+
+## 💡 Usage Patterns
+
+### Pattern 1: Fixed Segment Display
+Configure in node:
+- Segment: 0
+- Color: 00FF00 (green)
+- Font: mono
+
+Then just send:
 ```javascript
-// Before (old way)
-msg.command = "layout";
-msg.preset = 7;
+msg.payload = "22°C";  // Uses node defaults
+```
 
-// Now (v2.1)
-msg.layout = 7;  // Clean and simple!
+### Pattern 2: Dynamic Control
+Leave all fields empty in node.
+
+Send complete messages:
+```javascript
+msg.text = "Hello";
+msg.segment = 0;
+msg.color = "FF0000";
+```
+
+### Pattern 3: Hybrid (Recommended)
+Set common defaults in node:
+- Font: mono
+- Alignment: C
+
+Override per message:
+```javascript
+msg.text = "Warning!";
+msg.segment = 1;
+msg.color = "FF0000";  // Override for this message
+// Uses node defaults for font and alignment
 ```
 
 ---
 
 ## 🚀 Quick Examples
 
-### Display Text
+### 🔤 Text Display
 ```javascript
+// Minimal (uses node defaults if configured)
+msg.payload = "Hello";
+
+// Full control (overrides node defaults)
 msg.text = "Hello World";
-msg.segment = 0;
-msg.color = "00FF00";
+msg.segment = 0;             // Segment 0-3
+msg.color = "FF0000";        // Text color (hex)
+msg.bgcolor = "000000";      // Background color
+msg.font = "arial";          // "arial" or "mono"
+msg.align = "C";             // "L", "C", "R"
+msg.intensity = 255;         // 0-255
 ```
 
-Or use `msg.payload`:
-```javascript
-msg.payload = "Temperature: 22°C";
-msg.segment = 1;
-```
+**Priority:** Message values > Node defaults > Built-in defaults
 
 ### Change Layout
 ```javascript
@@ -264,14 +324,15 @@ node-red-restart
 
 ---
 
-## ✨ Why v2.1?
+## ✨ Why v2.2?
 
 ✅ **Simpler** - No `msg.command` hierarchy  
 ✅ **Cleaner** - Flat message structure  
-✅ **Intuitive** - `msg.layout` instead of `msg.command + msg.preset`  
-✅ **Less typing** - More productive  
-✅ **Flexible** - Multiple outputs to same node works perfectly
+✅ **Flexible defaults** - Set once in node or control via messages  
+✅ **Message priority** - Message values always override node defaults  
+✅ **Less typing** - Set defaults for common values, only send what changes  
+✅ **Works both ways** - Fixed displays OR dynamic control
 
 ---
 
-**Version 2.1.0 - Clean, Simple, Effective! 🚀**
+**Version 2.2.0 - Flexible Configuration with Smart Defaults! 🚀**
