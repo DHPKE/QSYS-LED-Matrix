@@ -1,232 +1,120 @@
 /**
- * Node-RED LED Matrix Controller - Simplified Nodes
- * Multiple specialized nodes for easier handling
+ * Node-RED LED Matrix Controller - Single Node, Simplified Commands
+ * Flat message structure: msg.layout, msg.brightness, msg.text, etc.
  */
 
 module.exports = function(RED) {
     "use strict";
     const dgram = require('dgram');
 
-    // Shared UDP client functionality
-    const udpClients = new Map();
+    function LEDMatrixNode(config) {
+        RED.nodes.createNode(this, config);
+        const node = this;
 
-    function getClient(nodeId) {
-        if (!udpClients.has(nodeId)) {
-            const client = dgram.createSocket('udp4');
-            client.on('error', (err) => {
-                console.error(`UDP error for ${nodeId}:`, err.message);
+        node.ip = config.ip || "10.1.1.24";
+        node.port = parseInt(config.port) || 21324;
+
+        // UDP client
+        const client = dgram.createSocket('udp4');
+
+        client.on('error', (err) => {
+            node.error(`UDP error: ${err.message}`);
+            node.status({fill:"red", shape:"ring", text:"error"});
+        });
+
+        function sendCommand(cmdObj) {
+            const message = JSON.stringify(cmdObj);
+            const buffer = Buffer.from(message);
+
+            client.send(buffer, 0, buffer.length, node.port, node.ip, (err) => {
+                if (err) {
+                    node.error(`Failed to send: ${err.message}`);
+                    node.status({fill:"red", shape:"ring", text:"send failed"});
+                } else {
+                    node.status({fill:"green", shape:"dot", text:`sent: ${cmdObj.cmd}`});
+                }
             });
-            udpClients.set(nodeId, client);
         }
-        return udpClients.get(nodeId);
-    }
-
-    function sendCommand(node, cmdObj, ip, port) {
-        const client = getClient(node.id);
-        const message = JSON.stringify(cmdObj);
-        const buffer = Buffer.from(message);
-
-        client.send(buffer, 0, buffer.length, port, ip, (err) => {
-            if (err) {
-                node.error(`Failed to send: ${err.message}`);
-                node.status({fill:"red", shape:"ring", text:"send failed"});
-            } else {
-                node.status({fill:"green", shape:"dot", text:`sent to ${ip}:${port}`});
-            }
-        });
-    }
-
-    // ========================================================================
-    // LED Matrix Text Node (per-segment)
-    // ========================================================================
-    function LEDMatrixTextNode(config) {
-        RED.nodes.createNode(this, config);
-        const node = this;
-
-        node.ip = config.ip || "192.168.1.100";
-        node.port = parseInt(config.port) || 21324;
-        node.segment = parseInt(config.segment) || 0;
-        node.color = config.color || "FFFFFF";
-        node.bgcolor = config.bgcolor || "000000";
-        node.font = config.font || "arial";
-        node.size = config.size || "auto";
-        node.align = config.align || "C";
-        node.effect = config.effect || "none";
-        node.intensity = parseInt(config.intensity) || 255;
 
         node.on('input', function(msg) {
-            const cmdObj = {
-                cmd: "text",
-                seg: msg.segment !== undefined ? msg.segment : node.segment,
-                text: msg.payload !== undefined ? String(msg.payload) : (msg.text || ""),
-                color: ((msg.color || node.color).replace('#', '')),
-                bgcolor: ((msg.bgcolor || node.bgcolor).replace('#', '')),
-                font: msg.font || node.font,
-                size: msg.size || node.size,
-                align: msg.align || node.align,
-                effect: msg.effect || node.effect,
-                intensity: msg.intensity !== undefined ? msg.intensity : node.intensity
-            };
+            let cmdObj = null;
 
-            const targetIp = msg.ip || node.ip;
-            const targetPort = msg.port || node.port;
-
-            sendCommand(node, cmdObj, targetIp, targetPort);
-
-            msg.ledmatrix = { command: cmdObj, ip: targetIp, port: targetPort };
-            node.send(msg);
-        });
-
-        node.on('close', function() {
-            if (udpClients.has(node.id)) {
-                udpClients.get(node.id).close();
-                udpClients.delete(node.id);
-            }
-            node.status({});
-        });
-
-        node.status({fill:"yellow", shape:"ring", text:`seg ${node.segment} ready`});
-    }
-
-    // ========================================================================
-    // LED Matrix Layout Node
-    // ========================================================================
-    function LEDMatrixLayoutNode(config) {
-        RED.nodes.createNode(this, config);
-        const node = this;
-
-        node.ip = config.ip || "192.168.1.100";
-        node.port = parseInt(config.port) || 21324;
-        node.preset = parseInt(config.preset) || 1;
-
-        node.on('input', function(msg) {
-            const preset = msg.layout !== undefined ? msg.layout : 
-                          (msg.preset !== undefined ? msg.preset : 
-                          (msg.payload !== undefined ? msg.payload : node.preset));
-
-            const cmdObj = {
-                cmd: "layout",
-                preset: preset
-            };
-
-            const targetIp = msg.ip || node.ip;
-            const targetPort = msg.port || node.port;
-
-            sendCommand(node, cmdObj, targetIp, targetPort);
-
-            msg.ledmatrix = { command: cmdObj, ip: targetIp, port: targetPort };
-            node.send(msg);
-        });
-
-        node.on('close', function() {
-            if (udpClients.has(node.id)) {
-                udpClients.get(node.id).close();
-                udpClients.delete(node.id);
-            }
-            node.status({});
-        });
-
-        node.status({fill:"yellow", shape:"ring", text:`layout ${node.preset}`});
-    }
-
-    // ========================================================================
-    // LED Matrix Brightness Node
-    // ========================================================================
-    function LEDMatrixBrightnessNode(config) {
-        RED.nodes.createNode(this, config);
-        const node = this;
-
-        node.ip = config.ip || "192.168.1.100";
-        node.port = parseInt(config.port) || 21324;
-        node.brightness = parseInt(config.brightness) || 128;
-
-        node.on('input', function(msg) {
-            const value = msg.brightness !== undefined ? msg.brightness :
-                         (msg.payload !== undefined ? msg.payload : node.brightness);
-
-            const cmdObj = {
-                cmd: "brightness",
-                value: value
-            };
-
-            const targetIp = msg.ip || node.ip;
-            const targetPort = msg.port || node.port;
-
-            sendCommand(node, cmdObj, targetIp, targetPort);
-
-            msg.ledmatrix = { command: cmdObj, ip: targetIp, port: targetPort };
-            node.send(msg);
-        });
-
-        node.on('close', function() {
-            if (udpClients.has(node.id)) {
-                udpClients.get(node.id).close();
-                udpClients.delete(node.id);
-            }
-            node.status({});
-        });
-
-        node.status({fill:"yellow", shape:"ring", text:`${node.brightness}`});
-    }
-
-    // ========================================================================
-    // LED Matrix Clear Node
-    // ========================================================================
-    function LEDMatrixClearNode(config) {
-        RED.nodes.createNode(this, config);
-        const node = this;
-
-        node.ip = config.ip || "192.168.1.100";
-        node.port = parseInt(config.port) || 21324;
-        node.segment = parseInt(config.segment) || 0;
-        node.clearAll = config.clearAll || false;
-
-        node.on('input', function(msg) {
-            let cmdObj;
-            
-            if (msg.clearAll !== undefined ? msg.clearAll : node.clearAll) {
-                cmdObj = { cmd: "clear_all" };
-            } else {
+            // Detect command type from message properties
+            if (msg.text !== undefined || msg.payload !== undefined) {
+                // TEXT command
                 cmdObj = {
-                    cmd: "clear",
-                    seg: msg.segment !== undefined ? msg.segment : node.segment
+                    cmd: "text",
+                    seg: msg.segment !== undefined ? msg.segment : (msg.seg !== undefined ? msg.seg : 0),
+                    text: msg.text !== undefined ? String(msg.text) : String(msg.payload || ""),
+                    color: (msg.color || "FFFFFF").replace('#', ''),
+                    bgcolor: (msg.bgcolor || "000000").replace('#', ''),
+                    font: msg.font || "arial",
+                    size: msg.size || "auto",
+                    align: msg.align || "C",
+                    effect: msg.effect || "none",
+                    intensity: msg.intensity !== undefined ? msg.intensity : 255
                 };
+            } else if (msg.layout !== undefined || msg.preset !== undefined) {
+                // LAYOUT command
+                cmdObj = {
+                    cmd: "layout",
+                    preset: msg.layout !== undefined ? msg.layout : msg.preset
+                };
+            } else if (msg.brightness !== undefined) {
+                // BRIGHTNESS command
+                cmdObj = {
+                    cmd: "brightness",
+                    value: msg.brightness
+                };
+            } else if (msg.clear !== undefined) {
+                // CLEAR command
+                if (msg.clear === "all" || msg.clear === true) {
+                    cmdObj = { cmd: "clear_all" };
+                } else {
+                    cmdObj = {
+                        cmd: "clear",
+                        seg: msg.clear
+                    };
+                }
+            } else if (msg.orientation !== undefined) {
+                // ORIENTATION command
+                cmdObj = {
+                    cmd: "orientation",
+                    value: msg.orientation
+                };
+            } else if (msg.group !== undefined) {
+                // GROUP command
+                cmdObj = {
+                    cmd: "group",
+                    group: msg.group,
+                    segments: msg.segments || []
+                };
+            } else if (msg.config !== undefined) {
+                // CONFIG command
+                cmdObj = {
+                    cmd: "config"
+                };
+                if (msg.config.network !== undefined) cmdObj.network = msg.config.network;
+                if (msg.config.name !== undefined) cmdObj.name = msg.config.name;
+                if (msg.config.orientation !== undefined) cmdObj.orientation = msg.config.orientation;
+            } else {
+                node.warn("No valid command found in message. Use msg.text, msg.layout, msg.brightness, msg.clear, etc.");
+                return;
             }
 
-            const targetIp = msg.ip || node.ip;
-            const targetPort = msg.port || node.port;
+            sendCommand(cmdObj);
 
-            sendCommand(node, cmdObj, targetIp, targetPort);
-
-            msg.ledmatrix = { command: cmdObj, ip: targetIp, port: targetPort };
+            msg.ledmatrix = { command: cmdObj };
             node.send(msg);
         });
 
         node.on('close', function() {
-            if (udpClients.has(node.id)) {
-                udpClients.get(node.id).close();
-                udpClients.delete(node.id);
-            }
+            client.close();
             node.status({});
         });
 
-        const statusText = node.clearAll ? "clear all" : `clear seg ${node.segment}`;
-        node.status({fill:"yellow", shape:"ring", text: statusText});
+        node.status({fill:"yellow", shape:"ring", text:`ready @ ${node.ip}:${node.port}`});
     }
 
-    // ========================================================================
-    // LED Matrix Config Node (connection settings)
-    // ========================================================================
-    function LEDMatrixConfigNode(config) {
-        RED.nodes.createNode(this, config);
-        this.ip = config.ip;
-        this.port = config.port;
-    }
-
-    // Register all node types
-    RED.nodes.registerType("led-matrix-text", LEDMatrixTextNode);
-    RED.nodes.registerType("led-matrix-layout", LEDMatrixLayoutNode);
-    RED.nodes.registerType("led-matrix-brightness", LEDMatrixBrightnessNode);
-    RED.nodes.registerType("led-matrix-clear", LEDMatrixClearNode);
-    RED.nodes.registerType("led-matrix-config", LEDMatrixConfigNode);
+    RED.nodes.registerType("led-matrix", LEDMatrixNode);
 };
