@@ -576,14 +576,8 @@ if Controls then
                 -- Event handlers for TCP connection
                 socket.Connected = function(sock)
                     Controls.connection_status.Value = 0  -- OK (green)
-                    Controls.last_command.String = "Connected"
+                    Controls.last_command.String = "Connected to " .. ip_addr .. ":" .. tostring(port)
                     print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
-                end
-                
-                socket.Reconnected = function(sock)
-                    Controls.connection_status.Value = 0  -- OK (green)
-                    Controls.last_command.String = "Reconnected"
-                    print("✓ TCP Reconnected")
                 end
                 
                 socket.Closed = function(sock)
