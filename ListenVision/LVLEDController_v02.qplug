@@ -25,8 +25,8 @@
 
 PluginInfo = {
     Name = "LED~Display Controller SDK v2",
-    Version = "2.0.1",
-    Id = "pke.led.controller.sdk.2.0.1",
+    Version = "2.0.2",
+    Id = "pke.led.controller.sdk.2.0.2",
     Description = "T/E/A/C Series LED Controller with Groups, Frames & Curtain",
     ShowDebug = true,
     Author = "DHPKE"
@@ -561,90 +561,6 @@ if Controls then
         return packet
     end
     
-    -- Forward declaration — defined after all Send* functions below
-    local SendInitialConfig
-
-    local function OpenSocket()
-        if socket then
-            pcall(function() socket:Close() end)
-            socket = nil
-        end
-        tcp_connected = false
-        Controls.connection_status.Value = 5  -- Connecting (orange)
-        Controls.last_command.String = "Connecting to " .. ip_addr .. ":" .. tostring(port) .. "..."
-
-        local ok, err = pcall(function()
-            if comm_type == 0 then  -- TCP
-                socket = TcpSocket.New()
-                socket.ReadTimeout  = 0   -- 0 = no idle-read timeout
-                socket.WriteTimeout = 10  -- 10 s write timeout
-
-                socket.Connected = function(sock)
-                    tcp_connected = true
-                    Controls.connection_status.Value = 0  -- OK (green)
-                    Controls.last_command.String = "Connected to " .. ip_addr .. ":" .. tostring(port)
-                    print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
-                    -- Send initial config only once connection is confirmed
-                    Timer.CallAfter(SendInitialConfig, 0.2)
-                    -- Keepalive: send a no-op brightness packet every 3s to prevent idle disconnect
-                    Timer.CallAfter(function()
-                        local function keepalive()
-                            if tcp_connected then
-                                local data = string.char(math.floor(Controls.brightness.Value))
-                                local pkt = BuildProtocolPacket(0x06, data)
-                                pcall(function() socket:Write(pkt) end)
-                                Timer.CallAfter(keepalive, 3)
-                            end
-                        end
-                        keepalive()
-                    end, 1.0)
-                end
-
-                socket.Closed = function(sock)
-                    tcp_connected = false
-                    Controls.connection_status.Value = 2  -- Fault (red)
-                    Controls.last_command.String = "Connection closed"
-                    print("✗ TCP Connection closed")
-                end
-
-                socket.Error = function(sock, err2)
-                    tcp_connected = false
-                    Controls.connection_status.Value = 2  -- Fault (red)
-                    Controls.last_command.String = "TCP Error: " .. tostring(err2)
-                    print("✗ TCP Error: " .. tostring(err2))
-                end
-
-                socket.Timeout = function(sock)
-                    tcp_connected = false
-                    Controls.connection_status.Value = 2  -- Fault (red)
-                    Controls.last_command.String = "TCP connect timeout"
-                    print("✗ TCP connect timeout")
-                end
-
-                socket:Connect(ip_addr, port)
-
-            elseif comm_type == 1 then  -- UDP
-                socket = UdpSocket.New()
-                -- Open binds to a local ephemeral port; remote IP/port is passed in Send()
-                socket:Open("0.0.0.0", 0)
-                tcp_connected = true  -- UDP is always "ready"
-                Controls.connection_status.Value = 4  -- Compromised (yellow)
-                Controls.last_command.String = "UDP ready -> " .. ip_addr .. ":" .. tostring(udp_port)
-                print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(udp_port))
-            end
-        end)
-
-        if not ok then
-            tcp_connected = false
-            Controls.connection_status.Value = 2  -- Fault (red)
-            Controls.last_command.String = "Socket error: " .. tostring(err)
-            print("✗ Socket error: " .. tostring(err))
-            return false
-        end
-
-        return true
-    end
-    
     local function SendData(data)
         if not socket or not tcp_connected then
             Controls.connection_status.Value = 2  -- Fault (red)
@@ -878,7 +794,7 @@ if Controls then
     end
 
     -- Defined here so all Send* functions above are already in scope
-    SendInitialConfig = function()
+    local function SendInitialConfig()
         print("=== Sending initial configuration ===")
         SendScreenParameters()
         SetBrightness(Controls.brightness.Value)
@@ -898,6 +814,85 @@ if Controls then
         if Controls.curtain_state.Boolean then Timer.CallAfter(SendCurtain, 0.7) end
         Controls.last_command.String = "Connected - initial config sent"
         print("✓ Initial configuration sent")
+    end
+
+    local function OpenSocket()
+        if socket then
+            pcall(function() socket:Close() end)
+            socket = nil
+        end
+        tcp_connected = false
+        Controls.connection_status.Value = 5  -- Connecting (orange)
+        Controls.last_command.String = "Connecting to " .. ip_addr .. ":" .. tostring(port) .. "..."
+
+        local ok, err = pcall(function()
+            if comm_type == 0 then  -- TCP
+                socket = TcpSocket.New()
+                socket.ReadTimeout  = 0   -- 0 = no idle-read timeout
+                socket.WriteTimeout = 10  -- 10 s write timeout
+
+                socket.Connected = function(sock)
+                    tcp_connected = true
+                    Controls.connection_status.Value = 0  -- OK (green)
+                    Controls.last_command.String = "Connected to " .. ip_addr .. ":" .. tostring(port)
+                    print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
+                    Timer.CallAfter(SendInitialConfig, 0.2)
+                    -- Keepalive: send brightness packet every 3s to prevent idle disconnect
+                    Timer.CallAfter(function()
+                        local function keepalive()
+                            if tcp_connected then
+                                local data = string.char(math.floor(Controls.brightness.Value))
+                                local pkt = BuildProtocolPacket(0x06, data)
+                                pcall(function() socket:Write(pkt) end)
+                                Timer.CallAfter(keepalive, 3)
+                            end
+                        end
+                        keepalive()
+                    end, 1.0)
+                end
+
+                socket.Closed = function(sock)
+                    tcp_connected = false
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "Connection closed"
+                    print("✗ TCP Connection closed")
+                end
+
+                socket.Error = function(sock, err2)
+                    tcp_connected = false
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "TCP Error: " .. tostring(err2)
+                    print("✗ TCP Error: " .. tostring(err2))
+                end
+
+                socket.Timeout = function(sock)
+                    tcp_connected = false
+                    Controls.connection_status.Value = 2  -- Fault (red)
+                    Controls.last_command.String = "TCP connect timeout"
+                    print("✗ TCP connect timeout")
+                end
+
+                socket:Connect(ip_addr, port)
+
+            elseif comm_type == 1 then  -- UDP
+                socket = UdpSocket.New()
+                socket:Open("0.0.0.0", 0)
+                tcp_connected = true
+                Controls.connection_status.Value = 4  -- Compromised (yellow)
+                Controls.last_command.String = "UDP ready -> " .. ip_addr .. ":" .. tostring(udp_port)
+                print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(udp_port))
+            end
+        end)
+
+        if not ok then
+            tcp_connected = false
+            Controls.connection_status.Value = 2  -- Fault (red)
+            Controls.last_command.String = "Socket error: " .. tostring(err)
+            print("✗ Socket error: " .. tostring(err))
+            return false
+        end
+
+        return true
     end
 
     local function Initialize()
