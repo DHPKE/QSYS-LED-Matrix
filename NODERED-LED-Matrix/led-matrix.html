@@ -1,86 +1,117 @@
 <script type="text/javascript">
-    RED.nodes.registerType('led-matrix', {
+    // ========================================================================
+    // LED Matrix Text Node
+    // ========================================================================
+    RED.nodes.registerType('led-matrix-text', {
         category: 'output',
         color: '#4a9eff',
         defaults: {
             name: { value: "" },
-            ip: { value: "192.168.1.100", required: true },
+            ip: { value: "10.1.1.24", required: true },
             port: { value: 21324, required: true, validate: RED.validators.number() },
-            command: { value: "text" },
             segment: { value: 0, validate: RED.validators.number() },
-            text: { value: "" },
             color: { value: "FFFFFF" },
             bgcolor: { value: "000000" },
             font: { value: "arial" },
             size: { value: "auto" },
             align: { value: "C" },
             effect: { value: "none" },
-            intensity: { value: 255, validate: RED.validators.number() },
-            preset: { value: 1, validate: RED.validators.number() },
-            brightness: { value: 128, validate: RED.validators.number() },
-            orientation: { value: "landscape" },
-            group: { value: 0, validate: RED.validators.number() }
+            intensity: { value: 255, validate: RED.validators.number() }
         },
         inputs: 1,
         outputs: 1,
-        icon: "font-awesome/fa-desktop",
+        icon: "font-awesome/fa-font",
         label: function() {
-            return this.name || `LED Matrix (${this.command})`;
+            return this.name || `Text Seg${this.segment}`;
         },
         labelStyle: function() {
             return this.name ? "node_label_italic" : "";
+        }
+    });
+
+    // ========================================================================
+    // LED Matrix Layout Node
+    // ========================================================================
+    RED.nodes.registerType('led-matrix-layout', {
+        category: 'output',
+        color: '#4a9eff',
+        defaults: {
+            name: { value: "" },
+            ip: { value: "10.1.1.24", required: true },
+            port: { value: 21324, required: true, validate: RED.validators.number() },
+            preset: { value: 1, validate: RED.validators.number() }
         },
-        oneditprepare: function() {
-            const node = this;
-            
-            // Command type selector
-            $("#node-input-command").on('change', function() {
-                const cmd = $(this).val();
-                
-                // Hide all parameter sections
-                $(".param-section").hide();
-                
-                // Show relevant sections based on command
-                switch(cmd) {
-                    case "text":
-                        $("#text-params").show();
-                        break;
-                    case "clear":
-                        $("#segment-param").show();
-                        break;
-                    case "brightness":
-                        $("#brightness-param").show();
-                        break;
-                    case "layout":
-                        $("#layout-param").show();
-                        break;
-                    case "orientation":
-                        $("#orientation-param").show();
-                        break;
-                    case "group":
-                        $("#group-param").show();
-                        break;
-                    case "config":
-                        $("#config-params").show();
-                        break;
-                }
-            });
-            
-            // Trigger initial visibility
-            $("#node-input-command").trigger('change');
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-th",
+        label: function() {
+            return this.name || `Layout ${this.preset}`;
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        }
+    });
+
+    // ========================================================================
+    // LED Matrix Brightness Node
+    // ========================================================================
+    RED.nodes.registerType('led-matrix-brightness', {
+        category: 'output',
+        color: '#4a9eff',
+        defaults: {
+            name: { value: "" },
+            ip: { value: "10.1.1.24", required: true },
+            port: { value: 21324, required: true, validate: RED.validators.number() },
+            brightness: { value: 128, validate: RED.validators.number() }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-sun-o",
+        label: function() {
+            return this.name || `Brightness ${this.brightness}`;
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        }
+    });
+
+    // ========================================================================
+    // LED Matrix Clear Node
+    // ========================================================================
+    RED.nodes.registerType('led-matrix-clear', {
+        category: 'output',
+        color: '#4a9eff',
+        defaults: {
+            name: { value: "" },
+            ip: { value: "10.1.1.24", required: true },
+            port: { value: 21324, required: true, validate: RED.validators.number() },
+            segment: { value: 0, validate: RED.validators.number() },
+            clearAll: { value: false }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-eraser",
+        label: function() {
+            return this.name || (this.clearAll ? "Clear All" : `Clear Seg${this.segment}`);
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
         }
     });
 </script>
 
-<script type="text/html" data-template-name="led-matrix">
+<!-- ========================================================================
+     LED Matrix Text Node Template
+     ======================================================================== -->
+<script type="text/html" data-template-name="led-matrix-text">
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="LED Matrix">
+        <input type="text" id="node-input-name" placeholder="Segment 0 Text">
     </div>
     
     <div class="form-row">
         <label for="node-input-ip"><i class="fa fa-globe"></i> IP Address</label>
-        <input type="text" id="node-input-ip" placeholder="192.168.1.100">
+        <input type="text" id="node-input-ip" placeholder="10.1.1.24">
     </div>
     
     <div class="form-row">
@@ -91,286 +122,264 @@
     <hr>
     
     <div class="form-row">
-        <label for="node-input-command"><i class="fa fa-cog"></i> Command</label>
-        <select id="node-input-command">
-            <option value="text">Text - Display text on segment</option>
-            <option value="clear">Clear - Clear specific segment</option>
-            <option value="clear_all">Clear All - Clear entire display</option>
-            <option value="brightness">Brightness - Set display brightness</option>
-            <option value="layout">Layout - Apply layout preset</option>
-            <option value="orientation">Orientation - Set landscape/portrait</option>
-            <option value="group">Group - Set group assignment</option>
-            <option value="config">Config - Manual segment configuration</option>
+        <label for="node-input-segment"><i class="fa fa-th-large"></i> Segment (0-3)</label>
+        <select id="node-input-segment">
+            <option value="0">0 - Segment 1</option>
+            <option value="1">1 - Segment 2</option>
+            <option value="2">2 - Segment 3</option>
+            <option value="3">3 - Segment 4</option>
         </select>
     </div>
     
-    <!-- Text Command Parameters -->
-    <div id="text-params" class="param-section">
-        <hr>
-        <h4 style="margin: 10px 0;">Text Parameters</h4>
-        
-        <div class="form-row">
-            <label for="node-input-segment"><i class="fa fa-th-large"></i> Segment (0-3)</label>
-            <input type="number" id="node-input-segment" min="0" max="3" placeholder="0">
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-text"><i class="fa fa-font"></i> Text</label>
-            <input type="text" id="node-input-text" placeholder="Hello World">
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-color"><i class="fa fa-tint"></i> Text Color</label>
-            <input type="text" id="node-input-color" placeholder="FFFFFF" style="width: 120px;">
-            <input type="color" id="color-picker" style="width: 60px; margin-left: 10px;">
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-bgcolor"><i class="fa fa-square"></i> Background</label>
-            <input type="text" id="node-input-bgcolor" placeholder="000000" style="width: 120px;">
-            <input type="color" id="bgcolor-picker" style="width: 60px; margin-left: 10px;">
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-font"><i class="fa fa-font"></i> Font</label>
-            <select id="node-input-font">
-                <option value="arial">Arial</option>
-                <option value="mono">Monospace</option>
-            </select>
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-size"><i class="fa fa-text-height"></i> Size</label>
-            <input type="text" id="node-input-size" placeholder="auto">
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-align"><i class="fa fa-align-center"></i> Alignment</label>
-            <select id="node-input-align">
-                <option value="L">Left</option>
-                <option value="C">Center</option>
-                <option value="R">Right</option>
-            </select>
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-effect"><i class="fa fa-magic"></i> Effect</label>
-            <select id="node-input-effect">
-                <option value="none">None</option>
-                <option value="scroll">Scroll</option>
-                <option value="fade">Fade</option>
-            </select>
-        </div>
-        
-        <div class="form-row">
-            <label for="node-input-intensity"><i class="fa fa-adjust"></i> Intensity (0-255)</label>
-            <input type="number" id="node-input-intensity" min="0" max="255" placeholder="255">
-        </div>
+    <div class="form-row">
+        <label for="node-input-color"><i class="fa fa-tint"></i> Text Color</label>
+        <input type="text" id="node-input-color" placeholder="FFFFFF" style="width: 120px;">
+        <input type="color" id="text-color-picker" style="width: 60px; margin-left: 10px;">
     </div>
     
-    <!-- Segment Parameter (for clear command) -->
-    <div id="segment-param" class="param-section" style="display:none;">
-        <hr>
-        <div class="form-row">
-            <label for="node-input-segment-clear"><i class="fa fa-th-large"></i> Segment (0-3)</label>
-            <input type="number" id="node-input-segment-clear" min="0" max="3" placeholder="0">
-        </div>
+    <div class="form-row">
+        <label for="node-input-bgcolor"><i class="fa fa-square"></i> Background</label>
+        <input type="text" id="node-input-bgcolor" placeholder="000000" style="width: 120px;">
+        <input type="color" id="text-bgcolor-picker" style="width: 60px; margin-left: 10px;">
     </div>
     
-    <!-- Brightness Parameter -->
-    <div id="brightness-param" class="param-section" style="display:none;">
-        <hr>
-        <div class="form-row">
-            <label for="node-input-brightness"><i class="fa fa-sun-o"></i> Brightness (0-255)</label>
-            <input type="number" id="node-input-brightness" min="0" max="255" placeholder="128">
-        </div>
+    <div class="form-row">
+        <label for="node-input-font"><i class="fa fa-font"></i> Font</label>
+        <select id="node-input-font">
+            <option value="arial">Arial</option>
+            <option value="mono">Monospace</option>
+        </select>
     </div>
     
-    <!-- Layout Parameter -->
-    <div id="layout-param" class="param-section" style="display:none;">
-        <hr>
-        <div class="form-row">
-            <label for="node-input-preset"><i class="fa fa-th"></i> Preset</label>
-            <select id="node-input-preset">
-                <option value="1">1 - Fullscreen</option>
-                <option value="2">2 - Top / Bottom</option>
-                <option value="3">3 - Left / Right</option>
-                <option value="4">4 - Triple Left</option>
-                <option value="5">5 - Triple Right</option>
-                <option value="6">6 - Thirds (Columns)</option>
-                <option value="7">7 - Quad View</option>
-                <option value="11">11 - Fullscreen Segment 1</option>
-                <option value="12">12 - Fullscreen Segment 2</option>
-                <option value="13">13 - Fullscreen Segment 3</option>
-                <option value="14">14 - Fullscreen Segment 4</option>
-            </select>
-        </div>
+    <div class="form-row">
+        <label for="node-input-align"><i class="fa fa-align-center"></i> Alignment</label>
+        <select id="node-input-align">
+            <option value="L">Left</option>
+            <option value="C">Center</option>
+            <option value="R">Right</option>
+        </select>
     </div>
     
-    <!-- Orientation Parameter -->
-    <div id="orientation-param" class="param-section" style="display:none;">
-        <hr>
-        <div class="form-row">
-            <label for="node-input-orientation"><i class="fa fa-rotate-right"></i> Orientation</label>
-            <select id="node-input-orientation">
-                <option value="landscape">Landscape (64×32)</option>
-                <option value="portrait">Portrait (32×64)</option>
-            </select>
-        </div>
-    </div>
-    
-    <!-- Group Parameter -->
-    <div id="group-param" class="param-section" style="display:none;">
-        <hr>
-        <div class="form-row">
-            <label for="node-input-group"><i class="fa fa-users"></i> Group (0-8)</label>
-            <select id="node-input-group">
-                <option value="0">0 - None (All)</option>
-                <option value="1">1 - White</option>
-                <option value="2">2 - Yellow</option>
-                <option value="3">3 - Orange</option>
-                <option value="4">4 - Red</option>
-                <option value="5">5 - Magenta</option>
-                <option value="6">6 - Blue</option>
-                <option value="7">7 - Cyan</option>
-                <option value="8">8 - Green</option>
-            </select>
-        </div>
-    </div>
-    
-    <!-- Config Parameters -->
-    <div id="config-params" class="param-section" style="display:none;">
-        <hr>
-        <h4 style="margin: 10px 0;">Manual Segment Configuration</h4>
-        <p style="color: #999; font-size: 12px; margin: 5px 0 15px 0;">
-            Override msg properties: x, y, w, h, segment
-        </p>
+    <div class="form-row">
+        <label for="node-input-intensity"><i class="fa fa-adjust"></i> Intensity (0-255)</label>
+        <input type="number" id="node-input-intensity" min="0" max="255" placeholder="255">
     </div>
 </script>
 
-<script type="text/html" data-help-name="led-matrix">
-    <p>Controls a 64×32 RGB LED Matrix panel via UDP commands.</p>
+<script type="text/html" data-help-name="led-matrix-text">
+    <p>Display text on a specific LED Matrix segment.</p>
     
     <h3>Inputs</h3>
     <dl class="message-properties">
-        <dt>payload <span class="property-type">string | number</span></dt>
-        <dd>For text command: the text to display. For brightness/layout: the value.</dd>
-        
-        <dt class="optional">command <span class="property-type">string</span></dt>
-        <dd>Override the configured command type.</dd>
-        
-        <dt class="optional">ip <span class="property-type">string</span></dt>
-        <dd>Override the target IP address.</dd>
-        
-        <dt class="optional">port <span class="property-type">number</span></dt>
-        <dd>Override the target UDP port.</dd>
+        <dt>payload <span class="property-type">string</span></dt>
+        <dd>The text to display on the matrix.</dd>
         
         <dt class="optional">segment <span class="property-type">number</span></dt>
-        <dd>Segment number (0-3) for text/clear/config commands.</dd>
+        <dd>Segment number (0-3). Overrides node configuration.</dd>
         
         <dt class="optional">color <span class="property-type">string</span></dt>
-        <dd>Text color in hex format (FFFFFF or #FFFFFF).</dd>
-        
-        <dt class="optional">bgcolor <span class="property-type">string</span></dt>
-        <dd>Background color in hex format.</dd>
-        
-        <dt class="optional">Other properties</span></dt>
-        <dd>font, size, align, effect, intensity, preset, brightness, orientation, group</dd>
+        <dd>Text color in hex (FFFFFF or #FFFFFF).</dd>
     </dl>
-    
-    <h3>Outputs</h3>
-    <dl class="message-properties">
-        <dt>ledmatrix <span class="property-type">object</span></dt>
-        <dd>Object containing the sent command, IP, and port.</dd>
-    </dl>
-    
-    <h3>Commands</h3>
-    <dl>
-        <dt>text</dt>
-        <dd>Display text on a specific segment with customizable styling.</dd>
-        
-        <dt>clear</dt>
-        <dd>Clear a specific segment.</dd>
-        
-        <dt>clear_all</dt>
-        <dd>Clear the entire display.</dd>
-        
-        <dt>brightness</dt>
-        <dd>Set the display brightness (0-255).</dd>
-        
-        <dt>layout</dt>
-        <dd>Apply a layout preset (1-7, 11-14).</dd>
-        
-        <dt>orientation</dt>
-        <dd>Set display orientation (landscape or portrait).</dd>
-        
-        <dt>group</dt>
-        <dd>Assign display to a group (0-8, where 0 = all).</dd>
-        
-        <dt>config</dt>
-        <dd>Manual segment configuration (x, y, width, height).</dd>
-    </dl>
-    
-    <h3>Layout Presets</h3>
-    <ul>
-        <li><strong>1</strong> - Fullscreen (64×32)</li>
-        <li><strong>2</strong> - Top / Bottom halves</li>
-        <li><strong>3</strong> - Left / Right halves</li>
-        <li><strong>4</strong> - Triple Left (left half + 2 right quarters)</li>
-        <li><strong>5</strong> - Triple Right (2 left quarters + right half)</li>
-        <li><strong>6</strong> - Thirds (21px | 21px | 22px columns)</li>
-        <li><strong>7</strong> - Quad View (4 equal segments)</li>
-        <li><strong>11-14</strong> - Fullscreen single segment (1-4)</li>
-    </ul>
-    
-    <h3>Examples</h3>
-    <h4>Display Text</h4>
-    <pre>msg.payload = "Hello World";
-msg.segment = 0;
-msg.color = "00FF00";
-return msg;</pre>
-    
-    <h4>Set Brightness</h4>
-    <pre>msg.command = "brightness";
-msg.payload = 128;
-return msg;</pre>
-    
-    <h4>Apply Layout</h4>
-    <pre>msg.command = "layout";
-msg.preset = 7; // Quad view
-return msg;</pre>
     
     <h3>Details</h3>
-    <p>This node sends UDP JSON commands to an LED Matrix controller running on a Raspberry Pi. 
-    It is fully compatible with the QSYS LED Matrix plugin and supports all the same commands 
-    and parameters.</p>
+    <p>Simply send text as <code>msg.payload</code> to display it on the configured segment.</p>
     
-    <p>The node can be configured with default values, or all parameters can be overridden via 
-    incoming message properties.</p>
+    <h3>Examples</h3>
+    <pre>msg.payload = "Hello World";</pre>
+    <pre>msg.payload = "Temp: 22°C";
+msg.color = "00FF00";  // Green</pre>
 </script>
 
+<!-- ========================================================================
+     LED Matrix Layout Node Template
+     ======================================================================== -->
+<script type="text/html" data-template-name="led-matrix-layout">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Quad View">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-ip"><i class="fa fa-globe"></i> IP Address</label>
+        <input type="text" id="node-input-ip" placeholder="10.1.1.24">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-port"><i class="fa fa-plug"></i> UDP Port</label>
+        <input type="number" id="node-input-port" placeholder="21324" min="1" max="65535">
+    </div>
+    
+    <hr>
+    
+    <div class="form-row">
+        <label for="node-input-preset"><i class="fa fa-th"></i> Layout Preset</label>
+        <select id="node-input-preset">
+            <option value="1">1 - Fullscreen</option>
+            <option value="2">2 - Top / Bottom</option>
+            <option value="3">3 - Left / Right</option>
+            <option value="4">4 - Triple Left</option>
+            <option value="5">5 - Triple Right</option>
+            <option value="6">6 - Thirds (Columns)</option>
+            <option value="7">7 - Quad View</option>
+            <option value="11">11 - Fullscreen Segment 1</option>
+            <option value="12">12 - Fullscreen Segment 2</option>
+            <option value="13">13 - Fullscreen Segment 3</option>
+            <option value="14">14 - Fullscreen Segment 4</option>
+        </select>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="led-matrix-layout">
+    <p>Apply a layout preset to the LED Matrix display.</p>
+    
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">layout <span class="property-type">number</span></dt>
+        <dd>Layout preset number (1-7, 11-14). Overrides node configuration.</dd>
+        
+        <dt class="optional">payload <span class="property-type">number</span></dt>
+        <dd>Alternative way to specify layout preset.</dd>
+    </dl>
+    
+    <h3>Details</h3>
+    <p>Trigger with any message to apply the configured layout, or send <code>msg.layout</code> to dynamically choose the layout.</p>
+    
+    <h3>Examples</h3>
+    <pre>msg.layout = 7;  // Quad view</pre>
+    <pre>msg.layout = 1;  // Fullscreen</pre>
+</script>
+
+<!-- ========================================================================
+     LED Matrix Brightness Node Template
+     ======================================================================== -->
+<script type="text/html" data-template-name="led-matrix-brightness">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Brightness">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-ip"><i class="fa fa-globe"></i> IP Address</label>
+        <input type="text" id="node-input-ip" placeholder="10.1.1.24">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-port"><i class="fa fa-plug"></i> UDP Port</label>
+        <input type="number" id="node-input-port" placeholder="21324" min="1" max="65535">
+    </div>
+    
+    <hr>
+    
+    <div class="form-row">
+        <label for="node-input-brightness"><i class="fa fa-sun-o"></i> Brightness (0-255)</label>
+        <input type="number" id="node-input-brightness" min="0" max="255" placeholder="128">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="led-matrix-brightness">
+    <p>Set the LED Matrix display brightness.</p>
+    
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">brightness <span class="property-type">number</span></dt>
+        <dd>Brightness value (0-255). Overrides node configuration.</dd>
+        
+        <dt class="optional">payload <span class="property-type">number</span></dt>
+        <dd>Alternative way to specify brightness.</dd>
+    </dl>
+    
+    <h3>Examples</h3>
+    <pre>msg.brightness = 255;  // Max</pre>
+    <pre>msg.payload = 128;     // 50%</pre>
+</script>
+
+<!-- ========================================================================
+     LED Matrix Clear Node Template
+     ======================================================================== -->
+<script type="text/html" data-template-name="led-matrix-clear">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Clear Display">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-ip"><i class="fa fa-globe"></i> IP Address</label>
+        <input type="text" id="node-input-ip" placeholder="10.1.1.24">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-port"><i class="fa fa-plug"></i> UDP Port</label>
+        <input type="number" id="node-input-port" placeholder="21324" min="1" max="65535">
+    </div>
+    
+    <hr>
+    
+    <div class="form-row">
+        <label for="node-input-clearAll">&nbsp;</label>
+        <input type="checkbox" id="node-input-clearAll" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-clearAll" style="width: 70%;">Clear entire display (all segments)</label>
+    </div>
+    
+    <div class="form-row" id="segment-row">
+        <label for="node-input-segment"><i class="fa fa-th-large"></i> Segment (0-3)</label>
+        <select id="node-input-segment">
+            <option value="0">0 - Segment 1</option>
+            <option value="1">1 - Segment 2</option>
+            <option value="2">2 - Segment 3</option>
+            <option value="3">3 - Segment 4</option>
+        </select>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="led-matrix-clear">
+    <p>Clear a specific segment or the entire LED Matrix display.</p>
+    
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">clearAll <span class="property-type">boolean</span></dt>
+        <dd>If true, clears entire display. Overrides node configuration.</dd>
+        
+        <dt class="optional">segment <span class="property-type">number</span></dt>
+        <dd>Segment number (0-3) to clear. Overrides node configuration.</dd>
+    </dl>
+    
+    <h3>Examples</h3>
+    <pre>msg.clearAll = true;  // Clear all</pre>
+    <pre>msg.segment = 2;      // Clear segment 2</pre>
+</script>
+
+<!-- Color picker sync for text node -->
 <script type="text/javascript">
-    // Color picker sync
     $(document).ready(function() {
-        $('#color-picker').on('change', function() {
+        // Text node color pickers
+        $('#text-color-picker').on('change', function() {
             $('#node-input-color').val($(this).val().substring(1).toUpperCase());
         });
         
-        $('#bgcolor-picker').on('change', function() {
+        $('#text-bgcolor-picker').on('change', function() {
             $('#node-input-bgcolor').val($(this).val().substring(1).toUpperCase());
         });
         
         $('#node-input-color').on('change', function() {
             const val = $(this).val().replace('#', '');
             if (val.length === 6) {
-                $('#color-picker').val('#' + val);
+                $('#text-color-picker').val('#' + val);
             }
         });
         
         $('#node-input-bgcolor').on('change', function() {
             const val = $(this).val().replace('#', '');
             if (val.length === 6) {
-                $('#bgcolor-picker').val('#' + val);
+                $('#text-bgcolor-picker').val('#' + val);
+            }
+        });
+
+        // Clear node: show/hide segment selector based on clearAll checkbox
+        $('#node-input-clearAll').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#segment-row').hide();
+            } else {
+                $('#segment-row').show();
             }
         });
     });

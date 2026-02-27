@@ -1,0 +1,451 @@
+[
+    {
+        "id": "simplified-tab",
+        "type": "tab",
+        "label": "LED Matrix - Simplified Examples",
+        "disabled": false,
+        "info": "Simplified node examples with dedicated nodes per function"
+    },
+    {
+        "id": "inject-hello",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "Say Hello",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "Hello World",
+        "payloadType": "str",
+        "x": 120,
+        "y": 80,
+        "wires": [
+            [
+                "text-seg0"
+            ]
+        ]
+    },
+    {
+        "id": "text-seg0",
+        "type": "led-matrix-text",
+        "z": "simplified-tab",
+        "name": "Segment 0",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 0,
+        "color": "00FF00",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "x": 320,
+        "y": 80,
+        "wires": [[]]
+    },
+    {
+        "id": "inject-clock",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "Every 1 sec",
+        "props": [],
+        "repeat": "1",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 160,
+        "wires": [
+            [
+                "format-time"
+            ]
+        ]
+    },
+    {
+        "id": "format-time",
+        "type": "function",
+        "z": "simplified-tab",
+        "name": "Format Time",
+        "func": "msg.payload = new Date().toLocaleTimeString('en-US', {\n    hour: '2-digit',\n    minute: '2-digit',\n    second: '2-digit',\n    hour12: false\n});\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 310,
+        "y": 160,
+        "wires": [
+            [
+                "text-clock"
+            ]
+        ]
+    },
+    {
+        "id": "text-clock",
+        "type": "led-matrix-text",
+        "z": "simplified-tab",
+        "name": "Clock",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 0,
+        "color": "00FFFF",
+        "bgcolor": "000000",
+        "font": "mono",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "x": 490,
+        "y": 160,
+        "wires": [[]]
+    },
+    {
+        "id": "inject-quad",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "Quad View",
+        "props": [
+            {
+                "p": "layout",
+                "v": "7",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 260,
+        "wires": [
+            [
+                "layout-node"
+            ]
+        ]
+    },
+    {
+        "id": "inject-fullscreen",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "Fullscreen",
+        "props": [
+            {
+                "p": "layout",
+                "v": "1",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 300,
+        "wires": [
+            [
+                "layout-node"
+            ]
+        ]
+    },
+    {
+        "id": "layout-node",
+        "type": "led-matrix-layout",
+        "z": "simplified-tab",
+        "name": "Apply Layout",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "preset": 1,
+        "x": 330,
+        "y": 280,
+        "wires": [[]]
+    },
+    {
+        "id": "inject-bright",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "100% Bright",
+        "props": [
+            {
+                "p": "brightness",
+                "v": "255",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 380,
+        "wires": [
+            [
+                "brightness-node"
+            ]
+        ]
+    },
+    {
+        "id": "inject-dim",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "50% Bright",
+        "props": [
+            {
+                "p": "brightness",
+                "v": "128",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 420,
+        "wires": [
+            [
+                "brightness-node"
+            ]
+        ]
+    },
+    {
+        "id": "brightness-node",
+        "type": "led-matrix-brightness",
+        "z": "simplified-tab",
+        "name": "Set Brightness",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "brightness": 128,
+        "x": 350,
+        "y": 400,
+        "wires": [[]]
+    },
+    {
+        "id": "inject-4seg",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "4 Segments",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 520,
+        "wires": [
+            [
+                "seg0-text",
+                "seg1-text",
+                "seg2-text",
+                "seg3-text"
+            ]
+        ]
+    },
+    {
+        "id": "seg0-text",
+        "type": "led-matrix-text",
+        "z": "simplified-tab",
+        "name": "Seg 0",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 0,
+        "color": "FF0000",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "x": 310,
+        "y": 500,
+        "wires": [[]]
+    },
+    {
+        "id": "seg1-text",
+        "type": "led-matrix-text",
+        "z": "simplified-tab",
+        "name": "Seg 1",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 1,
+        "color": "00FF00",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "x": 310,
+        "y": 540,
+        "wires": [[]]
+    },
+    {
+        "id": "seg2-text",
+        "type": "led-matrix-text",
+        "z": "simplified-tab",
+        "name": "Seg 2",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 2,
+        "color": "0000FF",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "x": 310,
+        "y": 580,
+        "wires": [[]]
+    },
+    {
+        "id": "seg3-text",
+        "type": "led-matrix-text",
+        "z": "simplified-tab",
+        "name": "Seg 3",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 3,
+        "color": "FFFF00",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "x": 310,
+        "y": 620,
+        "wires": [[]]
+    },
+    {
+        "id": "inject-clear",
+        "type": "inject",
+        "z": "simplified-tab",
+        "name": "Clear All",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 700,
+        "wires": [
+            [
+                "clear-node"
+            ]
+        ]
+    },
+    {
+        "id": "clear-node",
+        "type": "led-matrix-clear",
+        "z": "simplified-tab",
+        "name": "Clear Display",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "segment": 0,
+        "clearAll": true,
+        "x": 310,
+        "y": 700,
+        "wires": [[]]
+    },
+    {
+        "id": "comment-seg0",
+        "type": "comment",
+        "z": "simplified-tab",
+        "name": "Simple text display",
+        "info": "",
+        "x": 140,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "comment-clock",
+        "type": "comment",
+        "z": "simplified-tab",
+        "name": "Real-time clock",
+        "info": "",
+        "x": 130,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "comment-layout",
+        "type": "comment",
+        "z": "simplified-tab",
+        "name": "Layout switching with msg.layout",
+        "info": "",
+        "x": 180,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "comment-bright",
+        "type": "comment",
+        "z": "simplified-tab",
+        "name": "Brightness control with msg.brightness",
+        "info": "",
+        "x": 200,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "comment-multi",
+        "type": "comment",
+        "z": "simplified-tab",
+        "name": "Multiple segments at once",
+        "info": "",
+        "x": 160,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "comment-clear",
+        "type": "comment",
+        "z": "simplified-tab",
+        "name": "Clear display",
+        "info": "",
+        "x": 120,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "change-seg0",
+        "type": "change",
+        "z": "simplified-tab",
+        "name": "Text: Seg 0",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "Seg 0",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 310,
+        "y": 500,
+        "wires": [
+            [
+                "seg0-text"
+            ]
+        ]
+    }
+]

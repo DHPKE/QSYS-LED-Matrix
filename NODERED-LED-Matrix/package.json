@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-led-matrix",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Node-RED node for controlling 64x32 RGB LED Matrix panels via UDP (compatible with QSYS-LED-Matrix RPi controller)",
   "keywords": [
     "node-red",
@@ -19,7 +19,10 @@
   },
   "node-red": {
     "nodes": {
-      "led-matrix": "led-matrix.js"
+      "led-matrix-text": "led-matrix.js",
+      "led-matrix-layout": "led-matrix.js",
+      "led-matrix-brightness": "led-matrix.js",
+      "led-matrix-clear": "led-matrix.js"
     }
   },
   "dependencies": {},
