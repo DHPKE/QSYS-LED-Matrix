@@ -12,7 +12,10 @@
 #   3. Clone and build rpi-rgb-led-matrix library
 #   4. Install Python bindings
 #   5. Copy app files to /opt/led-matrix
-#   6. Install and enable the systemd service
+#   6. Configure network fallback IP (dhcpcd.conf)
+#   7. Install network configuration helper script
+#   8. Configure sudoers for daemon user
+#   9. Install and enable the systemd service
 
 set -e
 
@@ -33,7 +36,7 @@ if [ "$EUID" -eq 0 ]; then
 fi
 
 # ── 0. Pre-flight ──────────────────────────────────────────────────────────
-echo "[0/6] Pre-flight checks..."
+echo "[0/9] Pre-flight checks..."
 
 # Detect hardware model
 if [ -f /proc/device-tree/model ]; then
@@ -59,7 +62,7 @@ echo ""
 # The Pi on-board sound driver (snd_bcm2835) claims the same peripheral and
 # causes the library to hard-exit unless disable_hardware_pulsing is set.
 # Blacklisting the module allows hardware-timed (better quality) OE-.
-echo "[1/6] Blacklisting snd_bcm2835 (on-board sound conflicts with LED matrix PWM)..."
+echo "[1/9] Blacklisting snd_bcm2835 (on-board sound conflicts with LED matrix PWM)..."
 cat <<'EOF' | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf > /dev/null
 # Blacklisted by led-matrix install.sh — conflicts with rpi-rgb-led-matrix PWM
 blacklist snd_bcm2835
@@ -82,7 +85,7 @@ echo "  ✓ snd_bcm2835 blacklisted (reboot to fully apply)"
 echo ""
 
 # ── 2. System packages ─────────────────────────────────────────────────────
-echo "[2/6] Installing system packages..."
+echo "[2/9] Installing system packages..."
 sudo apt-get update -qq
 sudo apt-get install -y \
     python3 \
@@ -100,7 +103,7 @@ echo "  ✓ Dependencies installed"
 echo ""
 
 # ── 3. Clone / update rpi-rgb-led-matrix ──────────────────────────────────
-echo "[3/6] Installing rpi-rgb-led-matrix library..."
+echo "[3/9] Installing rpi-rgb-led-matrix library..."
 
 if [ -d ~/rpi-rgb-led-matrix ]; then
     echo "  ℹ  Library already exists at ~/rpi-rgb-led-matrix"
@@ -134,7 +137,7 @@ fi
 echo ""
 
 # ── 4. Compile library + Python bindings ──────────────────────────────────
-echo "[4/6] Compiling library (takes 2-3 minutes on Pi Zero 2 W)..."
+echo "[4/9] Compiling library (takes 2-3 minutes on Pi Zero 2 W)..."
 cd ~/rpi-rgb-led-matrix
 
 # Ensure we're in the right place
@@ -201,14 +204,123 @@ echo "  ✓ Python bindings installed"
 echo ""
 
 # ── 5. Copy app files ──────────────────────────────────────────────────────
-echo "[5/6] Copying application files to /opt/led-matrix..."
+echo "[5/9] Copying application files to /opt/led-matrix..."
 sudo mkdir -p /opt/led-matrix
 sudo cp "$SCRIPT_DIR"/*.py /opt/led-matrix/
 echo "  ✓ Files copied"
 echo ""
 
-# ── 6. Systemd service ─────────────────────────────────────────────────────
-echo "[6/6] Installing systemd service..."
+# ── 6. Configure network fallback IP ──────────────────────────────────────
+echo "[6/9] Configuring network fallback IP (dhcpcd.conf)..."
+
+# Backup dhcpcd.conf if not already backed up
+if [ -f /etc/dhcpcd.conf ] && [ ! -f /etc/dhcpcd.conf.backup ]; then
+    sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup
+    echo "  ✓ Created backup: /etc/dhcpcd.conf.backup"
+fi
+
+# Check if fallback profile already exists
+if sudo grep -q "profile static_fallback" /etc/dhcpcd.conf 2>/dev/null; then
+    echo "  ℹ  Fallback IP profile already configured in dhcpcd.conf"
+else
+    echo "  Adding fallback IP configuration..."
+    cat <<'DHCPCD_EOF' | sudo tee -a /etc/dhcpcd.conf > /dev/null
+
+# LED Matrix fallback static IP (added by install.sh)
+# Applied automatically if DHCP fails on eth0
+profile static_fallback
+static ip_address=10.20.30.40/24
+static routers=10.20.30.1
+static domain_name_servers=8.8.8.8
+
+interface eth0
+fallback static_fallback
+DHCPCD_EOF
+    echo "  ✓ Fallback IP configured: 10.20.30.40/24"
+fi
+echo ""
+
+# ── 7. Install network configuration helper ──────────────────────────────
+echo "[7/9] Installing network configuration helper..."
+
+# Copy network-config.sh helper
+if [ -f "$SCRIPT_DIR/network-config.sh" ]; then
+    sudo cp "$SCRIPT_DIR/network-config.sh" /opt/led-matrix/
+    sudo chmod +x /opt/led-matrix/network-config.sh
+    echo "  ✓ network-config.sh installed"
+else
+    echo "  ⚠  network-config.sh not found in source directory"
+    echo "  Creating default network-config.sh..."
+    
+    cat <<'NETCONFIG_EOF' | sudo tee /opt/led-matrix/network-config.sh > /dev/null
+#!/bin/bash
+# Network configuration helper for LED Matrix WebUI
+# Called via sudo by daemon user to modify network settings
+
+set -e
+
+MODE="$1"
+IP="$2"
+SUBNET="${3:-24}"
+
+case "$MODE" in
+    dhcp)
+        # Remove static configuration, enable DHCP
+        sudo sed -i '/^interface eth0$/,/^$/d' /etc/dhcpcd.conf
+        echo "DHCP enabled on eth0"
+        sudo systemctl restart dhcpcd
+        ;;
+    static)
+        # Validate inputs
+        if [[ ! "$IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "Error: Invalid IP address format"
+            exit 1
+        fi
+        if [[ ! "$SUBNET" =~ ^[0-9]{1,2}$ ]] || [ "$SUBNET" -lt 8 ] || [ "$SUBNET" -gt 30 ]; then
+            echo "Error: Invalid subnet (must be 8-30)"
+            exit 1
+        fi
+        
+        # Remove existing eth0 configuration
+        sudo sed -i '/^interface eth0$/,/^$/d' /etc/dhcpcd.conf
+        
+        # Add new static configuration
+        cat << EOF | sudo tee -a /etc/dhcpcd.conf > /dev/null
+
+interface eth0
+static ip_address=${IP}/${SUBNET}
+EOF
+        echo "Static IP configured: ${IP}/${SUBNET}"
+        sudo systemctl restart dhcpcd
+        ;;
+    *)
+        echo "Usage: $0 {dhcp|static} [ip] [subnet]"
+        exit 1
+        ;;
+esac
+NETCONFIG_EOF
+
+    sudo chmod +x /opt/led-matrix/network-config.sh
+    echo "  ✓ Default network-config.sh created"
+fi
+echo ""
+
+# ── 8. Configure sudoers for daemon user ──────────────────────────────────
+echo "[8/9] Configuring sudoers for network configuration..."
+
+SUDOERS_FILE="/etc/sudoers.d/led-matrix"
+
+if [ -f "$SUDOERS_FILE" ]; then
+    echo "  ℹ  Sudoers configuration already exists"
+else
+    echo "daemon ALL=(ALL) NOPASSWD: /opt/led-matrix/network-config.sh" | sudo tee "$SUDOERS_FILE" > /dev/null
+    sudo chmod 0440 "$SUDOERS_FILE"
+    echo "  ✓ Sudoers configured for daemon user"
+fi
+echo ""
+
+# ── 9. Systemd service ─────────────────────────────────────────────────────
+echo "[9/9] Installing systemd service..."
 sudo mkdir -p /var/lib/led-matrix
 sudo cp "$SCRIPT_DIR/led-matrix.service" /etc/systemd/system/led-matrix.service
 sudo systemctl daemon-reload
@@ -230,6 +342,14 @@ echo "========================================="
 echo "Installation complete!"
 echo "========================================="
 echo ""
+echo "Features configured:"
+echo "  ✅ LED Matrix display driver"
+echo "  ✅ UDP control (port 21324)"
+echo "  ✅ Web UI (port 8080)"
+echo "  ✅ Network fallback IP: 10.20.30.40/24"
+echo "  ✅ Network configuration via WebUI"
+echo "  ✅ Dynamic IP display on panel"
+echo ""
 echo "Current stable configuration (config.py):"
 echo "  - gpio_slowdown: 2 (balanced ~250-300Hz refresh)"
 echo "  - PWM bits: 7 (128 color levels)"
@@ -237,14 +357,30 @@ echo "  - Scan mode: 0 (progressive)"
 echo "  - Font threshold: 128 (sharp, no anti-aliasing)"
 echo "  - Hardware: RPi 4 / RPi Zero 2 W compatible"
 echo ""
-echo "Check status:   sudo systemctl status led-matrix"
-echo "View logs:      sudo journalctl -u led-matrix -f"
-echo "Stop:           sudo systemctl stop led-matrix"
-echo "Web UI:         http://$(hostname -I | awk '{print $1}'):8080/"
+echo "Network behavior:"
+echo "  - Panel shows IP address on startup"
+echo "  - Automatically updates if IP changes (DHCP)"
+echo "  - Fallback to 10.20.30.40 if no DHCP available"
 echo ""
-echo "NOTE: A reboot is recommended to fully apply the snd_bcm2835"
-echo "      blacklist and get hardware-timed PWM for best display quality."
+echo "Commands:"
+echo "  Status:    sudo systemctl status led-matrix"
+echo "  Logs:      sudo journalctl -u led-matrix -f"
+echo "  Stop:      sudo systemctl stop led-matrix"
+echo "  Restart:   sudo systemctl restart led-matrix"
 echo ""
-echo "For best signal quality, use an Adafruit HUB75 adapter with"
-echo "proper level shifting and quality ribbon cables."
+echo "Access:"
+echo "  Web UI:    http://$(hostname -I | awk '{print $1}'):8080/"
+echo "  UDP:       Send JSON to port 21324"
+echo ""
+echo "NOTE: A reboot is recommended to fully apply:"
+echo "      - snd_bcm2835 blacklist (hardware PWM)"
+echo "      - Network fallback configuration"
+echo ""
+echo "Reboot now? [y/N]"
+read -r REBOOT_CONFIRM
+if [[ "$REBOOT_CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Rebooting in 5 seconds... (Ctrl+C to cancel)"
+    sleep 5
+    sudo reboot
+fi
 echo ""
