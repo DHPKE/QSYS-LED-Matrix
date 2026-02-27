@@ -77,42 +77,34 @@ def _get_subnet_mask(iface: str = "eth0") -> str:
 
 def _configure_network(mode: str, ip: str = "", subnet: str = "24", gateway: str = "") -> dict:
     """
-    Configure network settings via dhcpcd.conf.
+    Configure network settings via helper script.
     mode: 'static' or 'dhcp'
     Returns: {status: 'ok'|'error', message: str, reboot_required: bool}
     """
     try:
+        script_path = "/opt/led-matrix/network-config.sh"
+        
         if mode == "dhcp":
-            # Remove static configuration from dhcpcd.conf
-            config_path = "/etc/dhcpcd.conf"
+            # Enable DHCP
+            result = subprocess.run(
+                ["sudo", script_path, "dhcp"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
             
-            # Read existing config
-            with open(config_path, 'r') as f:
-                lines = f.readlines()
-            
-            # Remove any existing static eth0 config
-            new_lines = []
-            skip = False
-            for line in lines:
-                if line.strip().startswith("# Static IP configuration") or \
-                   line.strip().startswith("interface eth0"):
-                    skip = True
-                    continue
-                if skip:
-                    if line.strip() and not line.startswith(" ") and not line.startswith("\t"):
-                        skip = False
-                if not skip:
-                    new_lines.append(line)
-            
-            # Write back
-            with open(config_path, 'w') as f:
-                f.writelines(new_lines)
-            
-            return {
-                "status": "ok",
-                "message": "DHCP enabled. Rebooting to apply changes...",
-                "reboot_required": True
-            }
+            if result.returncode == 0:
+                return {
+                    "status": "ok",
+                    "message": "DHCP enabled. Rebooting to apply changes...",
+                    "reboot_required": True
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to enable DHCP: {result.stderr}",
+                    "reboot_required": False
+                }
         
         elif mode == "static":
             if not ip or not subnet:
@@ -122,47 +114,31 @@ def _configure_network(mode: str, ip: str = "", subnet: str = "24", gateway: str
                     "reboot_required": False
                 }
             
-            # Calculate gateway (assumes .1 in the subnet)
+            # Calculate gateway if not provided
             if not gateway:
                 ip_parts = ip.rsplit('.', 1)
                 gateway = f"{ip_parts[0]}.1"
             
-            config_path = "/etc/dhcpcd.conf"
+            # Configure static IP
+            result = subprocess.run(
+                ["sudo", script_path, "static", ip, subnet, gateway],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
             
-            # Read existing config
-            with open(config_path, 'r') as f:
-                lines = f.readlines()
-            
-            # Remove any existing static eth0 config
-            new_lines = []
-            skip = False
-            for line in lines:
-                if line.strip().startswith("# Static IP configuration") or \
-                   line.strip().startswith("interface eth0"):
-                    skip = True
-                    continue
-                if skip:
-                    if line.strip() and not line.startswith(" ") and not line.startswith("\t"):
-                        skip = False
-                if not skip:
-                    new_lines.append(line)
-            
-            # Add new static config
-            new_lines.append("\n# Static IP configuration\n")
-            new_lines.append("interface eth0\n")
-            new_lines.append(f"static ip_address={ip}/{subnet}\n")
-            new_lines.append(f"static routers={gateway}\n")
-            new_lines.append("static domain_name_servers=8.8.8.8 1.1.1.1\n")
-            
-            # Write back
-            with open(config_path, 'w') as f:
-                f.writelines(new_lines)
-            
-            return {
-                "status": "ok",
-                "message": f"Static IP {ip}/{subnet} configured. Rebooting to apply changes...",
-                "reboot_required": True
-            }
+            if result.returncode == 0:
+                return {
+                    "status": "ok",
+                    "message": f"Static IP {ip}/{subnet} configured. Rebooting to apply changes...",
+                    "reboot_required": True
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to configure static IP: {result.stderr}",
+                    "reboot_required": False
+                }
         
         else:
             return {
@@ -171,6 +147,12 @@ def _configure_network(mode: str, ip: str = "", subnet: str = "24", gateway: str
                 "reboot_required": False
             }
     
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "error",
+            "message": "Network configuration timed out",
+            "reboot_required": False
+        }
     except Exception as e:
         logger.error(f"Network configuration failed: {e}")
         return {
