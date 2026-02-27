@@ -25,8 +25,8 @@
 
 PluginInfo = {
     Name = "LED~Display Controller SDK v2",
-    Version = "2.0.0",
-    Id = "pke.led.controller.sdk.2.0.0",
+    Version = "2.0.1",
+    Id = "pke.led.controller.sdk.2.0.1",
     Description = "T/E/A/C Series LED Controller with Groups, Frames & Curtain",
     ShowDebug = true,
     Author = "DHPKE"
@@ -561,26 +561,8 @@ if Controls then
         return packet
     end
     
-    local function SendInitialConfig()
-        print("=== Sending initial configuration ===")
-        SendScreenParameters()
-        SetBrightness(Controls.brightness.Value)
-        local rotation_map = {
-            ["0° (Normal)"] = 0, ["90° (Clockwise)"] = 90,
-            ["180° (Upside Down)"] = 180, ["270° (Counter-Clockwise)"] = 270
-        }
-        local angle = rotation_map[Controls.rotation.String] or 0
-        if angle ~= 0 then SetRotation(angle) end
-        for area = 1, 4 do
-            if Controls["area" .. area .. "_enable"].Boolean then
-                Timer.CallAfter(function() SendTextArea(area) end, 0.1 * area)
-            end
-        end
-        if Controls.clock_enable.Boolean  then Timer.CallAfter(SendClock,  0.5) end
-        if Controls.timer_enable.Boolean  then Timer.CallAfter(SendTimer,  0.6) end
-        if Controls.curtain_state.Boolean then Timer.CallAfter(SendCurtain,0.7) end
-        print("✓ Initial configuration sent")
-    end
+    -- Forward declaration — defined after all Send* functions below
+    local SendInitialConfig
 
     local function OpenSocket()
         if socket then
@@ -604,6 +586,18 @@ if Controls then
                     print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
                     -- Send initial config only once connection is confirmed
                     Timer.CallAfter(SendInitialConfig, 0.2)
+                    -- Keepalive: send a no-op brightness packet every 3s to prevent idle disconnect
+                    Timer.CallAfter(function()
+                        local function keepalive()
+                            if tcp_connected then
+                                local data = string.char(math.floor(Controls.brightness.Value))
+                                local pkt = BuildProtocolPacket(0x06, data)
+                                pcall(function() socket:Write(pkt) end)
+                                Timer.CallAfter(keepalive, 3)
+                            end
+                        end
+                        keepalive()
+                    end, 1.0)
                 end
 
                 socket.Closed = function(sock)
@@ -882,7 +876,30 @@ if Controls then
         local packet = BuildProtocolPacket(0x07, data)  -- Command 0x07 = Power Control
         SendData(packet)
     end
-    
+
+    -- Defined here so all Send* functions above are already in scope
+    SendInitialConfig = function()
+        print("=== Sending initial configuration ===")
+        SendScreenParameters()
+        SetBrightness(Controls.brightness.Value)
+        local rotation_map = {
+            ["0° (Normal)"] = 0, ["90° (Clockwise)"] = 90,
+            ["180° (Upside Down)"] = 180, ["270° (Counter-Clockwise)"] = 270
+        }
+        local angle = rotation_map[Controls.rotation.String] or 0
+        if angle ~= 0 then SetRotation(angle) end
+        for area = 1, 4 do
+            if Controls["area" .. area .. "_enable"].Boolean then
+                Timer.CallAfter(function() SendTextArea(area) end, 0.1 * area)
+            end
+        end
+        if Controls.clock_enable.Boolean  then Timer.CallAfter(SendClock,   0.5) end
+        if Controls.timer_enable.Boolean  then Timer.CallAfter(SendTimer,   0.6) end
+        if Controls.curtain_state.Boolean then Timer.CallAfter(SendCurtain, 0.7) end
+        Controls.last_command.String = "Connected - initial config sent"
+        print("✓ Initial configuration sent")
+    end
+
     local function Initialize()
         print("=== LED Display Controller SDK v2.0.0 Initializing ===")
         
