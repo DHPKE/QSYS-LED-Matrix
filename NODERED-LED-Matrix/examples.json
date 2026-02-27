@@ -1,0 +1,410 @@
+[
+    {
+        "id": "example-tab",
+        "type": "tab",
+        "label": "LED Matrix Examples",
+        "disabled": false,
+        "info": "Example flows for LED Matrix control"
+    },
+    {
+        "id": "simple-text",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Display 'Hello World'",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "Hello World",
+        "payloadType": "str",
+        "x": 140,
+        "y": 60,
+        "wires": [
+            [
+                "led-matrix-1"
+            ]
+        ]
+    },
+    {
+        "id": "led-matrix-1",
+        "type": "led-matrix",
+        "z": "example-tab",
+        "name": "LED Matrix",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "command": "text",
+        "segment": 0,
+        "text": "",
+        "color": "FFFFFF",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "preset": 1,
+        "brightness": 128,
+        "orientation": "landscape",
+        "group": 0,
+        "x": 370,
+        "y": 60,
+        "wires": [
+            [
+                "debug-1"
+            ]
+        ]
+    },
+    {
+        "id": "debug-1",
+        "type": "debug",
+        "z": "example-tab",
+        "name": "Debug Output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "ledmatrix",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "clock",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Every 1 second",
+        "props": [],
+        "repeat": "1",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 140,
+        "wires": [
+            [
+                "clock-function"
+            ]
+        ]
+    },
+    {
+        "id": "clock-function",
+        "type": "function",
+        "z": "example-tab",
+        "name": "Format Time",
+        "func": "const now = new Date();\nconst timeStr = now.toLocaleTimeString('en-US', {\n    hour: '2-digit',\n    minute: '2-digit',\n    second: '2-digit',\n    hour12: false\n});\n\nmsg.payload = timeStr;\nmsg.segment = 0;\nmsg.color = \"00FFFF\";\nmsg.align = \"C\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 330,
+        "y": 140,
+        "wires": [
+            [
+                "led-matrix-2"
+            ]
+        ]
+    },
+    {
+        "id": "led-matrix-2",
+        "type": "led-matrix",
+        "z": "example-tab",
+        "name": "Clock Display",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "command": "text",
+        "segment": 0,
+        "text": "",
+        "color": "00FFFF",
+        "bgcolor": "000000",
+        "font": "mono",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "preset": 1,
+        "brightness": 128,
+        "orientation": "landscape",
+        "group": 0,
+        "x": 540,
+        "y": 140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "brightness-50",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "50% Brightness",
+        "props": [
+            {
+                "p": "brightness",
+                "v": "128",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 220,
+        "wires": [
+            [
+                "led-matrix-brightness"
+            ]
+        ]
+    },
+    {
+        "id": "brightness-100",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "100% Brightness",
+        "props": [
+            {
+                "p": "brightness",
+                "v": "255",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 260,
+        "wires": [
+            [
+                "led-matrix-brightness"
+            ]
+        ]
+    },
+    {
+        "id": "led-matrix-brightness",
+        "type": "led-matrix",
+        "z": "example-tab",
+        "name": "Set Brightness",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "command": "brightness",
+        "segment": 0,
+        "text": "",
+        "color": "FFFFFF",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "preset": 1,
+        "brightness": 128,
+        "orientation": "landscape",
+        "group": 0,
+        "x": 380,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "layout-fullscreen",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Fullscreen",
+        "props": [
+            {
+                "p": "preset",
+                "v": "1",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 340,
+        "wires": [
+            [
+                "led-matrix-layout"
+            ]
+        ]
+    },
+    {
+        "id": "layout-quad",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Quad View",
+        "props": [
+            {
+                "p": "preset",
+                "v": "7",
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 380,
+        "wires": [
+            [
+                "led-matrix-layout"
+            ]
+        ]
+    },
+    {
+        "id": "led-matrix-layout",
+        "type": "led-matrix",
+        "z": "example-tab",
+        "name": "Apply Layout",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "command": "layout",
+        "segment": 0,
+        "text": "",
+        "color": "FFFFFF",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "preset": 1,
+        "brightness": 128,
+        "orientation": "landscape",
+        "group": 0,
+        "x": 370,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "multi-segment",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Trigger",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 110,
+        "y": 460,
+        "wires": [
+            [
+                "multi-segment-function"
+            ]
+        ]
+    },
+    {
+        "id": "multi-segment-function",
+        "type": "function",
+        "z": "example-tab",
+        "name": "4 Segments",
+        "func": "const colors = [\"FF0000\", \"00FF00\", \"0000FF\", \"FFFF00\"];\nconst messages = [];\n\nfor (let seg = 0; seg < 4; seg++) {\n    messages.push({\n        command: \"text\",\n        segment: seg,\n        payload: `Seg ${seg + 1}`,\n        color: colors[seg],\n        align: \"C\"\n    });\n}\n\nreturn [messages];",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 280,
+        "y": 460,
+        "wires": [
+            [
+                "led-matrix-multi"
+            ]
+        ]
+    },
+    {
+        "id": "led-matrix-multi",
+        "type": "led-matrix",
+        "z": "example-tab",
+        "name": "Multi Segment",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "command": "text",
+        "segment": 0,
+        "text": "",
+        "color": "FFFFFF",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "preset": 1,
+        "brightness": 128,
+        "orientation": "landscape",
+        "group": 0,
+        "x": 480,
+        "y": 460,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "clear-all",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Clear All",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 540,
+        "wires": [
+            [
+                "led-matrix-clear"
+            ]
+        ]
+    },
+    {
+        "id": "led-matrix-clear",
+        "type": "led-matrix",
+        "z": "example-tab",
+        "name": "Clear Display",
+        "ip": "10.1.1.24",
+        "port": "21324",
+        "command": "clear_all",
+        "segment": 0,
+        "text": "",
+        "color": "FFFFFF",
+        "bgcolor": "000000",
+        "font": "arial",
+        "size": "auto",
+        "align": "C",
+        "effect": "none",
+        "intensity": 255,
+        "preset": 1,
+        "brightness": 128,
+        "orientation": "landscape",
+        "group": 0,
+        "x": 360,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    }
+]
