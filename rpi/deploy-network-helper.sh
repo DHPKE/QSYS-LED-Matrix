@@ -21,15 +21,10 @@ sudo mv /tmp/network-config.sh /opt/led-matrix/
 sudo chmod +x /opt/led-matrix/network-config.sh
 sudo chown root:root /opt/led-matrix/network-config.sh
 
-# Add sudoers entry for the LED matrix service user to run this script
-SUDOERS_LINE="node ALL=(ALL) NOPASSWD: /opt/led-matrix/network-config.sh"
-if ! sudo grep -q "network-config.sh" /etc/sudoers.d/led-matrix 2>/dev/null; then
-    echo "$SUDOERS_LINE" | sudo tee /etc/sudoers.d/led-matrix > /dev/null
-    sudo chmod 0440 /etc/sudoers.d/led-matrix
-    echo "✓ Sudoers entry added"
-else
-    echo "✓ Sudoers entry already exists"
-fi
+# Add sudoers entry for the daemon user (LED matrix service runs as daemon)
+SUDOERS_LINE="daemon ALL=(ALL) NOPASSWD: /opt/led-matrix/network-config.sh"
+echo "$SUDOERS_LINE" | sudo tee /etc/sudoers.d/led-matrix > /dev/null
+sudo chmod 0440 /etc/sudoers.d/led-matrix
 
 # Verify sudoers syntax
 if ! sudo visudo -c -f /etc/sudoers.d/led-matrix; then
@@ -39,6 +34,7 @@ if ! sudo visudo -c -f /etc/sudoers.d/led-matrix; then
 fi
 
 echo "✓ Network helper installed successfully"
+echo "✓ Sudoers configured for daemon user"
 REMOTE_COMMANDS
 
 # Copy updated web_server.py
@@ -57,4 +53,5 @@ SSHPASS="$PI_PASS" sshpass -e ssh -o StrictHostKeyChecking=no ${PI_USER}@${PI_IP
 echo ""
 echo "✅ Deployment complete!"
 echo "   WebUI: http://${PI_IP}:8080"
-echo "   Network config now works with proper permissions"
+echo "   Network config now works with proper permissions (daemon user)"
+
