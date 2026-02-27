@@ -444,6 +444,7 @@ end
 -- ══════════════════════════════════════════════════════════════════
 if Controls then
     local socket = nil
+    local tcp_connected = false   -- true only after Connected callback fires
     local ip_addr = Properties["IP Address"].Value
     local port = Properties["Port"].Value          -- TCP port (default 10000)
     local udp_port = (Properties["UDP Port"] and Properties["UDP Port"].Value) or 9876
@@ -560,68 +561,98 @@ if Controls then
         return packet
     end
     
+    local function SendInitialConfig()
+        print("=== Sending initial configuration ===")
+        SendScreenParameters()
+        SetBrightness(Controls.brightness.Value)
+        local rotation_map = {
+            ["0° (Normal)"] = 0, ["90° (Clockwise)"] = 90,
+            ["180° (Upside Down)"] = 180, ["270° (Counter-Clockwise)"] = 270
+        }
+        local angle = rotation_map[Controls.rotation.String] or 0
+        if angle ~= 0 then SetRotation(angle) end
+        for area = 1, 4 do
+            if Controls["area" .. area .. "_enable"].Boolean then
+                Timer.CallAfter(function() SendTextArea(area) end, 0.1 * area)
+            end
+        end
+        if Controls.clock_enable.Boolean  then Timer.CallAfter(SendClock,  0.5) end
+        if Controls.timer_enable.Boolean  then Timer.CallAfter(SendTimer,  0.6) end
+        if Controls.curtain_state.Boolean then Timer.CallAfter(SendCurtain,0.7) end
+        print("✓ Initial configuration sent")
+    end
+
     local function OpenSocket()
-        if socket then pcall(function() socket:Close() end) end
-        
+        if socket then
+            pcall(function() socket:Close() end)
+            socket = nil
+        end
+        tcp_connected = false
         Controls.connection_status.Value = 5  -- Connecting (orange)
-        Controls.last_command.String = "Connecting..."
-        
+        Controls.last_command.String = "Connecting to " .. ip_addr .. ":" .. tostring(port) .. "..."
+
         local ok, err = pcall(function()
             if comm_type == 0 then  -- TCP
                 socket = TcpSocket.New()
-                socket.ReadTimeout = 2
-                socket.WriteTimeout = 2
-                socket.ReconnectTimeout = 5
-                
-                -- Event handlers for TCP connection
+                socket.ReadTimeout  = 0   -- 0 = no idle-read timeout
+                socket.WriteTimeout = 10  -- 10 s write timeout
+
                 socket.Connected = function(sock)
+                    tcp_connected = true
                     Controls.connection_status.Value = 0  -- OK (green)
                     Controls.last_command.String = "Connected to " .. ip_addr .. ":" .. tostring(port)
                     print("✓ TCP Connected to " .. ip_addr .. ":" .. tostring(port))
+                    -- Send initial config only once connection is confirmed
+                    Timer.CallAfter(SendInitialConfig, 0.2)
                 end
-                
+
                 socket.Closed = function(sock)
+                    tcp_connected = false
                     Controls.connection_status.Value = 2  -- Fault (red)
                     Controls.last_command.String = "Connection closed"
                     print("✗ TCP Connection closed")
                 end
-                
-                socket.Error = function(sock, err)
+
+                socket.Error = function(sock, err2)
+                    tcp_connected = false
                     Controls.connection_status.Value = 2  -- Fault (red)
-                    Controls.last_command.String = "ERROR: " .. tostring(err)
-                    print("✗ TCP Error: " .. tostring(err))
+                    Controls.last_command.String = "TCP Error: " .. tostring(err2)
+                    print("✗ TCP Error: " .. tostring(err2))
                 end
-                
-                socket.Timeout = function(sock, err)
+
+                socket.Timeout = function(sock)
+                    tcp_connected = false
                     Controls.connection_status.Value = 2  -- Fault (red)
-                    Controls.last_command.String = "ERROR: Connection timeout"
-                    print("✗ TCP Timeout")
+                    Controls.last_command.String = "TCP connect timeout"
+                    print("✗ TCP connect timeout")
                 end
-                
+
                 socket:Connect(ip_addr, port)
-                
+
             elseif comm_type == 1 then  -- UDP
                 socket = UdpSocket.New()
                 -- Open binds to a local ephemeral port; remote IP/port is passed in Send()
                 socket:Open("0.0.0.0", 0)
+                tcp_connected = true  -- UDP is always "ready"
                 Controls.connection_status.Value = 4  -- Compromised (yellow)
                 Controls.last_command.String = "UDP ready -> " .. ip_addr .. ":" .. tostring(udp_port)
                 print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(udp_port))
             end
         end)
-        
+
         if not ok then
+            tcp_connected = false
             Controls.connection_status.Value = 2  -- Fault (red)
-            Controls.last_command.String = "ERROR: " .. tostring(err)
+            Controls.last_command.String = "Socket error: " .. tostring(err)
             print("✗ Socket error: " .. tostring(err))
             return false
         end
-        
+
         return true
     end
     
     local function SendData(data)
-        if not socket then
+        if not socket or not tcp_connected then
             Controls.connection_status.Value = 2  -- Fault (red)
             Controls.last_command.String = "ERROR: Not connected"
             return false
@@ -948,69 +979,12 @@ if Controls then
         
         print("=== Ready - Auto-connecting ===")
         
-        -- Auto-connect on startup
+        -- Auto-connect on startup (initial config is sent inside Connected callback)
         Timer.CallAfter(function()
             ip_addr = Controls.ip_address.String
             port = tonumber(Controls.port.String) or 10000
             udp_port = (Properties["UDP Port"] and Properties["UDP Port"].Value) or 9876
             OpenSocket()
-            
-            -- Send initial settings after connection established
-            Timer.CallAfter(function()
-                if socket then
-                    print("=== Sending initial configuration ===")
-                    
-                    -- Send screen parameters
-                    SendScreenParameters()
-                    
-                    -- Send brightness
-                    SetBrightness(Controls.brightness.Value)
-                    
-                    -- Send rotation
-                    local rotation_map = {
-                        ["0° (Normal)"] = 0,
-                        ["90° (Clockwise)"] = 90,
-                        ["180° (Upside Down)"] = 180,
-                        ["270° (Counter-Clockwise)"] = 270
-                    }
-                    local angle = rotation_map[Controls.rotation.String] or 0
-                    if angle ~= 0 then
-                        SetRotation(angle)
-                    end
-                    
-                    -- Send all enabled text areas
-                    for area = 1, 4 do
-                        if Controls["area" .. area .. "_enable"].Boolean then
-                            Timer.CallAfter(function()
-                                SendTextArea(area)
-                            end, 0.1 * area)
-                        end
-                    end
-                    
-                    -- Send clock if enabled
-                    if Controls.clock_enable.Boolean then
-                        Timer.CallAfter(function()
-                            SendClock()
-                        end, 0.5)
-                    end
-                    
-                    -- Send timer if enabled
-                    if Controls.timer_enable.Boolean then
-                        Timer.CallAfter(function()
-                            SendTimer()
-                        end, 0.6)
-                    end
-                    
-                    -- Send curtain if enabled
-                    if Controls.curtain_state.Boolean then
-                        Timer.CallAfter(function()
-                            SendCurtain()
-                        end, 0.7)
-                    end
-                    
-                    print("✓ Initial configuration sent")
-                end
-            end, 1.0)
         end, 0.5)
     end
     
