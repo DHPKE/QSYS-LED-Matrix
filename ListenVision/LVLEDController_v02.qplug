@@ -602,10 +602,10 @@ if Controls then
                 
             elseif comm_type == 1 then  -- UDP
                 socket = UdpSocket.New()
-                socket:Open(ip_addr, udp_port)
-                -- UDP is connectionless, so we assume OK but mark as compromised (yellow)
+                -- Open binds to a local ephemeral port; remote IP/port is passed in Send()
+                socket:Open("0.0.0.0", 0)
                 Controls.connection_status.Value = 4  -- Compromised (yellow)
-                Controls.last_command.String = "UDP socket open -> " .. ip_addr .. ":" .. tostring(udp_port)
+                Controls.last_command.String = "UDP ready -> " .. ip_addr .. ":" .. tostring(udp_port)
                 print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(udp_port))
             end
         end)
