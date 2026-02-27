@@ -257,28 +257,26 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 
   <div class="grid">
     <div class="card" style="grid-column:1/-1;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;">
-        <div style="flex:1;">
-          <h2 style="margin:0 0 15px 0;">Network Information</h2>
-          <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:end;">
-            <div class="info-item"><span class="info-label">IP Address</span>
-              <div class="info-value"><input type="text" id="ip-address" value="{{IP_ADDRESS}}" 
-                placeholder="e.g., 10.20.30.40" style="min-width:140px;"></div></div>
-            <div class="info-item"><span class="info-label">Subnet</span>
-              <div class="info-value"><input type="text" id="subnet-mask" value="{{SUBNET}}" 
-                placeholder="e.g., 24" style="width:60px;"></div></div>
-            <div class="info-item"><span class="info-label">UDP Port</span>
-              <div class="info-value"><input type="number" id="udp-port" value="{{UDP_PORT}}" 
-                placeholder="21324" style="width:100px;"></div></div>
-            <button class="btn-primary" onclick="applyNetworkSettings('static')" 
-              style="padding:8px 20px;margin-bottom:2px;">Apply Static</button>
-            <button class="btn-primary" onclick="applyNetworkSettings('dhcp')" 
-              style="padding:8px 20px;margin-bottom:2px;background:#16a34a;">Enable DHCP</button>
-            <div class="info-item"><span class="info-label">Display Size</span>
-              <span class="info-value" style="padding:6px 10px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid rgba(255,255,255,.1);">{{MATRIX_SIZE}}</span></div>
-          </div>
-        </div>
-        <div style="align-self:center;"><span id="status" class="status ready">Ready</span></div>
+      <h2 style="margin:0 0 15px 0;">Network Information</h2>
+      <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:end;margin-bottom:15px;">
+        <div class="info-item"><span class="info-label">IP Address</span>
+          <div class="info-value"><input type="text" id="ip-address" value="{{IP_ADDRESS}}" 
+            placeholder="e.g., 10.20.30.40" style="min-width:140px;"></div></div>
+        <div class="info-item"><span class="info-label">Subnet</span>
+          <div class="info-value"><input type="text" id="subnet-mask" value="{{SUBNET}}" 
+            placeholder="e.g., 24" style="width:60px;"></div></div>
+        <div class="info-item"><span class="info-label">UDP Port</span>
+          <div class="info-value"><input type="number" id="udp-port" value="{{UDP_PORT}}" 
+            placeholder="21324" style="width:100px;"></div></div>
+        <button class="btn-primary" onclick="applyNetworkSettings('static')" 
+          style="padding:8px 20px;margin-bottom:2px;">Apply Static</button>
+        <button class="btn-primary" onclick="applyNetworkSettings('dhcp')" 
+          style="padding:8px 20px;margin-bottom:2px;background:#16a34a;">Enable DHCP</button>
+        <div class="info-item"><span class="info-label">Display Size</span>
+          <span class="info-value" style="padding:6px 10px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid rgba(255,255,255,.1);">{{MATRIX_SIZE}}</span></div>
+      </div>
+      <div style="display:flex;justify-content:center;padding:8px 0;border-top:1px solid rgba(255,255,255,.1);">
+        <span id="status" class="status ready">Ready</span>
       </div>
     </div>
 
