@@ -172,6 +172,7 @@ def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
             # Update splash screen with new IP
             sm.update_text(0, current_ip, color="FFFFFF", bgcolor="000000", align="C")
             sm.set_frame(0, enabled=True, color="FFFFFF", width=1)
+            sm.mark_dirty(0)  # Trigger re-render
             logger.info(f"[NET-MON] Updated splash screen with new IP: {current_ip}")
             
             # Notify callback to update device_ip variable
@@ -290,6 +291,7 @@ def main():
     ip_splash_active = True
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
     sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
+    sm.mark_dirty(0)  # Trigger initial render
     logger.info(f"[SPLASH] Showing IP address: {current_ip_ref[0]}")
     
     # Start network monitor thread
