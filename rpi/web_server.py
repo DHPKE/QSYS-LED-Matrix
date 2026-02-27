@@ -55,7 +55,129 @@ def _get_real_ip(iface: str = "eth0") -> str:
                 return line.split()[1].split("/")[0]
     except Exception:
         pass
-    return "unknown"
+    return "10.20.30.40"  # Default fallback IP
+
+
+def _get_subnet_mask(iface: str = "eth0") -> str:
+    """Return the subnet mask in CIDR notation (e.g., '24')."""
+    try:
+        out = subprocess.check_output(
+            ["ip", "-4", "addr", "show", iface],
+            stderr=subprocess.DEVNULL, text=True)
+        for line in out.splitlines():
+            line = line.strip()
+            if line.startswith("inet "):
+                # Format: inet 10.1.1.24/24 ...
+                cidr = line.split()[1].split("/")[1]
+                return cidr
+    except Exception:
+        pass
+    return "24"  # Default fallback
+
+
+def _configure_network(mode: str, ip: str = "", subnet: str = "24", gateway: str = "") -> dict:
+    """
+    Configure network settings via dhcpcd.conf.
+    mode: 'static' or 'dhcp'
+    Returns: {status: 'ok'|'error', message: str, reboot_required: bool}
+    """
+    try:
+        if mode == "dhcp":
+            # Remove static configuration from dhcpcd.conf
+            config_path = "/etc/dhcpcd.conf"
+            
+            # Read existing config
+            with open(config_path, 'r') as f:
+                lines = f.readlines()
+            
+            # Remove any existing static eth0 config
+            new_lines = []
+            skip = False
+            for line in lines:
+                if line.strip().startswith("# Static IP configuration") or \
+                   line.strip().startswith("interface eth0"):
+                    skip = True
+                    continue
+                if skip:
+                    if line.strip() and not line.startswith(" ") and not line.startswith("\t"):
+                        skip = False
+                if not skip:
+                    new_lines.append(line)
+            
+            # Write back
+            with open(config_path, 'w') as f:
+                f.writelines(new_lines)
+            
+            return {
+                "status": "ok",
+                "message": "DHCP enabled. Rebooting to apply changes...",
+                "reboot_required": True
+            }
+        
+        elif mode == "static":
+            if not ip or not subnet:
+                return {
+                    "status": "error",
+                    "message": "IP address and subnet are required for static configuration",
+                    "reboot_required": False
+                }
+            
+            # Calculate gateway (assumes .1 in the subnet)
+            if not gateway:
+                ip_parts = ip.rsplit('.', 1)
+                gateway = f"{ip_parts[0]}.1"
+            
+            config_path = "/etc/dhcpcd.conf"
+            
+            # Read existing config
+            with open(config_path, 'r') as f:
+                lines = f.readlines()
+            
+            # Remove any existing static eth0 config
+            new_lines = []
+            skip = False
+            for line in lines:
+                if line.strip().startswith("# Static IP configuration") or \
+                   line.strip().startswith("interface eth0"):
+                    skip = True
+                    continue
+                if skip:
+                    if line.strip() and not line.startswith(" ") and not line.startswith("\t"):
+                        skip = False
+                if not skip:
+                    new_lines.append(line)
+            
+            # Add new static config
+            new_lines.append("\n# Static IP configuration\n")
+            new_lines.append("interface eth0\n")
+            new_lines.append(f"static ip_address={ip}/{subnet}\n")
+            new_lines.append(f"static routers={gateway}\n")
+            new_lines.append("static domain_name_servers=8.8.8.8 1.1.1.1\n")
+            
+            # Write back
+            with open(config_path, 'w') as f:
+                f.writelines(new_lines)
+            
+            return {
+                "status": "ok",
+                "message": f"Static IP {ip}/{subnet} configured. Rebooting to apply changes...",
+                "reboot_required": True
+            }
+        
+        else:
+            return {
+                "status": "error",
+                "message": f"Unknown mode: {mode}",
+                "reboot_required": False
+            }
+    
+    except Exception as e:
+        logger.error(f"Network configuration failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "reboot_required": False
+        }
 
 
 # ─── HTML template (same layout / JS as the ESP32 version) ─────────────────
@@ -159,12 +281,17 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
           <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:end;">
             <div class="info-item"><span class="info-label">IP Address</span>
               <div class="info-value"><input type="text" id="ip-address" value="{{IP_ADDRESS}}" 
-                placeholder="e.g., 10.1.1.22" style="min-width:140px;"></div></div>
+                placeholder="e.g., 10.20.30.40" style="min-width:140px;"></div></div>
+            <div class="info-item"><span class="info-label">Subnet</span>
+              <div class="info-value"><input type="text" id="subnet-mask" value="{{SUBNET}}" 
+                placeholder="e.g., 24" style="width:60px;"></div></div>
             <div class="info-item"><span class="info-label">UDP Port</span>
               <div class="info-value"><input type="number" id="udp-port" value="{{UDP_PORT}}" 
                 placeholder="21324" style="width:100px;"></div></div>
-            <button class="btn-primary" onclick="applyNetworkSettings()" 
-              style="padding:8px 20px;margin-bottom:2px;">Apply</button>
+            <button class="btn-primary" onclick="applyNetworkSettings('static')" 
+              style="padding:8px 20px;margin-bottom:2px;">Apply Static</button>
+            <button class="btn-primary" onclick="applyNetworkSettings('dhcp')" 
+              style="padding:8px 20px;margin-bottom:2px;background:#16a34a;">Enable DHCP</button>
             <div class="info-item"><span class="info-label">Display Size</span>
               <span class="info-value" style="padding:6px 10px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid rgba(255,255,255,.1);">{{MATRIX_SIZE}}</span></div>
           </div>
@@ -509,20 +636,44 @@ function loadGroup() {
     })
     .catch(err=>console.error('Failed to load group:',err));
 }
-function applyNetworkSettings() {
+function applyNetworkSettings(mode) {
   const ip = document.getElementById('ip-address').value;
+  const subnet = document.getElementById('subnet-mask').value;
   const port = parseInt(document.getElementById('udp-port').value);
   
-  if (!ip || !port || port < 1 || port > 65535) {
-    updateStatus('Invalid IP or port', 'error');
+  if (mode === 'static') {
+    if (!ip || !subnet || !port || port < 1 || port > 65535) {
+      updateStatus('Invalid IP, subnet, or port', 'error');
+      return;
+    }
+  } else if (!port || port < 1 || port > 65535) {
+    updateStatus('Invalid port', 'error');
     return;
   }
   
-  updateStatus('Network settings noted (changing IP requires system reconfiguration)', 'ready');
-  console.log('Network settings:', {ip, port});
-  // Note: Actual IP change requires system-level networking changes
-  // Port change would require restarting the UDP handler
-  // This UI update is informational only for now
+  updateStatus('Applying network settings...', 'sending');
+  
+  fetch('/api/network', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({mode, ip, subnet, port})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'ok') {
+      updateStatus(data.message || 'Network settings applied', 'ready');
+      if (data.reboot_required) {
+        setTimeout(() => {
+          updateStatus('Rebooting... Please reconnect in 30 seconds', 'sending');
+        }, 2000);
+      }
+    } else {
+      updateStatus('Error: ' + (data.message || 'Unknown error'), 'error');
+    }
+  })
+  .catch(err => {
+    updateStatus('Network error: ' + err, 'error');
+  });
 }
 // Layout presets — mirrors config.py LAYOUT_PRESETS exactly.
 // Each entry: list of [x, y, w, h] per active segment.
@@ -619,9 +770,11 @@ class _Handler(BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html"):
             ip = _get_real_ip()
+            subnet = _get_subnet_mask()
             html = _HTML_TEMPLATE \
                 .replace("{{DEVICE_IP}}", ip) \
                 .replace("{{IP_ADDRESS}}", ip) \
+                .replace("{{SUBNET}}", subnet) \
                 .replace("{{UDP_PORT}}",   str(UDP_PORT)) \
                 .replace("{{MATRIX_SIZE}}", f"{MATRIX_WIDTH}x{MATRIX_HEIGHT}")
             self._send(200, "text/html", html)
@@ -687,6 +840,31 @@ class _Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.error(f"[HTTP] /api/group failed: {e}")
                 self._send(400, "text/plain", f"Error: {e}")
+        
+        elif path == "/api/network":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode("utf-8", errors="replace")
+            try:
+                data = json.loads(body)
+                mode = data.get("mode", "dhcp")
+                ip = data.get("ip", "")
+                subnet = data.get("subnet", "24")
+                gateway = data.get("gateway", "")
+                
+                logger.info(f"[HTTP] /api/network  mode={mode} ip={ip}/{subnet}")
+                
+                result = _configure_network(mode, ip, subnet, gateway)
+                
+                self._send(200, "application/json", json.dumps(result))
+                
+                # Trigger reboot if needed
+                if result.get("reboot_required"):
+                    threading.Timer(2.0, lambda: subprocess.run(["sudo", "reboot"])).start()
+                
+            except Exception as e:
+                logger.error(f"[HTTP] /api/network failed: {e}")
+                self._send(400, "application/json", 
+                          json.dumps({"status": "error", "message": str(e), "reboot_required": False}))
         
         else:
             self._send(404, "text/plain", "Not found")
