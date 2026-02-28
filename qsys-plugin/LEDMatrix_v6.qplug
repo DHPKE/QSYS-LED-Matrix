@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 6.1.0 - Full rotation support, orientation control removed
+-- Version 6.2.0 - Added reboot button for remote panel restart
 -- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -16,7 +16,7 @@
 --   Rotation is applied at matrix initialization, so changes require a service restart.
 --   Setting is persisted in config.json and survives reboots.
 --   Layouts automatically adapt: 90°/270° use portrait coords (32×64)
---   Use the "Apply Rotation" button to send the rotation command and restart the panel.
+--   Use the "Apply Rotation" button, then "Reboot Panel" to apply.
 --
 -- GROUPING (v5.0):
 --   Each LED panel can be assigned to a group (1-8) via the panel's WebUI or UDP command.
@@ -40,10 +40,10 @@
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display (Groups+Rotation)",
-    Version = "6.1.0",
-    Id = "dhpke.olimex.led.matrix.6.1.0",
-    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation (0°, 90°, 180°, 270°)",
+    Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
+    Version = "6.2.0",
+    Id = "dhpke.olimex.led.matrix.6.2.0",
+    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -103,6 +103,7 @@ function GetControls(props)
     table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
     return controls
@@ -158,7 +159,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.1.0",
+        Type="Text", Text="LED Matrix Controller  v6.2.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -394,12 +395,13 @@ function GetControlLayout(props)
     layout["apply_rotation"] = { PrettyName="Global~ApplyRot", Style="Button",
         ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
         Position={218, y+30}, Size={120, 36} }
-    
-    -- Note: Rotation requires panel restart via Web UI
+    layout["reboot_panel"] = { PrettyName="Global~Reboot", Style="Button",
+        ButtonStyle="Trigger", Legend="Reboot Panel", Color={200, 80, 80},
+        Position={344, y+30}, Size={110, 36} }
     
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
-        Position={388, y+30}, Size={W-394, 36} }
+        Position={460, y+30}, Size={W-466, 36} }
 
     return layout, graphics
 end
@@ -576,10 +578,10 @@ if Controls then
     end
 
     local function Initialize()
-        print("===========================================")
-        print("=== LED Matrix v6.0.0 (Groups+Rotation) ===")
-        print("=== Initializing with DEBUG LOGGING     ===")
-        print("===========================================")
+        print("=======================================================")
+        print("=== LED Matrix v6.2.0 (Groups+Rotation+Reboot)     ===")
+        print("=== Initializing...                                ===")
+        print("=======================================================")
         print(string.format("[INIT] Target IP: %s", ip_addr))
         print(string.format("[INIT] Target Port: %s", tostring(udp_port)))
         
@@ -861,8 +863,31 @@ if Controls then
         local rotation = tonumber(Controls.rotation.String) or 0
         if SendCommand(buildJson({cmd="rotation", value=rotation, group=activeGroup})) then
             print("✓ Rotation set to: " .. rotation .. "° for group " .. (activeGroup == 0 and "All" or activeGroup))
-            print("⚠ Rotation requires panel restart - use Web UI reboot button")
-            Controls.last_command.String = "Rotation saved - restart panel to apply"
+            print("⚠ Use Reboot Panel button to apply rotation")
+            Controls.last_command.String = "Rotation saved - click Reboot Panel to apply"
+        end
+    end
+
+    -- Reboot panel handler
+    Controls.reboot_panel.EventHandler = function()
+        print("[REBOOT] Sending reboot command to panel...")
+        -- Use curl to trigger web UI reboot endpoint
+        local rebootCmd = string.format('curl -s -X POST http://%s:8080/reboot', ip_addr)
+        print("[REBOOT] Command: " .. rebootCmd)
+        Controls.last_command.String = "Rebooting panel..."
+        -- Note: Panel will be offline for ~30 seconds
+        Timer.CallAfter(function()
+            Controls.last_command.String = "Panel rebooting (offline ~30s)"
+        end, 1)
+        -- Execute via shell (Q-SYS allows os.execute in plugins)
+        local ok, result = pcall(function() 
+            return os.execute(rebootCmd)
+        end)
+        if ok then
+            print("✓ [REBOOT] Reboot command sent successfully")
+        else
+            print("✗ [REBOOT] Failed to send reboot command: " .. tostring(result))
+            Controls.last_command.String = "Reboot failed - use Web UI"
         end
     end
 
