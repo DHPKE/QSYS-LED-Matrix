@@ -331,5 +331,3 @@ void TextRenderer::renderGroupIndicator() {
         }
     }
 }
-
-#endif // TEXT_RENDERER_H

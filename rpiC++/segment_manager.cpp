@@ -258,5 +258,3 @@ Effect SegmentManager::parseEffect(const std::string& value) {
     if (v == "fade") return EFFECT_FADE;
     return EFFECT_NONE;
 }
-
-#endif // SEGMENT_MANAGER_H
