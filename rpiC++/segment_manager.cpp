@@ -207,6 +207,7 @@ void SegmentManager::configure(int seg_id, int x, int y, int w, int h) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     Segment* seg = getSegment(seg_id);
     if (seg) {
+        std::cout << "[SEG] configure: seg=" << seg_id << " x=" << x << " y=" << y << " w=" << w << " h=" << h << std::endl;
         seg->x = x;
         seg->y = y;
         seg->width = w;
