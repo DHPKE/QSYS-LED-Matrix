@@ -101,8 +101,10 @@ else
     # Build with optimizations
     make -j$(nproc)
     
-    # Install
-    make install
+    # Manual install (no install target in Makefile)
+    echo "Installing library files..."
+    cp -r include/* /usr/local/include/
+    cp lib/librgbmatrix.* /usr/local/lib/
     ldconfig
     
     cd "$INSTALL_DIR"
