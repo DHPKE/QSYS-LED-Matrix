@@ -395,7 +395,7 @@ function GetControlLayout(props)
         ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
         Position={218, y+30}, Size={120, 36} }
     
-    Lbl("Requires panel restart via Web UI", 112, y+70, 250)
+    -- Note: Rotation requires panel restart via Web UI
     
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
