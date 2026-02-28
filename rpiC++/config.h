@@ -28,7 +28,7 @@
 #define PWM_LSB_NANOSECONDS 130     // Timing for LSB (130 is stable for most panels)
 #define PWM_DITHER_BITS     0       // 0-2: Match Python version
 #define LED_RGB_SEQUENCE    "RGB"   // "RGB", "RBG", "GRB", etc.
-#define REFRESH_LIMIT       0       // Hz: 0=no limit like Python
+#define REFRESH_LIMIT       200     // Hz: Match Python version (200 = stable refresh)
 
 // ─── Network ─────────────────────────────────────────────────────────────────
 #define UDP_PORT       21324
@@ -45,7 +45,7 @@
 // ─── Display ─────────────────────────────────────────────────────────────────
 #define MAX_SEGMENTS      4
 #define MAX_TEXT_LENGTH   128
-#define EFFECT_INTERVAL   100   // milliseconds between effect updates (10 fps)
+#define EFFECT_INTERVAL   50    // milliseconds between effect updates (20 fps, matches Python)
 
 // Orientation: 0=landscape (64×32), 1=portrait (32×64)
 enum Orientation {
