@@ -1,10 +1,11 @@
 #!/bin/bash
 # install.sh - Out-of-the-box installer for Raspbian Lite 64
-# Installs all dependencies, builds, and configures the LED matrix controller
+# Fetches latest code from GitHub, installs dependencies, builds, and configures
 
 set -e
 
-INSTALL_DIR="$(pwd)"
+REPO_URL="https://github.com/DHPKE/QSYS-LED-Matrix.git"
+INSTALL_DIR="/home/$SUDO_USER/rpiC++"
 RGB_MATRIX_DIR="/tmp/rpi-rgb-led-matrix"
 
 echo "╔════════════════════════════════════════════════════════════╗"
@@ -20,7 +21,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Detect non-root user for later use
+# Detect non-root user
 if [ -n "$SUDO_USER" ]; then
     REAL_USER="$SUDO_USER"
 else
@@ -32,7 +33,7 @@ echo ""
 
 # ─── 1. System Dependencies ──────────────────────────────────────────────────
 
-echo "==[ Step 1/8: Installing System Dependencies ]=="
+echo "==[ Step 1/9: Installing System Dependencies ]=="
 echo "This may take a few minutes on first run..."
 echo ""
 
@@ -57,18 +58,20 @@ echo ""
 
 # ─── 2. Disable Audio (prevents interference) ─────────────────────────────────
 
-echo "==[ Step 2/8: Disabling Audio (prevents LED flicker) ]=="
+echo "==[ Step 2/9: Disabling Audio (prevents LED flicker) ]=="
 
-if ! grep -q "^dtparam=audio=off" /boot/firmware/config.txt 2>/dev/null; then
-    if ! grep -q "^dtparam=audio=off" /boot/config.txt 2>/dev/null; then
-        echo "dtparam=audio=off" >> /boot/config.txt
-        echo "⚠  Audio disabled in /boot/config.txt (requires reboot)"
-        NEEDS_REBOOT=1
-    else
-        echo "✓ Audio already disabled in /boot/config.txt"
-    fi
+# Try both locations (Bookworm uses /boot/firmware)
+BOOT_CONFIG="/boot/config.txt"
+if [ -f "/boot/firmware/config.txt" ]; then
+    BOOT_CONFIG="/boot/firmware/config.txt"
+fi
+
+if ! grep -q "^dtparam=audio=off" "$BOOT_CONFIG"; then
+    echo "dtparam=audio=off" >> "$BOOT_CONFIG"
+    echo "⚠  Audio disabled in $BOOT_CONFIG (requires reboot)"
+    NEEDS_REBOOT=1
 else
-    echo "✓ Audio already disabled in /boot/firmware/config.txt"
+    echo "✓ Audio already disabled in $BOOT_CONFIG"
 fi
 
 # Blacklist audio modules
@@ -87,7 +90,7 @@ echo ""
 
 # ─── 3. Install RGB LED Matrix Library ───────────────────────────────────────
 
-echo "==[ Step 3/8: Installing rpi-rgb-led-matrix Library ]=="
+echo "==[ Step 3/9: Installing rpi-rgb-led-matrix Library ]=="
 
 if [ -f "/usr/local/include/led-matrix.h" ] && [ -f "/usr/local/lib/librgbmatrix.a" ]; then
     echo "✓ rpi-rgb-led-matrix already installed"
@@ -112,39 +115,56 @@ else
     cp lib/librgbmatrix.* /usr/local/lib/
     ldconfig
     
-    cd "$INSTALL_DIR"
-    
     echo "✓ rpi-rgb-led-matrix library installed"
 fi
 
 echo ""
 
-# ─── 4. Build LED Matrix Controller ──────────────────────────────────────────
+# ─── 4. Fetch Latest Controller Code ─────────────────────────────────────────
 
-echo "==[ Step 4/8: Building LED Matrix Controller ]=="
+echo "==[ Step 4/9: Fetching Latest Controller Code ]=="
 
-if [ ! -f "led-matrix" ]; then
-    echo "Building controller..."
-    make clean 2>/dev/null || true
-    make
-    echo "✓ Build complete"
+# Create install directory
+if [ ! -d "$INSTALL_DIR" ]; then
+    mkdir -p "$INSTALL_DIR"
+    chown "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
+fi
+
+cd "$INSTALL_DIR"
+
+# Clone or update repository
+if [ ! -d ".git" ]; then
+    echo "Cloning from GitHub..."
+    # Remove any existing files
+    rm -rf *
+    # Clone as real user
+    sudo -u "$REAL_USER" git clone "$REPO_URL" temp_clone
+    # Move rpiC++ contents to current directory
+    sudo -u "$REAL_USER" mv temp_clone/rpiC++/* .
+    sudo -u "$REAL_USER" rm -rf temp_clone
+    echo "✓ Code fetched from GitHub"
 else
-    echo "⚠  Binary exists. Rebuild? (y/n)"
-    read -r response
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        make clean
-        make
-        echo "✓ Rebuild complete"
-    else
-        echo "✓ Using existing binary"
-    fi
+    echo "Updating from GitHub..."
+    sudo -u "$REAL_USER" git pull
+    echo "✓ Code updated"
 fi
 
 echo ""
 
-# ─── 5. Install Service ──────────────────────────────────────────────────────
+# ─── 5. Build LED Matrix Controller ──────────────────────────────────────────
 
-echo "==[ Step 5/8: Installing Systemd Service ]=="
+echo "==[ Step 5/9: Building LED Matrix Controller ]=="
+
+echo "Building controller..."
+make clean 2>/dev/null || true
+make
+echo "✓ Build complete"
+
+echo ""
+
+# ─── 6. Install Service ──────────────────────────────────────────────────────
+
+echo "==[ Step 6/9: Installing Systemd Service ]=="
 
 # Stop existing service if running
 systemctl stop led-matrix 2>/dev/null || true
@@ -156,13 +176,17 @@ chmod +x /usr/local/bin/led-matrix
 echo "✓ Binary installed to /usr/local/bin/led-matrix"
 
 # Install network config applier
-cp apply-network-config.sh /usr/local/bin/
-chmod +x /usr/local/bin/apply-network-config.sh
-echo "✓ Network config script installed"
+if [ -f "apply-network-config.sh" ]; then
+    cp apply-network-config.sh /usr/local/bin/
+    chmod +x /usr/local/bin/apply-network-config.sh
+    echo "✓ Network config script installed"
+fi
 
 # Install systemd services
 cp led-matrix.service /etc/systemd/system/
-cp led-matrix-network.service /etc/systemd/system/
+if [ -f "led-matrix-network.service" ]; then
+    cp led-matrix-network.service /etc/systemd/system/
+fi
 systemctl daemon-reload
 echo "✓ Systemd services installed"
 
@@ -174,22 +198,24 @@ echo "✓ Config directory created at /var/lib/led-matrix"
 
 echo ""
 
-# ─── 6. Enable Service ───────────────────────────────────────────────────────
+# ─── 7. Enable Service ───────────────────────────────────────────────────────
 
-echo "==[ Step 6/7: Enabling Services ]=="
+echo "==[ Step 7/9: Enabling Services ]=="
 
 systemctl enable led-matrix
-systemctl enable led-matrix-network
+if [ -f "/etc/systemd/system/led-matrix-network.service" ]; then
+    systemctl enable led-matrix-network
+fi
 echo "✓ Services enabled (will start on boot)"
 
 echo ""
 
-# ─── 7. CPU Optimization (Optional) ──────────────────────────────────────────
+# ─── 8. CPU Optimization (Optional) ──────────────────────────────────────────
 
-echo "==[ Step 7/8: CPU Isolation (Optional) ]=="
+echo "==[ Step 8/9: CPU Isolation (Optional) ]=="
 echo ""
-echo "The RGB matrix library uses ~50% of one CPU core to refresh the display."
-echo "This is normal behavior. You can dedicate one core to it (recommended for Pi 4/5)."
+echo "The RGB matrix library uses significant CPU to refresh the display."
+echo "On multi-core devices (Pi 3/4/5/CM4), you can dedicate one core to it."
 echo ""
 echo "Add 'isolcpus=3' to /boot/cmdline.txt?"
 echo "This isolates CPU core 3 for the LED matrix only."
@@ -218,9 +244,9 @@ fi
 
 echo ""
 
-# ─── 8. Network Configuration ────────────────────────────────────────────────
+# ─── 9. Network Configuration ────────────────────────────────────────────────
 
-echo "==[ Step 8/8: Network Configuration ]=="
+echo "==[ Step 9/9: Network Configuration ]=="
 echo ""
 IP=$(hostname -I | awk '{print $1}')
 if [ -z "$IP" ]; then
@@ -240,10 +266,9 @@ echo "╚═══════════════════════�
 echo ""
 
 if [ -n "$NEEDS_REBOOT" ]; then
-    echo "⚠  REBOOT REQUIRED (audio disabled in /boot/config.txt)"
+    echo "⚠  REBOOT REQUIRED (audio/CPU config changed)"
     echo ""
-    echo "After reboot, start the service:"
-    echo "  sudo systemctl start led-matrix"
+    echo "After reboot, the service will start automatically."
     echo ""
     echo "Reboot now? (y/n)"
     read -r response
@@ -259,12 +284,12 @@ else
     echo ""
     
     if [ -n "$IP" ]; then
+        echo "Web UI:"
+        echo "  http://$IP:8080"
+        echo ""
         echo "UDP Protocol:"
         echo "  Port:    21324"
         echo "  Test:    echo '{\"cmd\":\"text\",\"seg\":0,\"text\":\"HELLO\"}' | nc -u -w1 $IP 21324"
-        echo ""
-        echo "Full Test Suite:"
-        echo "  ./test-commands.sh $IP"
         echo ""
     fi
     
@@ -272,9 +297,9 @@ else
     read -r response
     if [[ "$response" =~ ^[Yy]$ ]]; then
         systemctl start led-matrix
-        sleep 2
+        sleep 3
         echo ""
-        systemctl status led-matrix --no-pager
+        systemctl status led-matrix --no-pager | head -15
         echo ""
         
         if [ -n "$IP" ]; then
@@ -283,7 +308,7 @@ else
             echo "Send test command? (y/n)"
             read -r test_response
             if [[ "$test_response" =~ ^[Yy]$ ]]; then
-                echo '{"cmd":"text","seg":0,"text":"C++ READY!","color":"00FF00","bgcolor":"000000","align":"C"}' | nc -u -w1 "$IP" 21324
+                echo '{"cmd":"text","seg":0,"text":"C++ READY!","color":"00FF00","bgcolor":"000000","align":"center"}' | nc -u -w1 "$IP" 21324
                 echo "✓ Test command sent - check your display!"
             fi
         fi
@@ -291,4 +316,5 @@ else
 fi
 
 echo ""
-echo "Installation log saved to: /var/log/led-matrix-install.log"
+echo "Documentation: $INSTALL_DIR/README.md"
+echo "Quick Start:   $INSTALL_DIR/QUICK_START.md"
