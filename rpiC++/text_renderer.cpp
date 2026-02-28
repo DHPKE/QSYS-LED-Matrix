@@ -17,6 +17,7 @@ TextRenderer::TextRenderer(RGBMatrix* matrix, SegmentManager* segment_manager)
       current_orientation_(LANDSCAPE),
       canvas_width_(MATRIX_WIDTH),
       canvas_height_(MATRIX_HEIGHT),
+      last_layout_(0),
       group_id_cache_(0),
       group_color_cache_(0, 0, 0),
       render_count_(0) {
@@ -131,6 +132,9 @@ void TextRenderer::renderAll() {
     // Update canvas dimensions if orientation changed
     if (g_udp_handler) {
         Orientation orient = g_udp_handler->getOrientation();
+        int current_layout = g_udp_handler->getCurrentLayout();
+        
+        // Check if orientation changed
         if (orient != current_orientation_) {
             current_orientation_ = orient;
             if (orient == PORTRAIT) {
@@ -143,11 +147,19 @@ void TextRenderer::renderAll() {
             std::cout << "[RENDER] Canvas resized to " << canvas_width_ << "×" 
                      << canvas_height_ << " for " 
                      << (orient == PORTRAIT ? "portrait" : "landscape") << " mode" << std::endl;
+            
+            // Full clear needed when orientation changes
+            canvas_->Fill(0, 0, 0);
         }
+        // Check if layout changed
+        else if (current_layout != last_layout_) {
+            last_layout_ = current_layout;
+            // Full clear needed when layout changes to remove old segments
+            canvas_->Fill(0, 0, 0);
+            std::cout << "[RENDER] Layout changed to " << current_layout << " - canvas cleared" << std::endl;
+        }
+        // Otherwise: NO full clear - segments fill their own backgrounds
     }
-    
-    // Clear back buffer (won't be visible until SwapOnVSync)
-    canvas_->Fill(0, 0, 0);
     
     // Render all segments that are in the current layout
     int rendered_count = 0;

@@ -34,6 +34,7 @@ private:
     Orientation current_orientation_;
     int canvas_width_;
     int canvas_height_;
+    int last_layout_;  // Track layout changes to know when to clear
     
     uint8_t group_id_cache_;
     Color group_color_cache_;
