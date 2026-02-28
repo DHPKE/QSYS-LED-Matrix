@@ -140,6 +140,7 @@ void UDPHandler::dispatch(const std::string& raw_json) {
         if (cmd != "frame" && doc.contains("seg")) {
             int seg = doc.value("seg", 0);
             if (seg == 1) {
+                std::cout << "[UDP] Auto-disabling frame on segment 1 (cmd: " << cmd << ")" << std::endl;
                 sm_->setFrame(seg, false, "FFFFFF", 2);
             }
         }

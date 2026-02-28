@@ -238,6 +238,7 @@ void SegmentManager::setFrame(int seg_id, bool enabled, const std::string& color
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     Segment* seg = getSegment(seg_id);
     if (seg) {
+        std::cout << "[SEG] setFrame: seg=" << seg_id << " enabled=" << enabled << " color=" << color << " width=" << width << std::endl;
         seg->frame_enabled = enabled;
         if (!color.empty()) {
             seg->frame_color = Color::fromHex(color);

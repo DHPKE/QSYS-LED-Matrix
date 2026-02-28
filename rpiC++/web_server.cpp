@@ -202,7 +202,7 @@ std::string WebServer::getConfigPage() {
             margin-bottom: 20px;
         }
         .logo-container svg {
-            width: 200px;
+            width: 600px;
             height: auto;
         }
         .container {
