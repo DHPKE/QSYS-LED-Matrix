@@ -226,6 +226,11 @@ void UDPHandler::applyLayout(int preset) {
         return;
     }
     
+    // Skip if layout didn't actually change
+    if (current_layout_ == preset) {
+        return;  // No-op, already on this layout
+    }
+    
     current_layout_ = preset;
     
     const std::vector<LayoutRect>* zones;
