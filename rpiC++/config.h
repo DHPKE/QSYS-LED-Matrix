@@ -17,8 +17,8 @@
 
 // GPIO Configuration
 #define HARDWARE_MAPPING "regular"  // "regular", "adafruit-hat", "adafruit-hat-pwm"
-#define GPIO_SLOWDOWN   2           // 0-4: Lower = less CPU (Pi Zero 2W: try 2-3)
-#define PWM_BITS        6           // 1-11: Lower = less CPU (6-7 good for low power)
+#define GPIO_SLOWDOWN   3           // Match Python version
+#define PWM_BITS        8           // Match Python version
 #define BRIGHTNESS      50          // 0-100: Initial brightness percentage
 
 // Additional matrix options
@@ -26,9 +26,9 @@
 #define ROW_ADDR_TYPE       0       // 0-5: Address line config
 #define MULTIPLEXING        0       // 0-17: Multiplex type
 #define PWM_LSB_NANOSECONDS 130     // Timing for LSB (130 is stable for most panels)
-#define PWM_DITHER_BITS     0       // 0-2: Dithering for speed boost
+#define PWM_DITHER_BITS     0       // 0-2: Match Python version
 #define LED_RGB_SEQUENCE    "RGB"   // "RGB", "RBG", "GRB", etc.
-#define REFRESH_LIMIT       120     // Hz: Lower limit = less CPU (try 100-120)
+#define REFRESH_LIMIT       0       // Hz: 0=no limit like Python
 
 // ─── Network ─────────────────────────────────────────────────────────────────
 #define UDP_PORT       21324
