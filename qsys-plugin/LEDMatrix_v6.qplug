@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 6.0.2-debug - Rotation layout fix + orientation deprecated
+-- Version 6.1.0 - Full rotation support, orientation control removed
 -- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
@@ -11,16 +11,12 @@
 --   {"cmd":"layout","preset":N,"group":1}
 --   {"cmd":"group","value":3}   -- Assign panel to group 3
 --
--- DEPRECATED:
---   {"cmd":"orientation","value":"landscape","group":1}  -- Use rotation instead
---   - "landscape" → maps to rotation 0°
---   - "portrait"  → maps to rotation 90°
---
 -- ROTATION (v6.0+):
 --   Supports 0°, 90°, 180°, and 270° rotation of the entire display.
 --   Rotation is applied at matrix initialization, so changes require a service restart.
 --   Setting is persisted in config.json and survives reboots.
 --   Layouts automatically adapt: 90°/270° use portrait coords (32×64)
+--   Use the "Apply Rotation" button to send the rotation command and restart the panel.
 --
 -- GROUPING (v5.0):
 --   Each LED panel can be assigned to a group (1-8) via the panel's WebUI or UDP command.
@@ -44,10 +40,10 @@
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display (Groups+Rotation) DEBUG",
-    Version = "6.0.2-debug",
-    Id = "dhpke.olimex.led.matrix.6.0.2",
-    Description = "RPi 64x32 LED Matrix with 8-group support + rotation (DEBUG BUILD) - orientation deprecated",
+    Name = "PKE~LED Matrix Display (Groups+Rotation)",
+    Version = "6.1.0",
+    Id = "dhpke.olimex.led.matrix.6.1.0",
+    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation (0°, 90°, 180°, 270°)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -105,9 +101,8 @@ function GetControls(props)
 
     -- Global
     table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="orientation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })  -- NEW in v6.0
-    table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })  -- NEW in v6.0
+    table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
     return controls
@@ -163,7 +158,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.0.2-debug (VERBOSE LOGGING)",
+        Type="Text", Text="LED Matrix Controller  v6.1.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -392,19 +387,15 @@ function GetControlLayout(props)
     layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
         Position={6, y+30}, Size={100, 36} }
     
-    Lbl("Orientation", 112, y+16, 100)
-    layout["orientation"] = { PrettyName="Global~Orient", Style="ComboBox",
-        Position={112, y+30}, Size={110, 36} }
-    
-    -- NEW in v6.0: Rotation control
-    Lbl("Rotation (°)", 228, y+16, 100)
+    -- Rotation control
+    Lbl("Rotation (°)", 112, y+16, 100)
     layout["rotation"] = { PrettyName="Global~Rotation", Style="ComboBox",
-        Position={228, y+30}, Size={80, 36} }
+        Position={112, y+30}, Size={100, 36} }
     layout["apply_rotation"] = { PrettyName="Global~ApplyRot", Style="Button",
-        ButtonStyle="Trigger", Legend="Apply", Color=C_BTN_O,
-        Position={314, y+30}, Size={68, 36} }
+        ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
+        Position={218, y+30}, Size={120, 36} }
     
-    Lbl("Note: Rotation requires panel restart", 228, y+70, 200)
+    Lbl("Requires panel restart via Web UI", 112, y+70, 250)
     
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
@@ -600,14 +591,10 @@ if Controls then
         end
         
         print("[INIT] Setting up control choices...")
-        Controls.orientation.Choices = {"landscape", "portrait"}
-        Controls.rotation.Choices = {"0", "90", "180", "270"}  -- NEW in v6.0
+        Controls.rotation.Choices = {"0", "90", "180", "270"}
         Controls.layout_preset.Choices = LayoutChoices
         
-        if Controls.orientation.String == "" then
-            Controls.orientation.String = "landscape"
-        end
-        if Controls.rotation.String == "" then  -- NEW in v6.0
+        if Controls.rotation.String == "" then
             Controls.rotation.String = "0"
         end
         if Controls.brightness.String == "" or Controls.brightness.String == "0" then
@@ -870,26 +857,12 @@ if Controls then
     end
 
     Controls.orientation.EventHandler = function(ctl)
-        -- DEPRECATED: Map orientation to rotation for backward compatibility
-        local orient = ctl.String
-        local rotation = (orient == "portrait") and 90 or 0
-        
-        print(string.format("[DEPRECATED] Orientation '%s' → mapped to rotation %d°", orient, rotation))
-        print("⚠ Use the Rotation control instead (orientation will be removed in future versions)")
-        
-        if SendCommand(buildJson({cmd="rotation", value=rotation, group=activeGroup})) then
-            print("Rotation set to: " .. rotation .. "° for group " .. (activeGroup == 0 and "All" or activeGroup))
-            print("⚠ Rotation requires panel restart to take effect - use WebUI reboot button")
-            Controls.last_command.String = "Rotation saved - restart panel to apply"
-        end
-    end
-
-    -- NEW in v6.0: Rotation handler
+    -- Rotation handler
     Controls.apply_rotation.EventHandler = function()
         local rotation = tonumber(Controls.rotation.String) or 0
         if SendCommand(buildJson({cmd="rotation", value=rotation, group=activeGroup})) then
-            print("Rotation set to: " .. rotation .. "° for group " .. (activeGroup == 0 and "All" or activeGroup))
-            print("⚠ Rotation requires panel restart to take effect - use WebUI reboot button")
+            print("✓ Rotation set to: " .. rotation .. "° for group " .. (activeGroup == 0 and "All" or activeGroup))
+            print("⚠ Rotation requires panel restart - use Web UI reboot button")
             Controls.last_command.String = "Rotation saved - restart panel to apply"
         end
     end
