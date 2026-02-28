@@ -5,7 +5,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -march=native
 CXXFLAGS += -I/usr/local/include -I./
 LDFLAGS = -L/usr/local/lib
-LIBS = -lrgbmatrix -lpthread -lfreetype -lboost_system -lboost_thread
+LIBS = -lrgbmatrix -lpthread
 
 # FreeType flags
 CXXFLAGS += $(shell pkg-config --cflags freetype2)
