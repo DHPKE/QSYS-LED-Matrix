@@ -1,7 +1,7 @@
 #!/bin/bash
 # apply-network-config.sh - Apply saved network configuration
 
-CONFIG_FILE="/var/lib/led-matrix/network-config.json"
+CONFIG_FILE="/var/lib/led-matrix/config.json"
 DHCPCD_CONF="/etc/dhcpcd.conf"
 
 if [ ! -f "$CONFIG_FILE" ]; then

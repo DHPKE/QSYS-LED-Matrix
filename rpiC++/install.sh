@@ -192,9 +192,9 @@ echo "✓ Systemd services installed"
 
 # Create config directory with proper permissions
 mkdir -p /var/lib/led-matrix
-chown "$REAL_USER:$REAL_USER" /var/lib/led-matrix
+chown daemon:daemon /var/lib/led-matrix
 chmod 755 /var/lib/led-matrix
-echo "✓ Config directory created at /var/lib/led-matrix"
+echo "✓ Config directory created at /var/lib/led-matrix (daemon:daemon)"
 
 echo ""
 
