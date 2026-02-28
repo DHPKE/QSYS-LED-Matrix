@@ -113,7 +113,8 @@ void UDPHandler::run() {
 }
 
 void UDPHandler::dispatch(const std::string& raw_json) {
-    std::cout << "[UDP] Received: " << raw_json << std::endl;
+    // Reduced logging - only log on startup or errors
+    // std::cout << "[UDP] Received: " << raw_json << std::endl;
     
     try {
         json doc = json::parse(raw_json);
@@ -131,8 +132,9 @@ void UDPHandler::dispatch(const std::string& raw_json) {
             return;
         }
         
-        std::cout << "[UDP] Executing command: " << cmd 
-                 << " (group=" << cmd_group << ", my_group=" << my_group << ")" << std::endl;
+        // Reduced logging - only on group changes or layout commands
+        // std::cout << "[UDP] Executing command: " << cmd 
+        //          << " (group=" << cmd_group << ", my_group=" << my_group << ")" << std::endl;
         
         if (cmd == "text") {
             int seg = doc.value("seg", 0);
