@@ -1,0 +1,13 @@
+[Unit]
+Description=Apply LED Matrix Network Configuration
+Before=network-online.target
+Wants=network-pre.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/apply-network-config.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

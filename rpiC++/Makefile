@@ -15,7 +15,7 @@ LIBS += $(shell pkg-config --libs freetype2)
 TARGET = led-matrix
 
 # Source files
-SOURCES = main.cpp segment_manager.cpp udp_handler.cpp text_renderer.cpp
+SOURCES = main.cpp segment_manager.cpp udp_handler.cpp text_renderer.cpp web_server.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 # Build targets

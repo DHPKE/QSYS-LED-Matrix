@@ -16,6 +16,7 @@
 #include "segment_manager.h"
 #include "udp_handler.h"
 #include "text_renderer.h"
+#include "web_server.h"
 #include "config.h"
 
 using namespace rgb_matrix;
@@ -185,7 +186,11 @@ int main(int argc, char* argv[]) {
              << std::endl;
     // UDP handler already loaded config, layout will be applied on first command
     
-    // ── 7. Initialize text renderer ──────────────────────────────────────────
+    // ── 7. Start web config server ───────────────────────────────────────────
+    WebServer web_server(WEB_PORT);
+    web_server.start();
+    
+    // ── 8. IP splash screen ──────────────────────────────────────────────────
     TextRenderer renderer(g_matrix, &sm);
     
     // ── 8. IP splash screen ──────────────────────────────────────────────────

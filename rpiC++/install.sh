@@ -48,7 +48,7 @@ apt-get install -y libfreetype6-dev nlohmann-json3-dev
 apt-get install -y fonts-dejavu-core
 
 # Network tools
-apt-get install -y netcat-openbsd
+apt-get install -y netcat-openbsd jq
 
 echo "✓ System dependencies installed"
 echo ""
@@ -153,10 +153,16 @@ cp led-matrix /usr/local/bin/
 chmod +x /usr/local/bin/led-matrix
 echo "✓ Binary installed to /usr/local/bin/led-matrix"
 
-# Install systemd service
+# Install network config applier
+cp apply-network-config.sh /usr/local/bin/
+chmod +x /usr/local/bin/apply-network-config.sh
+echo "✓ Network config script installed"
+
+# Install systemd services
 cp led-matrix.service /etc/systemd/system/
+cp led-matrix-network.service /etc/systemd/system/
 systemctl daemon-reload
-echo "✓ Systemd service installed"
+echo "✓ Systemd services installed"
 
 # Create config directory with proper permissions
 mkdir -p /var/lib/led-matrix
@@ -168,10 +174,11 @@ echo ""
 
 # ─── 6. Enable Service ───────────────────────────────────────────────────────
 
-echo "==[ Step 6/7: Enabling Service ]=="
+echo "==[ Step 6/7: Enabling Services ]=="
 
 systemctl enable led-matrix
-echo "✓ Service enabled (will start on boot)"
+systemctl enable led-matrix-network
+echo "✓ Services enabled (will start on boot)"
 
 echo ""
 
