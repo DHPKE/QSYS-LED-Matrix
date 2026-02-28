@@ -44,6 +44,9 @@ apt-get install -y build-essential git cmake pkg-config
 # LED matrix dependencies
 apt-get install -y libfreetype6-dev nlohmann-json3-dev
 
+# Fonts for text rendering
+apt-get install -y fonts-dejavu-core
+
 # Network tools
 apt-get install -y netcat-openbsd
 
