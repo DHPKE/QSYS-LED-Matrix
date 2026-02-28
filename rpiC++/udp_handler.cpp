@@ -253,11 +253,20 @@ void UDPHandler::dispatch(const std::string& raw_json) {
             
         } else if (cmd == "group") {
             int value = doc.value("value", 0);
+            std::cout << "[UDP] GROUP command received: value=" << value << std::endl;
             if (value >= 0 && value <= 8) {
-                std::lock_guard<std::mutex> lock(config_mutex_);
-                group_id_ = value;
+                std::cout << "[UDP] Setting group_id to " << value << std::endl;
+                {
+                    std::lock_guard<std::mutex> lock(config_mutex_);
+                    group_id_ = value;
+                }
+                std::cout << "[UDP] Group ID set, marking segments dirty..." << std::endl;
                 sm_->markAllDirty();
-                saveConfig();
+                std::cout << "[UDP] Segments marked dirty, saving config..." << std::endl;
+                saveConfig();  // saveConfig() locks config_mutex_ internally
+                std::cout << "[UDP] ✓ Group changed to " << value << std::endl;
+            } else {
+                std::cout << "[UDP] ✗ Invalid group value: " << value << std::endl;
             }
             
         } else if (cmd == "config") {
