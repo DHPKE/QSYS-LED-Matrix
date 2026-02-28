@@ -297,5 +297,3 @@ void UDPHandler::saveConfig() {
         std::cerr << "[CONFIG] Failed to save" << std::endl;
     }
 }
-
-#endif // UDP_HANDLER_H
