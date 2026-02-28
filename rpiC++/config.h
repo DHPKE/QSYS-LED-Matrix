@@ -18,7 +18,7 @@
 // GPIO Configuration
 #define HARDWARE_MAPPING "regular"  // "regular", "adafruit-hat", "adafruit-hat-pwm"
 #define GPIO_SLOWDOWN   4           // 0-4: RPi Zero 2W use 3-4, RPi 3 use 1-2, RPi 4 use 2-4 (higher=more stable)
-#define PWM_BITS        11          // 1-11: Color depth (11=best quality)
+#define PWM_BITS        8           // 1-11: Color depth (8=good compromise, 11=max quality but CPU intensive)
 #define BRIGHTNESS      50          // 0-100: Initial brightness percentage
 
 // Additional matrix options

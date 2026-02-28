@@ -103,27 +103,64 @@ void SegmentManager::updateText(int seg_id, const std::string& text,
     Segment* seg = getSegment(seg_id);
     if (!seg) return;
     
-    seg->text = text.substr(0, MAX_TEXT_LENGTH);
+    // Track if anything actually changed
+    bool changed = false;
+    
+    std::string new_text = text.substr(0, MAX_TEXT_LENGTH);
+    if (seg->text != new_text) {
+        seg->text = new_text;
+        changed = true;
+    }
+    
     if (!color.empty()) {
-        seg->color = Color::fromHex(color);
+        Color new_color = Color::fromHex(color);
+        if (seg->color.r != new_color.r || seg->color.g != new_color.g || seg->color.b != new_color.b) {
+            seg->color = new_color;
+            changed = true;
+        }
     }
+    
     if (!bgcolor.empty()) {
-        seg->bgcolor = Color::fromHex(bgcolor);
+        Color new_bgcolor = Color::fromHex(bgcolor);
+        if (seg->bgcolor.r != new_bgcolor.r || seg->bgcolor.g != new_bgcolor.g || seg->bgcolor.b != new_bgcolor.b) {
+            seg->bgcolor = new_bgcolor;
+            changed = true;
+        }
     }
+    
     if (!align.empty()) {
-        seg->align = parseAlign(align);
+        Align new_align = parseAlign(align);
+        if (seg->align != new_align) {
+            seg->align = new_align;
+            changed = true;
+        }
     }
+    
     if (!effect.empty()) {
-        seg->effect = parseEffect(effect);
+        Effect new_effect = parseEffect(effect);
+        if (seg->effect != new_effect) {
+            seg->effect = new_effect;
+            changed = true;
+        }
     }
+    
     if (!font.empty()) {
         std::string f = font;
         std::transform(f.begin(), f.end(), f.begin(), ::tolower);
-        seg->font_name = (f == "monospace" || f == "mono") ? "monospace" : "arial";
+        std::string new_font = (f == "monospace" || f == "mono") ? "monospace" : "arial";
+        if (seg->font_name != new_font) {
+            seg->font_name = new_font;
+            changed = true;
+        }
     }
+    
     // Note: is_active is controlled by layout command only!
     // Updating text doesn't activate segments outside current layout.
-    seg->is_dirty = true;
+    
+    // Only mark dirty if something actually changed
+    if (changed) {
+        seg->is_dirty = true;
+    }
 }
 
 void SegmentManager::clearSegment(int seg_id) {

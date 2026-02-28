@@ -251,9 +251,9 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Sleep to yield CPU (longer sleep when idle)
-        int sleep_ms = needs_render ? 1 : 10;  // 1ms when active, 10ms when idle
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+        // Sleep to yield CPU
+        // With 33ms render throttle, we can afford longer sleeps
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
     // ── Cleanup ──────────────────────────────────────────────────────────────
