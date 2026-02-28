@@ -606,8 +606,8 @@ if Controls then
         if Controls.rotation.String == "" then  -- NEW in v6.0
             Controls.rotation.String = "0"
         end
-        if Controls.brightness.Value == 0 then
-            Controls.brightness.Value = 128
+        if Controls.brightness.String == "" or Controls.brightness.String == "0" then
+            Controls.brightness.String = "128"
         end
         if Controls.last_command.String == "" then
             Controls.last_command.String = "Ready"
