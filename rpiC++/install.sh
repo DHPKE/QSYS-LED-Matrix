@@ -182,9 +182,43 @@ echo "✓ Services enabled (will start on boot)"
 
 echo ""
 
-# ─── 7. Network Configuration ────────────────────────────────────────────────
+# ─── 7. CPU Optimization (Optional) ──────────────────────────────────────────
 
-echo "==[ Step 7/7: Network Configuration ]=="
+echo "==[ Step 7/8: CPU Isolation (Optional) ]=="
+echo ""
+echo "The RGB matrix library uses ~50% of one CPU core to refresh the display."
+echo "This is normal behavior. You can dedicate one core to it (recommended for Pi 4/5)."
+echo ""
+echo "Add 'isolcpus=3' to /boot/cmdline.txt?"
+echo "This isolates CPU core 3 for the LED matrix only."
+echo ""
+echo "Configure CPU isolation? (y/n)"
+read -r cpu_response
+
+if [[ "$cpu_response" =~ ^[Yy]$ ]]; then
+    CMDLINE_FILE="/boot/cmdline.txt"
+    if [ -f "/boot/firmware/cmdline.txt" ]; then
+        CMDLINE_FILE="/boot/firmware/cmdline.txt"
+    fi
+    
+    if ! grep -q "isolcpus=3" "$CMDLINE_FILE"; then
+        # Add isolcpus=3 at the end (remove trailing newline first)
+        sed -i 's/$//' "$CMDLINE_FILE"
+        echo -n " isolcpus=3" >> "$CMDLINE_FILE"
+        echo "✓ CPU isolation configured (core 3 dedicated to LED matrix)"
+        NEEDS_REBOOT=1
+    else
+        echo "✓ CPU isolation already configured"
+    fi
+else
+    echo "⏭  Skipped CPU isolation"
+fi
+
+echo ""
+
+# ─── 8. Network Configuration ────────────────────────────────────────────────
+
+echo "==[ Step 8/8: Network Configuration ]=="
 echo ""
 IP=$(hostname -I | awk '{print $1}')
 if [ -z "$IP" ]; then
