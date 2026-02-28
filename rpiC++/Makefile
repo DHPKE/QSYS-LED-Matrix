@@ -2,7 +2,7 @@
 
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -march=native
 CXXFLAGS += -I/usr/local/include -I./
 LDFLAGS = -L/usr/local/lib
 LIBS = -lrgbmatrix -lpthread

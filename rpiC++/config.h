@@ -25,7 +25,7 @@
 #define SCAN_MODE           0       // 0=progressive, 1=interlaced
 #define ROW_ADDR_TYPE       0       // 0-5: Address line config
 #define MULTIPLEXING        0       // 0-17: Multiplex type
-#define PWM_LSB_NANOSECONDS 130     // Timing for LSB (130 is stable for most panels)
+#define PWM_LSB_NANOSECONDS 200     // Timing for LSB (100-300 typical)
 #define PWM_DITHER_BITS     0       // 0-2: Match Python version
 #define LED_RGB_SEQUENCE    "RGB"   // "RGB", "RBG", "GRB", etc.
 #define REFRESH_LIMIT       200     // Hz: Match Python version (200 = stable refresh)
