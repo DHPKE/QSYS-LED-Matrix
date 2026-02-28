@@ -11,6 +11,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <fstream>
+#include "nlohmann/json.hpp"
 
 #include "led-matrix.h"
 #include "segment_manager.h"
@@ -18,6 +19,8 @@
 #include "text_renderer.h"
 #include "web_server.h"
 #include "config.h"
+
+using json = nlohmann::json;
 
 using namespace rgb_matrix;
 
@@ -139,10 +142,30 @@ int main(int argc, char* argv[]) {
     // ── 1. Network setup ─────────────────────────────────────────────────────
     std::string device_ip = ensureNetwork();
     
-    // ── 2. Initialize segment manager ────────────────────────────────────────
+    //── 3. Setup segment manager and load initial config ─────────────────────
     SegmentManager sm;
     
-    // ── 3. Setup RGB matrix ──────────────────────────────────────────────────
+    // Load rotation from config before matrix init
+    Rotation initial_rotation = ROTATION_0;
+    {
+        std::ifstream config_file(CONFIG_FILE);
+        if (config_file.is_open()) {
+            try {
+                json config;
+                config_file >> config;
+                int rotation_value = config.value("rotation", 0);
+                if (rotation_value == 0) initial_rotation = ROTATION_0;
+                else if (rotation_value == 90) initial_rotation = ROTATION_90;
+                else if (rotation_value == 180) initial_rotation = ROTATION_180;
+                else if (rotation_value == 270) initial_rotation = ROTATION_270;
+                std::cout << "[INIT] Loaded rotation from config: " << rotation_value << "°" << std::endl;
+            } catch (...) {
+                std::cout << "[INIT] Could not load rotation from config, using default (0°)" << std::endl;
+            }
+        }
+    }
+    
+    // ── 4. Setup RGB matrix ──────────────────────────────────────────────────
     RGBMatrix::Options matrix_options;
     RuntimeOptions runtime_opt;
     
@@ -163,6 +186,24 @@ int main(int argc, char* argv[]) {
     matrix_options.disable_hardware_pulsing = true;  // Avoid audio conflict
     matrix_options.show_refresh_rate = false;        // Disable refresh overlay
     matrix_options.inverse_colors = false;           // Normal color display
+    
+    // Set pixel mapper for rotation
+    const char* pixel_mapper = "";
+    switch (initial_rotation) {
+        case ROTATION_0:
+            pixel_mapper = "";  // No rotation
+            break;
+        case ROTATION_90:
+            pixel_mapper = "Rotate:90";
+            break;
+        case ROTATION_180:
+            pixel_mapper = "Rotate:180";
+            break;
+        case ROTATION_270:
+            pixel_mapper = "Rotate:270";
+            break;
+    }
+    matrix_options.pixel_mapper_config = pixel_mapper;
     
     runtime_opt.gpio_slowdown = GPIO_SLOWDOWN;
     runtime_opt.drop_privileges = 1;  // Drop root after init
@@ -200,9 +241,17 @@ int main(int argc, char* argv[]) {
         }
     };
     
-    // ── 6. Start UDP listener ────────────────────────────────────────────────
-    g_udp_handler = new UDPHandler(&sm, on_brightness_change, on_orientation_change);
+    // ── 6. Rotation callback ─────────────────────────────────────────────────
+    auto on_rotation_change = [](Rotation rotation) {
+        int angle = static_cast<int>(rotation);
+        std::cout << "[MAIN] Rotation changed to " << angle << "° (will apply on next restart)" << std::endl;
+    };
+    
+    // ── 7. Start UDP listener ────────────────────────────────────────────────
+    g_udp_handler = new UDPHandler(&sm, on_brightness_change, on_orientation_change, on_rotation_change);
     g_udp_handler->start();
+    
+    // Note: rotation is already applied during matrix init from loaded config
     
     // Apply initial layout based on loaded orientation
     std::cout << "[MAIN] Initial orientation: " 
@@ -210,7 +259,7 @@ int main(int argc, char* argv[]) {
              << std::endl;
     // UDP handler already loaded config, layout will be applied on first command
     
-    // ── 7. Start web config server ───────────────────────────────────────────
+    // ── 8. Start web config server ───────────────────────────────────────────
     WebServer web_server(WEB_PORT);
     web_server.start();
     
@@ -242,9 +291,201 @@ int main(int argc, char* argv[]) {
     while (!interrupt_received) {
         auto now = std::chrono::steady_clock::now();
         
+        // Check for test mode
+        static bool test_mode_active = false;
+        static bool test_mode_was_active = false;
+        static int test_bar_offset = 0;
+        std::ifstream testfile("/tmp/led-matrix-testmode");
+        if (testfile.is_open()) {
+            char c;
+            testfile >> c;
+            test_mode_active = (c == '1');
+            testfile.close();
+        }
+        
+        // Clear all segments when entering test mode
+        if (test_mode_active && !test_mode_was_active) {
+            std::cout << "[TEST] Entering test mode - clearing display..." << std::endl;
+            sm.clearAll();
+            // Clear matrix multiple times to ensure it's black
+            for (int i = 0; i < 5; i++) {
+                g_matrix->Clear();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            test_bar_offset = 0; // Reset bar position
+            std::cout << "[TEST] Display cleared, starting test pattern" << std::endl;
+        }
+        test_mode_was_active = test_mode_active;
+        
+        if (test_mode_active) {
+            // Skip first few frames after entering test mode to let clear take effect
+            static int frames_since_test_start = 0;
+            static auto test_mode_start_time = std::chrono::steady_clock::now();
+            static bool initial_clear_done = false;
+            
+            if (!test_mode_was_active) {
+                frames_since_test_start = 0;
+                test_mode_start_time = now;
+                initial_clear_done = false;
+            }
+            frames_since_test_start++;
+            
+            // Keep clearing for first 1 second (30 frames at 30fps)
+            auto elapsed_since_start = std::chrono::duration_cast<std::chrono::milliseconds>(now - test_mode_start_time);
+            if (elapsed_since_start.count() < 1000) {
+                sm.clearAll(); // Keep segments clear
+                g_matrix->Clear(); // Keep clearing
+                std::this_thread::sleep_for(std::chrono::milliseconds(33));
+                continue;
+            }
+            
+            // After blackout, ensure segments are cleared once before starting pattern
+            if (!initial_clear_done) {
+                sm.clearAll();
+                initial_clear_done = true;
+            }
+            
+            // Render test pattern: 4-state cycle (hostname top, blank, IP bottom, blank)
+            
+            // Reset cycle state when entering test mode
+            static bool test_mode_just_started = false;
+            if (!test_mode_was_active) {
+                test_mode_just_started = true;
+            }
+            
+            // Get current hostname (refresh every 10 seconds)
+            static std::string hostname = "led-matrix";
+            static auto last_hostname_fetch = std::chrono::steady_clock::now();
+            auto hostname_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_hostname_fetch);
+            if (hostname_elapsed.count() >= 10) {
+                FILE* pipe = popen("hostname", "r");
+                if (pipe) {
+                    char buf[128];
+                    if (fgets(buf, sizeof(buf), pipe)) {
+                        hostname = buf;
+                        if (!hostname.empty() && hostname.back() == '\n') {
+                            hostname.pop_back();
+                        }
+                    }
+                    pclose(pipe);
+                }
+                last_hostname_fetch = now;
+            }
+            
+            // Get current IP address (refresh every 10 seconds)
+            static std::string test_device_ip = device_ip;
+            static auto last_ip_fetch = std::chrono::steady_clock::now();
+            auto ip_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_ip_fetch);
+            if (ip_elapsed.count() >= 10) {
+                // Get IP from eth1 (same as ensureNetwork)
+                FILE* pipe = popen("ip -4 addr show eth1 2>/dev/null | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'", "r");
+                if (pipe) {
+                    char buf[64];
+                    if (fgets(buf, sizeof(buf), pipe)) {
+                        test_device_ip = buf;
+                        if (!test_device_ip.empty() && test_device_ip.back() == '\n') {
+                            test_device_ip.pop_back();
+                        }
+                    }
+                    pclose(pipe);
+                }
+                last_ip_fetch = now;
+            }
+            
+            // 4-state cycle every second: 0=hostname top, 1=blank, 2=IP bottom, 3=blank
+            static auto last_cycle_switch = std::chrono::steady_clock::now();
+            static int cycle_state = 0;
+            static int last_cycle_state = -1;
+            
+            // Reset cycle on test mode start
+            if (test_mode_just_started) {
+                cycle_state = 0;
+                last_cycle_state = -1;
+                last_cycle_switch = now;
+                test_mode_just_started = false;
+            }
+            
+            auto cycle_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_cycle_switch);
+            if (cycle_elapsed.count() >= 1) {
+                cycle_state = (cycle_state + 1) % 4;
+                last_cycle_switch = now;
+            }
+            
+            // Draw vertical color bars (full height)
+            const int bar_width = MATRIX_WIDTH / 5; // Even wider bars (1/5 = ~13px)
+            const int num_bars = 8;
+            
+            // Colors: Red, Green, Blue, Cyan, Magenta, Yellow, White, Black
+            const int colors[][3] = {
+                {255, 0, 0},    // Red
+                {0, 255, 0},    // Green
+                {0, 0, 255},    // Blue
+                {0, 255, 255},  // Cyan
+                {255, 0, 255},  // Magenta
+                {255, 255, 0},  // Yellow
+                {255, 255, 255},// White
+                {0, 0, 0}       // Black
+            };
+            
+            // Move bars from left to right (slower for smoother appearance)
+            static int frame_counter = 0;
+            frame_counter++;
+            if (frame_counter % 4 == 0) { // Update bar position every 4 frames (slower)
+                test_bar_offset = (test_bar_offset + 1) % (bar_width * num_bars);
+            }
+            
+            for (int x = 0; x < MATRIX_WIDTH; x++) {
+                int bar_index = ((x + test_bar_offset) / bar_width) % num_bars;
+                for (int y = 0; y < MATRIX_HEIGHT; y++) {
+                    g_matrix->SetPixel(x, y, colors[bar_index][0], colors[bar_index][1], colors[bar_index][2]);
+                }
+            }
+            
+            // Update segments when cycle state changes
+            if (cycle_state != last_cycle_state) {
+                sm.clearAll();
+                
+                if (cycle_state == 0) {
+                    // Hostname in upper half
+                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT / 2);
+                    sm.activate(0, true);
+                    sm.setFrame(0, false, "FFFFFF", 1); // Disable frame
+                    sm.updateText(0, hostname, "000000", "010101", "C", "none");
+                } else if (cycle_state == 2) {
+                    // IP in lower half
+                    sm.configure(0, 0, MATRIX_HEIGHT / 2, MATRIX_WIDTH, MATRIX_HEIGHT / 2);
+                    sm.activate(0, true);
+                    sm.setFrame(0, false, "FFFFFF", 1); // Disable frame
+                    sm.updateText(0, test_device_ip, "000000", "010101", "C", "none");
+                }
+                // States 1 and 3 are blank (no segments active)
+                
+                last_cycle_state = cycle_state;
+            }
+            
+            // Mark dirty every frame so text renders on top of bars
+            sm.markAllDirty();
+            
+            // Render text on top of bars
+            renderer.renderAll();
+            
+            std::this_thread::sleep_for(std::chrono::milliseconds(33)); // 30fps
+            continue; // Skip normal rendering
+        }
+        
         // Dismiss IP splash on first command
         if (ip_splash_active && g_udp_handler->hasReceivedCommand()) {
+            std::cout << "[SPLASH] Dismissing splash - clearing segment 0 and disabling frame..." << std::endl;
             ip_splash_active = false;
+            sm.clearSegment(0);  // Clear splash text
+            std::cout << "[SPLASH] clearSegment(0) called" << std::endl;
+            sm.setFrame(0, false, "FFFFFF", 1);  // Disable splash frame
+            std::cout << "[SPLASH] setFrame(0, false) called" << std::endl;
+            
+            // Force full canvas clear to remove frame pixels
+            g_matrix->Clear();
+            std::cout << "[SPLASH] Canvas cleared" << std::endl;
+            
             sm.markAllDirty();  // Force re-render
             std::cout << "[SPLASH] First command received — IP splash dismissed" << std::endl;
         }

@@ -14,10 +14,12 @@ class UDPHandler {
 public:
     using BrightnessCallback = std::function<void(int)>;
     using OrientationCallback = std::function<void(Orientation)>;
+    using RotationCallback = std::function<void(Rotation)>;
     
     UDPHandler(SegmentManager* segment_manager,
                BrightnessCallback brightness_cb = nullptr,
-               OrientationCallback orientation_cb = nullptr);
+               OrientationCallback orientation_cb = nullptr,
+               RotationCallback rotation_cb = nullptr);
     ~UDPHandler();
     
     void start();
@@ -25,6 +27,7 @@ public:
     bool hasReceivedCommand() const { return first_command_received_; }
     int getCurrentLayout() const { return current_layout_; }
     Orientation getOrientation() const { return orientation_; }
+    Rotation getRotation() const { return rotation_; }
     int getGroupId() const { return group_id_; }
     int getBrightness() const { return brightness_; }
     
@@ -38,8 +41,10 @@ private:
     std::atomic<bool> first_command_received_;
     BrightnessCallback brightness_callback_;
     OrientationCallback orientation_callback_;
+    RotationCallback rotation_callback_;
     
     Orientation orientation_;
+    Rotation rotation_;
     int current_layout_;
     int brightness_;
     int group_id_;

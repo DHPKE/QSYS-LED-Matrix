@@ -176,6 +176,7 @@ void SegmentManager::clearAll() {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     for (auto& seg : segments_) {
         seg.text = "";
+        seg.is_active = false;  // Deactivate all segments
         seg.is_dirty = true;
     }
 }

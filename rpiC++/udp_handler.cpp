@@ -17,14 +17,17 @@ using json = nlohmann::json;
 
 UDPHandler::UDPHandler(SegmentManager* segment_manager,
                        BrightnessCallback brightness_cb,
-                       OrientationCallback orientation_cb)
+                       OrientationCallback orientation_cb,
+                       RotationCallback rotation_cb)
     : sm_(segment_manager),
       socket_fd_(-1),
       running_(false),
       first_command_received_(false),
       brightness_callback_(brightness_cb),
       orientation_callback_(orientation_cb),
+      rotation_callback_(rotation_cb),
       orientation_(LANDSCAPE),
+      rotation_(ROTATION_0),
       current_layout_(1),
       brightness_(128),
       group_id_(0) {
@@ -113,6 +116,18 @@ void UDPHandler::run() {
 }
 
 void UDPHandler::dispatch(const std::string& raw_json) {
+    // Check if test mode is active - if so, ignore all UDP commands
+    std::ifstream testfile("/tmp/led-matrix-testmode");
+    if (testfile.is_open()) {
+        char c;
+        testfile >> c;
+        testfile.close();
+        if (c == '1') {
+            // Test mode active - ignore all commands silently
+            return;
+        }
+    }
+    
     // Reduced logging - only log on startup or errors
     // std::cout << "[UDP] Received: " << raw_json << std::endl;
     
@@ -198,6 +213,31 @@ void UDPHandler::dispatch(const std::string& raw_json) {
             applyLayout(current_layout_);
             saveConfig();
             
+        } else if (cmd == "rotation") {
+            int value = doc.value("value", 0);
+            Rotation new_rotation = ROTATION_0;
+            
+            if (value == 0) new_rotation = ROTATION_0;
+            else if (value == 90) new_rotation = ROTATION_90;
+            else if (value == 180) new_rotation = ROTATION_180;
+            else if (value == 270) new_rotation = ROTATION_270;
+            else {
+                std::cerr << "[UDP] Invalid rotation value: " << value << " (must be 0, 90, 180, or 270)" << std::endl;
+                return;
+            }
+            
+            {
+                std::lock_guard<std::mutex> lock(config_mutex_);
+                rotation_ = new_rotation;
+            }
+            
+            if (rotation_callback_) {
+                rotation_callback_(new_rotation);
+            }
+            
+            std::cout << "[UDP] Rotation set to " << value << "°" << std::endl;
+            saveConfig();
+            
         } else if (cmd == "group") {
             int value = doc.value("value", 0);
             if (value >= 0 && value <= 8) {
@@ -264,6 +304,10 @@ void UDPHandler::applyLayout(int preset) {
             sm_->activate(i, false);
         }
     }
+    
+    // Always disable frame on segment 1 after layout change
+    std::cout << "[UDP] Disabling frame on segment 1 after layout change" << std::endl;
+    sm_->setFrame(1, false, "FFFFFF", 2);
 }
 
 void UDPHandler::loadConfig() {
@@ -280,10 +324,18 @@ void UDPHandler::loadConfig() {
         std::string orient = config.value("orientation", "landscape");
         orientation_ = (orient == "portrait") ? PORTRAIT : LANDSCAPE;
         
+        int rotation_value = config.value("rotation", 0);
+        if (rotation_value == 0) rotation_ = ROTATION_0;
+        else if (rotation_value == 90) rotation_ = ROTATION_90;
+        else if (rotation_value == 180) rotation_ = ROTATION_180;
+        else if (rotation_value == 270) rotation_ = ROTATION_270;
+        else rotation_ = ROTATION_0;
+        
         group_id_ = config.value("group_id", 0);
         brightness_ = config.value("brightness", 128);
         
         std::cout << "[CONFIG] Loaded orientation: " << orient 
+                 << ", rotation: " << rotation_value << "°"
                  << ", group_id: " << group_id_ 
                  << ", brightness: " << brightness_ << std::endl;
     } catch (const json::exception& e) {
@@ -302,6 +354,7 @@ void UDPHandler::saveConfig() {
     {
         std::lock_guard<std::mutex> lock(config_mutex_);
         config["orientation"] = (orientation_ == PORTRAIT) ? "portrait" : "landscape";
+        config["rotation"] = static_cast<int>(rotation_);
         config["group_id"] = group_id_;
         config["brightness"] = brightness_;
     }

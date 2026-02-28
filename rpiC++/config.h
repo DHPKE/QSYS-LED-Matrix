@@ -47,6 +47,15 @@
 #define MAX_TEXT_LENGTH   128
 #define EFFECT_INTERVAL   50    // milliseconds between effect updates (20 fps, matches Python)
 
+// Rotation: 0=normal, 90=clockwise, 180=upside-down, 270=counter-clockwise
+enum Rotation {
+    ROTATION_0 = 0,
+    ROTATION_90 = 90,
+    ROTATION_180 = 180,
+    ROTATION_270 = 270
+};
+
+// Legacy orientation enum (kept for compatibility)
 // Orientation: 0=landscape (64×32), 1=portrait (32×64)
 enum Orientation {
     LANDSCAPE = 0,

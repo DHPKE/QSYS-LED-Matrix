@@ -203,10 +203,15 @@ void TextRenderer::renderAll() {
 }
 
 void TextRenderer::renderSegment(const Segment& seg) {
-    // Fill background
-    for (int y = seg.y; y < seg.y + seg.height; y++) {
-        for (int x = seg.x; x < seg.x + seg.width; x++) {
-            canvas_->SetPixel(x, y, seg.bgcolor.r, seg.bgcolor.g, seg.bgcolor.b);
+    // Skip background fill if bgcolor is (1,1,1) - transparent marker for test mode
+    bool skip_background = (seg.bgcolor.r == 1 && seg.bgcolor.g == 1 && seg.bgcolor.b == 1);
+    
+    if (!skip_background) {
+        // Fill background
+        for (int y = seg.y; y < seg.y + seg.height; y++) {
+            for (int x = seg.x; x < seg.x + seg.width; x++) {
+                canvas_->SetPixel(x, y, seg.bgcolor.r, seg.bgcolor.g, seg.bgcolor.b);
+            }
         }
     }
     

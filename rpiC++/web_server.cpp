@@ -149,6 +149,30 @@ std::string WebServer::handleRequest(const std::string& method, const std::strin
         return response.str();
     }
     
+    if (path == "/api/testmode" && method == "POST") {
+        // Toggle test mode
+        static bool test_mode_enabled = false;
+        test_mode_enabled = !test_mode_enabled;
+        
+        // Write test mode state to a file that main.cpp can read
+        std::ofstream testfile("/tmp/led-matrix-testmode");
+        testfile << (test_mode_enabled ? "1" : "0");
+        testfile.close();
+        
+        std::cout << "[WEB] Test mode " << (test_mode_enabled ? "enabled" : "disabled") << std::endl;
+        
+        std::string json_str = test_mode_enabled ? 
+            "{\"status\":\"ok\",\"enabled\":true}" : 
+            "{\"status\":\"ok\",\"enabled\":false}";
+        std::ostringstream response;
+        response << "HTTP/1.1 200 OK\r\n";
+        response << "Content-Type: application/json\r\n";
+        response << "Content-Length: " << json_str.length() << "\r\n";
+        response << "Connection: close\r\n\r\n";
+        response << json_str;
+        return response.str();
+    }
+    
     if (path == "/api/reboot" && method == "POST") {
         std::cout << "[WEB] Reboot requested via web UI" << std::endl;
         // Fork to avoid killing the response
@@ -184,7 +208,7 @@ std::string WebServer::getConfigPage() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LED Matrix Network Config</title>
+    <title id="pageTitle">LED Matrix Config</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -202,7 +226,8 @@ std::string WebServer::getConfigPage() {
             margin-bottom: 20px;
         }
         .logo-container svg {
-            width: 600px;
+            width: 50%;
+            max-width: 450px;
             height: auto;
         }
         .container {
@@ -350,12 +375,12 @@ std::string WebServer::getConfigPage() {
 </head>
 <body>
     <div class="logo-container">
-        <svg version="1.0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2050 240">
-            <path fill="#FFFFFF" d="M1132.82,98.27c9.3-10.68,18.49-21.27,27.56-31.76c1.85-2.12,3.99-4.62,7.01-4.79c1.77-0.11,3.61-0.15,5.49-0.12c12.29,0.12,24.05,0.15,35.3,0.09c1.04-0.01,1.19,0.37,0.47,1.13l-40.57,42.53c-0.39,0.41-0.45,1.03-0.14,1.51l45.38,71.37c0.45,0.71,0.27,1.07-0.57,1.07l-43.28-0.01c-0.47,0-0.82-0.2-1.07-0.6l-27.2-45.13c-0.18-0.29-0.59-0.34-0.83-0.1l-8.05,8.26c-0.32,0.32-0.49,0.76-0.49,1.21l-0.02,35.89c0,0.27-0.21,0.48-0.47,0.48l-36.58-0.04c-0.49,0-0.9-0.42-0.9-0.93V62.9c0-0.81,0.4-1.22,1.19-1.22l36.21,0.04c0.32,0,0.58,0.26,0.58,0.58l0.01,35.6C1131.85,98.89,1132.18,99.01,1132.82,98.27z"/>
-            <path fill="#FFFFFF" d="M1012.43,141.61c-0.36-0.01-0.64,0.27-0.65,0.62v35.16c0,0.37-0.3,0.67-0.67,0.67l-37.9-0.01c-0.34,0-0.62-0.28-0.62-0.62l0.01-116.34c0-0.15,0.12-0.27,0.28-0.27c20.27-0.16,40.15-0.13,59.65,0.09c6.38,0.07,12.73,0.98,19.05,2.72c16.02,4.42,25.29,14.33,27.84,29.74c1.19,7.24,0.59,14.73-1.82,22.48C1068.91,143.69,1035.58,142.32,1012.43,141.61z M1013,89.03l-0.05,24.92c0,0.23,0.19,0.42,0.42,0.42l14.88,0.02c8.48,0.01,15.36-5.28,15.37-11.82v-2.07c0.01-6.54-6.85-11.85-15.33-11.87l-14.88-0.02C1013.19,88.61,1013,88.8,1013,89.03z"/>
-            <path fill="#FFFFFF" d="M1269.12,151.6c16.44-0.06,33.01-0.05,49.71,0.05c2.23,0.01,4.55,0.11,6.96,0.26c0.55,0.04,0.83,0.33,0.83,0.87l0.12,24.38c0,0.61-0.31,0.9-0.93,0.9l-96.57,0.01c-0.34,0-0.62-0.28-0.62-0.62l0.01-115.92c0-0.18,0.14-0.32,0.32-0.32c23.03-0.04,47.93-0.05,74.68-0.01c6.67,0.01,13.64,0.13,20.92,0.37c0.42,0.01,0.64,0.23,0.65,0.63c0.32,8.58,0.3,16.92-0.06,25.02c-0.04,0.94-0.53,1.4-1.47,1.4h-55.23c-0.35,0-0.62,0.27-0.62,0.61l0.05,15.69c0,0.47,0.36,0.85,0.83,0.85l46.58-0.09c0.22,0,0.33,0.11,0.33,0.34l0.01,26.62c0,0.87-0.42,1.31-1.26,1.31l-45.93,0.08c-0.4,0-0.6,0.19-0.6,0.57l0.04,15.77C1267.86,151.07,1268.42,151.61,1269.12,151.6z"/>
-            <path fill="#FFFFFF" d="M954.26,107c7.09,31.42-11.98,62.34-43.02,69.99c-5.32,1.31-13.55,1.89-24.68,1.74c-14.12-0.18-28.26-0.18-42.39,0c-0.65,0.01-0.98-0.32-1.66-0.97v-13.57c0.68-0.47,0.92-0.74,1.38-0.82c13.39-2.17,23.58-8.17,30.59-18.01c11.17-15.69,11.09-35.91-0.43-51.21c-7.22-9.57-17.26-15.35-30.16-17.33c-0.48-0.09-0.72-0.36-0.16-0.83V62.15c-0.54-0.51-0.28-0.77,0.23-0.77c18.61-0.11,36.15-0.09,52.63,0.06C924.41,61.68,948.11,79.71,954.26,107z M849.07,68.2c-0.78,1.7,0,3.63,1.92,4.2c3.8,1.14,7.62,2.23,11.12,4.04c24.26,12.58,33.66,42.99,20.45,67.06c-6.39,11.65-18.12,21.44-31.8,24.56c-1.79,0.4-2.34,1.68-1.67,3.82c0.18,0.58,0.72,0.97,1.32,0.96c14.38-0.11,28.97-0.1,43.78,0.06c5.95,0.06,11.21-0.48,15.77-1.62c21.1-5.28,37.35-23.4,39.67-45.4c1.19-11.32-0.88-21.73-6.21-31.23c-7.23-12.89-18.19-21.44-32.91-25.65c-4.48-1.29-9.97-1.9-16.45-1.85c-13.01,0.11-25.33,0.15-36.96,0.1c-2.41-0.01-4.7,0.04-6.86,0.15C849.7,67.44,849.3,67.7,849.07,68.2z"/>
-            <path fill="#FFFFFF" d="M799.67,103.49c-3.37,7.71-4.34,15.57-2.88,23.58c3.53,19.49,18.63,33.44,38.32,36.14c0.42,0.06,0.74,0.43,0.04,0.85v13.73c0.66,0.61,0.36,0.92-0.26,0.91c-17.33-0.07-35.07-0.16-53.24-0.26c-16.8-0.1-30.76-5.97-41.9-17.62c-23.12-24.19-21.74-61.89,3-84.36c13.86-12.57,29.17-15.4,47.85-15.22c15.72,0.16,30.44,0.17,44.16,0.01c0.65-0.01,0.98,0.32,1.6,0.97v13.78c-0.49,0.62-0.99,1.13-1.62,1.11c-1.59-0.01-3.14,0.18-4.62,0.59C815.6,81.65,805.45,90.25,799.67,103.49z M783.4,67.17c-18.83-0.18-35.15,8.48-45.61,23.91c-9.13,13.49-11.44,31.58-5.65,46.71c8.59,22.37,27.7,35.26,51.75,35.09c17.11-0.12,32.18-0.12,45.18,0c0.64,0.01,0.96-0.31-0.05-0.94v-2.58c1-0.58,0.61-1.08,0.06-1.23c-13.46-3.43-23.7-10.56-30.72-21.38c-18.77-28.95-2.49-67.33,30.66-74.47c0.66-0.15,0.99-0.56,1.23-1.24v-2.9c-0.27-0.6-0.58-0.91-1.18-0.89C814.13,67.35,798.92,67.33,783.4,67.17z"/>
+        <svg version="1.0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 657.1 240">
+            <path fill="#FFFFFF" d="M435.25,98.27c9.3-10.68,18.49-21.27,27.56-31.76c1.85-2.12,3.99-4.62,7.01-4.79c1.77-0.11,3.61-0.15,5.49-0.12c12.29,0.12,24.05,0.15,35.3,0.09c1.04-0.01,1.19,0.37,0.47,1.13l-40.57,42.53c-0.39,0.41-0.45,1.03-0.14,1.51l45.38,71.37c0.45,0.71,0.27,1.07-0.57,1.07l-43.28-0.01c-0.47,0-0.82-0.2-1.07-0.6l-27.2-45.13c-0.18-0.29-0.59-0.34-0.83-0.1l-8.05,8.26c-0.32,0.32-0.49,0.76-0.49,1.21l-0.02,35.89c0,0.27-0.21,0.48-0.47,0.48l-36.58-0.04c-0.49,0-0.9-0.42-0.9-0.93V62.9c0-0.81,0.4-1.22,1.19-1.22l36.21,0.04c0.32,0,0.58,0.26,0.58,0.58l0.01,35.6C434.28,98.89,434.61,99.01,435.25,98.27z"/>
+            <path fill="#FFFFFF" d="M314.86,141.61c-0.36-0.01-0.64,0.27-0.65,0.62v35.16c0,0.37-0.3,0.67-0.67,0.67l-37.9-0.01c-0.34,0-0.62-0.28-0.62-0.62l0.01-116.34c0-0.15,0.12-0.27,0.28-0.27c20.27-0.16,40.15-0.13,59.65,0.09c6.38,0.07,12.73,0.98,19.05,2.72c16.02,4.42,25.29,14.33,27.84,29.74c1.19,7.24,0.59,14.73-1.82,22.48C371.34,143.69,338.01,142.32,314.86,141.61z M315.43,89.03l-0.05,24.92c0,0.23,0.19,0.42,0.42,0.42l14.88,0.02c8.48,0.01,15.36-5.28,15.37-11.82v-2.07c0.01-6.54-6.85-11.85-15.33-11.87l-14.88-0.02C315.62,88.61,315.43,88.8,315.43,89.03z"/>
+            <path fill="#FFFFFF" d="M571.55,151.6c16.44-0.06,33.01-0.05,49.71,0.05c2.23,0.01,4.55,0.11,6.96,0.26c0.55,0.04,0.83,0.33,0.83,0.87l0.12,24.38c0,0.61-0.31,0.9-0.93,0.9l-96.57,0.01c-0.34,0-0.62-0.28-0.62-0.62l0.01-115.92c0-0.18,0.14-0.32,0.32-0.32c23.03-0.04,47.93-0.05,74.68-0.01c6.67,0.01,13.64,0.13,20.92,0.37c0.42,0.01,0.64,0.23,0.65,0.63c0.32,8.58,0.3,16.92-0.06,25.02c-0.04,0.94-0.53,1.4-1.47,1.4h-55.23c-0.35,0-0.62,0.27-0.62,0.61l0.05,15.69c0,0.47,0.36,0.85,0.83,0.85l46.58-0.09c0.22,0,0.33,0.11,0.33,0.34l0.01,26.62c0,0.87-0.42,1.31-1.26,1.31l-45.93,0.08c-0.4,0-0.6,0.19-0.6,0.57l0.04,15.77C570.29,151.07,570.85,151.61,571.55,151.6z"/>
+            <path fill="#FFFFFF" d="M256.69,107c7.09,31.42-11.98,62.34-43.02,69.99c-5.32,1.31-13.55,1.89-24.68,1.74c-14.12-0.18-28.26-0.18-42.39,0c-0.65,0.01-0.98-0.32-1.66-0.97v-13.57c0.68-0.47,0.92-0.74,1.38-0.82c13.39-2.17,23.58-8.17,30.59-18.01c11.17-15.69,11.09-35.91-0.43-51.21c-7.22-9.57-17.26-15.35-30.16-17.33c-0.48-0.09-0.72-0.36-0.16-0.83V62.15c-0.54-0.51-0.28-0.77,0.23-0.77c18.61-0.11,36.15-0.09,52.63,0.06C226.84,61.68,250.54,79.71,256.69,107z M151.5,68.2c-0.78,1.7,0,3.63,1.92,4.2c3.8,1.14,7.62,2.23,11.12,4.04c24.26,12.58,33.66,42.99,20.45,67.06c-6.39,11.65-18.12,21.44-31.8,24.56c-1.79,0.4-2.34,1.68-1.67,3.82c0.18,0.58,0.72,0.97,1.32,0.96c14.38-0.11,28.97-0.1,43.78,0.06c5.95,0.06,11.21-0.48,15.77-1.62c21.1-5.28,37.35-23.4,39.67-45.4c1.19-11.32-0.88-21.73-6.21-31.23c-7.23-12.89-18.19-21.44-32.91-25.65c-4.48-1.29-9.97-1.9-16.45-1.85c-13.01,0.11-25.33,0.15-36.96,0.1c-2.41-0.01-4.7,0.04-6.86,0.15C152.13,67.44,151.73,67.7,151.5,68.2z"/>
+            <path fill="#FFFFFF" d="M102.1,103.49c-3.37,7.71-4.34,15.57-2.88,23.58c3.53,19.49,18.63,33.44,38.32,36.14c0.42,0.06,0.74,0.43,0.04,0.85v13.73c0.66,0.61,0.36,0.92-0.26,0.91c-17.33-0.07-35.07-0.16-53.24-0.26c-16.8-0.1-30.76-5.97-41.9-17.62c-23.12-24.19-21.74-61.89,3-84.36c13.86-12.57,29.17-15.4,47.85-15.22c15.72,0.16,30.44,0.17,44.16,0.01c0.65-0.01,0.98,0.32,1.6,0.97V76c-0.49,0.62-0.99,1.13-1.62,1.11c-1.59-0.01-3.14,0.18-4.62,0.59C118.03,81.65,107.88,90.25,102.1,103.49z M85.83,67.17C67,66.99,50.68,75.65,40.22,91.08c-9.13,13.49-11.44,31.58-5.65,46.71c8.59,22.37,27.7,35.26,51.75,35.09c17.11-0.12,32.18-0.12,45.18,0c0.64,0.01,0.96-0.31-0.05-0.94v-2.58c1-0.58,0.61-1.08,0.06-1.23c-13.46-3.43-23.7-10.56-30.72-21.38c-18.77-28.95-2.49-67.33,30.66-74.47c0.66-0.15,0.99-0.56,1.23-1.24v-2.9c-0.27-0.6-0.58-0.91-1.18-0.89C116.56,67.35,101.35,67.33,85.83,67.17z"/>
         </svg>
     </div>
     <div class="container">
@@ -367,6 +392,11 @@ std::string WebServer::getConfigPage() {
         </div>
         
         <form id="configForm">
+            <div class="form-group">
+                <label>Hostname</label>
+                <input type="text" id="hostname" placeholder="led-matrix" pattern="[a-zA-Z0-9-]+">
+            </div>
+            
             <div class="form-group">
                 <label>Network Mode</label>
                 <div class="toggle-group">
@@ -398,6 +428,7 @@ std::string WebServer::getConfigPage() {
             <button type="submit" class="btn-primary">💾 Save & Apply</button>
         </form>
         
+        <button id="testModeBtn" class="btn-reboot" onclick="toggleTestMode()">🎨 Toggle Test Pattern</button>
         <button id="rebootBtn" class="btn-reboot" onclick="rebootDevice()">🔄 Reboot Device</button>
         
         <div class="status" id="status"></div>
@@ -409,13 +440,21 @@ std::string WebServer::getConfigPage() {
         const staticFields = document.getElementById('staticFields');
         const status = document.getElementById('status');
         let currentMode = 'dhcp';
+        let testModeActive = false;
         
         // Load current config
         fetch('/api/config')
             .then(r => r.json())
             .then(data => {
-                document.getElementById('ipDisplay').textContent = data.currentIP || 'Unknown';
+                const currentIP = data.currentIP || 'Unknown';
+                const hostname = data.hostname || 'led-matrix';
+                
+                document.getElementById('ipDisplay').textContent = currentIP;
+                document.getElementById('hostname').value = hostname;
                 document.getElementById('udpPort').value = data.udpPort || 21324;
+                
+                // Update page title
+                document.getElementById('pageTitle').textContent = hostname + ' (' + currentIP + ')';
                 
                 if (data.mode === 'static') {
                     currentMode = 'static';
@@ -443,6 +482,7 @@ std::string WebServer::getConfigPage() {
             
             const config = {
                 mode: currentMode,
+                hostname: document.getElementById('hostname').value || 'led-matrix',
                 udpPort: parseInt(document.getElementById('udpPort').value) || 21324
             };
             
@@ -510,6 +550,19 @@ std::string WebServer::getConfigPage() {
             }, 5000);
         }
         
+        async function toggleTestMode() {
+            try {
+                const response = await fetch('/api/testmode', { method: 'POST' });
+                const result = await response.json();
+                testModeActive = result.enabled;
+                const btn = document.getElementById('testModeBtn');
+                btn.textContent = testModeActive ? '⏹️ Stop Test Pattern' : '🎨 Toggle Test Pattern';
+                showStatus(testModeActive ? '✓ Test pattern enabled' : '✓ Test pattern disabled', 'success');
+            } catch (e) {
+                showStatus('Failed to toggle test mode', 'error');
+            }
+        }
+        
         async function rebootDevice() {
             if (!confirm('Reboot the LED Matrix controller? Display will be offline for ~30 seconds.')) {
                 return;
@@ -565,7 +618,22 @@ std::string WebServer::getCurrentConfig() {
         pclose(pipe);
     }
     
+    // Get current hostname
+    std::string current_hostname = "led-matrix";
+    pipe = popen("hostname", "r");
+    if (pipe) {
+        char buf[128];
+        if (fgets(buf, sizeof(buf), pipe)) {
+            current_hostname = buf;
+            if (!current_hostname.empty() && current_hostname.back() == '\n') {
+                current_hostname.pop_back();
+            }
+        }
+        pclose(pipe);
+    }
+    
     config["currentIP"] = current_ip;
+    config["hostname"] = config.value("hostname", current_hostname);
     
     // Set defaults if missing
     if (!config.contains("mode")) config["mode"] = "dhcp";
@@ -591,6 +659,16 @@ bool WebServer::saveConfig(const std::string& json_str) {
         if (mode == "static") {
             if (!config.contains("staticIP") || !config.contains("subnet") || !config.contains("gateway")) {
                 return false;
+            }
+        }
+        
+        // Apply hostname if provided
+        if (config.contains("hostname")) {
+            std::string hostname = config["hostname"];
+            if (!hostname.empty() && hostname != "led-matrix") {
+                std::string cmd = "sudo hostnamectl set-hostname " + hostname;
+                std::cout << "[WEB] Setting hostname to: " << hostname << std::endl;
+                system(cmd.c_str());
             }
         }
         
