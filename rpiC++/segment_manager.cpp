@@ -28,7 +28,8 @@ Segment::Segment(int seg_id, int x_, int y_, int w_, int h_)
       scroll_offset(0), last_scroll_update(0),
       blink_state(true), last_blink_update(0),
       is_active(false), is_dirty(false),
-      frame_enabled(false), frame_color(255, 255, 255), frame_width(2) {
+      frame_enabled(false), frame_color(255, 255, 255), frame_width(2),
+      font_name("arial") {
 }
 
 // ─── SegmentManager ──────────────────────────────────────────────────────────
@@ -96,7 +97,8 @@ void SegmentManager::updateText(int seg_id, const std::string& text,
                                 const std::string& bgcolor,
                                 const std::string& align,
                                 const std::string& effect,
-                                int intensity) {
+                                int intensity,
+                                const std::string& font) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     Segment* seg = getSegment(seg_id);
     if (!seg) return;
@@ -113,6 +115,11 @@ void SegmentManager::updateText(int seg_id, const std::string& text,
     }
     if (!effect.empty()) {
         seg->effect = parseEffect(effect);
+    }
+    if (!font.empty()) {
+        std::string f = font;
+        std::transform(f.begin(), f.end(), f.begin(), ::tolower);
+        seg->font_name = (f == "monospace" || f == "mono") ? "monospace" : "arial";
     }
     // Note: is_active is controlled by layout command only!
     // Updating text doesn't activate segments outside current layout.

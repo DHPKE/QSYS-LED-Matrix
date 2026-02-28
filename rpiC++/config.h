@@ -69,8 +69,9 @@ enum Align {
 };
 
 // ─── Font Paths ──────────────────────────────────────────────────────────────
-#define FONT_PATH          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-#define FONT_PATH_FALLBACK "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+#define FONT_PATH          "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"
+#define FONT_PATH_FALLBACK "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+#define FONT_MONO_PATH     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 
 // Font size search range (tries largest first)
 const int FONT_SIZES[] = {32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 13, 12, 11, 10, 9, 8, 7, 6};

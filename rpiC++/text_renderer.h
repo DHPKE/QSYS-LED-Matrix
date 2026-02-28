@@ -41,10 +41,15 @@ private:
     
     int render_count_;
     
-    struct FontCache {
-        std::map<int, FT_Face> faces;
+    struct FontCacheKey {
+        std::string font_name;
+        int size;
+        bool operator<(const FontCacheKey& other) const {
+            if (font_name != other.font_name) return font_name < other.font_name;
+            return size < other.size;
+        }
     };
-    FontCache font_cache_;
+    std::map<FontCacheKey, FT_Face> font_cache_;
     
     struct TextMeasurement {
         int width;
@@ -53,9 +58,9 @@ private:
     std::map<std::pair<std::string, int>, TextMeasurement> text_measurement_cache_;
     
     bool initFreeType();
-    FT_Face loadFont(int size);
-    TextMeasurement measureText(const std::string& text, int font_size);
-    std::pair<int, TextMeasurement> fitText(const std::string& text, int max_w, int max_h);
+    FT_Face loadFont(const std::string& font_name, int size);
+    TextMeasurement measureText(const std::string& text, const std::string& font_name, int font_size);
+    std::pair<int, TextMeasurement> fitText(const std::string& text, const std::string& font_name, int max_w, int max_h);
     
     void renderSegment(const Segment& seg);
     void renderGroupIndicator();

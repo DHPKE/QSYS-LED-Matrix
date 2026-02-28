@@ -37,6 +37,7 @@ struct Segment {
     bool frame_enabled;
     Color frame_color;
     int frame_width;
+    std::string font_name;  // "arial" or "monospace"
     
     Segment(int seg_id, int x_, int y_, int w_, int h_);
 };
@@ -57,7 +58,8 @@ public:
                    const std::string& bgcolor = "",
                    const std::string& align = "",
                    const std::string& effect = "",
-                   int intensity = 255);
+                   int intensity = 255,
+                   const std::string& font = "");
     void clearSegment(int seg_id);
     void clearAll();
     void markAllDirty();

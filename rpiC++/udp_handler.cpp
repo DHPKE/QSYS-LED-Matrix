@@ -142,8 +142,9 @@ void UDPHandler::dispatch(const std::string& raw_json) {
             std::string align = doc.value("align", "C");
             std::string effect = doc.value("effect", "none");
             int intensity = doc.value("intensity", 255);
+            std::string font = doc.value("font", "arial");  // "arial" or "monospace"
             
-            sm_->updateText(seg, text, color, bgcolor, align, effect, intensity);
+            sm_->updateText(seg, text, color, bgcolor, align, effect, intensity, font);
             
         } else if (cmd == "layout") {
             int preset = doc.value("preset", 1);

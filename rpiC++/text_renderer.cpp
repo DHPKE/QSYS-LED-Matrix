@@ -31,7 +31,7 @@ TextRenderer::TextRenderer(RGBMatrix* matrix, SegmentManager* segment_manager)
 TextRenderer::~TextRenderer() {
     if (ft_initialized_) {
         // Clean up cached font faces
-        for (auto& pair : font_cache_.faces) {
+        for (auto& pair : font_cache_) {
             FT_Done_Face(pair.second);
         }
         FT_Done_FreeType(ft_library_);
@@ -54,36 +54,48 @@ bool TextRenderer::initFreeType() {
     return true;
 }
 
-FT_Face TextRenderer::loadFont(int size) {
+FT_Face TextRenderer::loadFont(const std::string& font_name, int size) {
     // Check cache first
-    auto it = font_cache_.faces.find(size);
-    if (it != font_cache_.faces.end()) {
+    FontCacheKey key = {font_name, size};
+    auto it = font_cache_.find(key);
+    if (it != font_cache_.end()) {
         return it->second;
+    }
+    
+    // Determine font path
+    const char* font_path;
+    if (font_name == "monospace" || font_name == "mono") {
+        font_path = FONT_MONO_PATH;
+    } else {
+        // Default to Arial
+        font_path = FONT_PATH;
     }
     
     // Load new face at this size
     FT_Face face;
-    if (FT_New_Face(ft_library_, FONT_PATH, 0, &face)) {
+    if (FT_New_Face(ft_library_, font_path, 0, &face)) {
+        // Fallback to DejaVu Sans
         if (FT_New_Face(ft_library_, FONT_PATH_FALLBACK, 0, &face)) {
+            std::cerr << "[RENDER] Failed to load font: " << font_path << std::endl;
             return nullptr;
         }
     }
     
     FT_Set_Pixel_Sizes(face, 0, size);
-    font_cache_.faces[size] = face;
+    font_cache_[key] = face;
     return face;
 }
 
-TextRenderer::TextMeasurement TextRenderer::measureText(const std::string& text, int font_size) {
+TextRenderer::TextMeasurement TextRenderer::measureText(const std::string& text, const std::string& font_name, int font_size) {
     // Check cache
-    auto key = std::make_pair(text, font_size);
+    auto key = std::make_pair(text + ":" + font_name, font_size);
     auto it = text_measurement_cache_.find(key);
     if (it != text_measurement_cache_.end()) {
         return it->second;
     }
     
     // Measure text
-    FT_Face face = loadFont(font_size);
+    FT_Face face = loadFont(font_name, font_size);
     if (!face) {
         return {0, 0};
     }
@@ -105,10 +117,10 @@ TextRenderer::TextMeasurement TextRenderer::measureText(const std::string& text,
     return result;
 }
 
-std::pair<int, TextRenderer::TextMeasurement> TextRenderer::fitText(const std::string& text, int max_w, int max_h) {
+std::pair<int, TextRenderer::TextMeasurement> TextRenderer::fitText(const std::string& text, const std::string& font_name, int max_w, int max_h) {
     for (int i = 0; i < FONT_SIZES_COUNT; i++) {
         int size = FONT_SIZES[i];
-        TextMeasurement meas = measureText(text, size);
+        TextMeasurement meas = measureText(text, font_name, size);
         
         if (meas.width <= max_w && meas.height <= max_h) {
             return {size, meas};
@@ -117,7 +129,7 @@ std::pair<int, TextRenderer::TextMeasurement> TextRenderer::fitText(const std::s
     
     // Fallback to smallest
     int size = FONT_SIZES[FONT_SIZES_COUNT - 1];
-    return {size, measureText(text, size)};
+    return {size, measureText(text, font_name, size)};
 }
 
 void TextRenderer::renderAll() {
@@ -217,8 +229,8 @@ void TextRenderer::renderSegment(const Segment& seg) {
     int avail_w = std::max(1, seg.width - 2);
     int avail_h = std::max(1, seg.height - 2);
     
-    auto [font_size, meas] = fitText(seg.text, avail_w, avail_h);
-    FT_Face face = loadFont(font_size);
+    auto [font_size, meas] = fitText(seg.text, seg.font_name, avail_w, avail_h);
+    FT_Face face = loadFont(seg.font_name, font_size);
     if (!face) {
         return;
     }
