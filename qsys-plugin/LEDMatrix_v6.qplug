@@ -1,22 +1,26 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 6.0.0 - Added rotation support (0°, 90°, 180°, 270°)
--- Controls RPi Zero 2 W 64x32 LED Matrix via UDP (JSON format)
+-- Version 6.0.2-debug - Rotation layout fix + orientation deprecated
+-- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
 --   {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
 --    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
 --   {"cmd":"clear","seg":0,"group":1}  |  {"cmd":"clear_all","group":1}
 --   {"cmd":"brightness","value":200,"group":1}
---   {"cmd":"orientation","value":"landscape","group":1}
---   {"cmd":"rotation","value":0,"group":1}  -- NEW in v6.0: 0, 90, 180, or 270 degrees
+--   {"cmd":"rotation","value":0,"group":1}  -- 0, 90, 180, or 270 degrees
 --   {"cmd":"layout","preset":N,"group":1}
 --   {"cmd":"group","value":3}   -- Assign panel to group 3
 --
--- ROTATION (NEW in v6.0):
+-- DEPRECATED:
+--   {"cmd":"orientation","value":"landscape","group":1}  -- Use rotation instead
+--   - "landscape" → maps to rotation 0°
+--   - "portrait"  → maps to rotation 90°
+--
+-- ROTATION (v6.0+):
 --   Supports 0°, 90°, 180°, and 270° rotation of the entire display.
 --   Rotation is applied at matrix initialization, so changes require a service restart.
 --   Setting is persisted in config.json and survives reboots.
---   Useful for mounting panels in different orientations.
+--   Layouts automatically adapt: 90°/270° use portrait coords (32×64)
 --
 -- GROUPING (v5.0):
 --   Each LED panel can be assigned to a group (1-8) via the panel's WebUI or UDP command.
@@ -41,9 +45,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation) DEBUG",
-    Version = "6.0.1-debug",
-    Id = "dhpke.olimex.led.matrix.6.0.1",
-    Description = "RPi 64x32 LED Matrix with 8-group support + rotation (DEBUG BUILD)",
+    Version = "6.0.2-debug",
+    Id = "dhpke.olimex.led.matrix.6.0.2",
+    Description = "RPi 64x32 LED Matrix with 8-group support + rotation (DEBUG BUILD) - orientation deprecated",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -159,7 +163,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.0.1-debug (VERBOSE LOGGING)",
+        Type="Text", Text="LED Matrix Controller  v6.0.2-debug (VERBOSE LOGGING)",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -866,9 +870,17 @@ if Controls then
     end
 
     Controls.orientation.EventHandler = function(ctl)
+        -- DEPRECATED: Map orientation to rotation for backward compatibility
         local orient = ctl.String
-        if SendCommand(buildJson({cmd="orientation", value=orient, group=activeGroup})) then
-            print("Orientation set to: " .. orient .. " for group " .. (activeGroup == 0 and "All" or activeGroup))
+        local rotation = (orient == "portrait") and 90 or 0
+        
+        print(string.format("[DEPRECATED] Orientation '%s' → mapped to rotation %d°", orient, rotation))
+        print("⚠ Use the Rotation control instead (orientation will be removed in future versions)")
+        
+        if SendCommand(buildJson({cmd="rotation", value=rotation, group=activeGroup})) then
+            print("Rotation set to: " .. rotation .. "° for group " .. (activeGroup == 0 and "All" or activeGroup))
+            print("⚠ Rotation requires panel restart to take effect - use WebUI reboot button")
+            Controls.last_command.String = "Rotation saved - restart panel to apply"
         end
     end
 
