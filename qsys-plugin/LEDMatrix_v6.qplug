@@ -40,10 +40,10 @@
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display (Groups+Rotation)",
-    Version = "6.0.0",
-    Id = "dhpke.olimex.led.matrix.6.0.0",
-    Description = "RPi 64x32 LED Matrix with 8-group support + rotation",
+    Name = "PKE~LED Matrix Display (Groups+Rotation) DEBUG",
+    Version = "6.0.1-debug",
+    Id = "dhpke.olimex.led.matrix.6.0.1",
+    Description = "RPi 64x32 LED Matrix with 8-group support + rotation (DEBUG BUILD)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -159,7 +159,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.0.0 (Groups+Rotation)",
+        Type="Text", Text="LED Matrix Controller  v6.0.1-debug (VERBOSE LOGGING)",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -464,18 +464,28 @@ if Controls then
         t:Start(delay)
     end
 
+    local commandCounter = 0
+    local lastError = nil
+    local errorCount = 0
+    
     local function ReopenSocket()
-        if socket then pcall(function() socket:Close() end) end
+        print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
+        if socket then 
+            print("[SOCKET] Closing existing socket...")
+            pcall(function() socket:Close() end) 
+        end
         local ok, err = pcall(function()
             socket = UdpSocket.New()
             socket:Open()
         end)
         if ok then
             Controls.connection_status.Value = 0
-            print("✓ UDP socket ready -> " .. ip_addr .. ":" .. tostring(udp_port))
+            errorCount = 0
+            print(string.format("✓ [SOCKET] UDP socket ready -> %s:%s", ip_addr, tostring(udp_port)))
         else
             Controls.connection_status.Value = 2
-            print("✗ Socket error: " .. tostring(err))
+            errorCount = errorCount + 1
+            print(string.format("✗ [SOCKET ERROR #%d] %s", errorCount, tostring(err)))
         end
     end
 
@@ -502,21 +512,53 @@ if Controls then
     end
 
     local function SendCommand(json)
+        commandCounter = commandCounter + 1
+        local cmdId = commandCounter
+        
+        print(string.format("[CMD #%d] Preparing to send: %s", cmdId, json))
+        
         if not socket then
+            print(string.format("✗ [CMD #%d ERROR] No socket available", cmdId))
             Controls.connection_status.Value = 2
             Controls.last_command.String = "ERROR: No socket"
+            errorCount = errorCount + 1
+            lastError = "No socket"
+            
+            -- Auto-reconnect attempt
+            if errorCount < 3 then
+                print(string.format("[CMD #%d] Attempting auto-reconnect (attempt %d/3)...", cmdId, errorCount + 1))
+                ReopenSocket()
+            end
             return false
         end
-        local ok, err = pcall(function() socket:Send(ip_addr, udp_port, json .. "\n") end)
+        
+        print(string.format("[CMD #%d] Socket state: %s", cmdId, socket and "OK" or "NULL"))
+        
+        local ok, err = pcall(function() 
+            print(string.format("[CMD #%d] Calling socket:Send()...", cmdId))
+            socket:Send(ip_addr, udp_port, json .. "\n") 
+            print(string.format("[CMD #%d] socket:Send() completed", cmdId))
+        end)
+        
         if ok then
             Controls.last_command.String = json
             Controls.connection_status.Value = 0
-            print("-> " .. json)
+            errorCount = 0
+            lastError = nil
+            print(string.format("✓ [CMD #%d SUCCESS] Sent to %s:%d", cmdId, ip_addr, udp_port))
             return true
         else
+            errorCount = errorCount + 1
+            lastError = tostring(err)
             Controls.last_command.String = "ERROR: " .. tostring(err)
             Controls.connection_status.Value = 2
-            print("✗ Send error: " .. tostring(err))
+            print(string.format("✗ [CMD #%d ERROR #%d] %s", cmdId, errorCount, tostring(err)))
+            
+            -- Auto-reconnect on error
+            if errorCount >= 2 then
+                print(string.format("[CMD #%d] Multiple errors detected, forcing socket reconnect...", cmdId))
+                ReopenSocket()
+            end
             return false
         end
     end
@@ -539,7 +581,12 @@ if Controls then
     end
 
     local function Initialize()
-        print("=== LED Matrix v6.0.0 (Groups+Rotation) Initializing ===")
+        print("===========================================")
+        print("=== LED Matrix v6.0.0 (Groups+Rotation) ===")
+        print("=== Initializing with DEBUG LOGGING     ===")
+        print("===========================================")
+        print(string.format("[INIT] Target IP: %s", ip_addr))
+        print(string.format("[INIT] Target Port: %s", tostring(udp_port)))
         
         if Controls.ip_address.String == "" then
             Controls.ip_address.String = ip_addr
@@ -548,6 +595,7 @@ if Controls then
             Controls.udp_port.String = tostring(udp_port)
         end
         
+        print("[INIT] Setting up control choices...")
         Controls.orientation.Choices = {"landscape", "portrait"}
         Controls.rotation.Choices = {"0", "90", "180", "270"}  -- NEW in v6.0
         Controls.layout_preset.Choices = LayoutChoices
@@ -621,18 +669,29 @@ if Controls then
             Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
         end
 
+        print("[INIT] Opening UDP socket...")
         ReopenSocket()
-        print("=== Ready ===")
+        print("===========================================")
+        print("=== Plugin Ready - Debug Mode Active    ===")
+        print(string.format("=== Commands sent: %d | Errors: %d       ===", commandCounter, errorCount))
+        print("===========================================")
     end
 
     -- Group selection handlers
     for grp = 0, 8 do
         Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
-            if updatingGroups then return end
+            print(string.format("[GROUP] Button %d event: Boolean=%s, updatingGroups=%s", 
+                grp, tostring(ctl.Boolean), tostring(updatingGroups)))
+            if updatingGroups then 
+                print(string.format("[GROUP] Ignoring event (updatingGroups=true)"))
+                return 
+            end
             if ctl.Boolean then
+                print(string.format("[GROUP] Activating group %d", grp))
                 -- Delay execution slightly to ensure it happens after button release
                 Timer.CallAfter(function()
                     updatingGroups = true
+                    print(string.format("[GROUP] Deactivating other groups..."))
                     -- Turn off all other group buttons
                     for g = 0, 8 do
                         if g ~= grp then
@@ -643,11 +702,12 @@ if Controls then
                     activeGroup = grp
                     local groupName = grp == 0 and "All" or tostring(grp)
                     Controls.active_group.String = groupName
-                    print("Active group set to: " .. groupName)
+                    print(string.format("[GROUP] Active group set to: %s", groupName))
                     -- Send group assignment command to Pi(s)
                     SendCommand(buildJson({cmd="group", value=grp}))
                 end, 0.05)
             else
+                print(string.format("[GROUP] Preventing deselect of group %d", grp))
                 -- Don't allow deselecting - always have one selected
                 ctl.Boolean = true
             end
@@ -824,7 +884,7 @@ if Controls then
 
     Controls.ip_address.EventHandler = function(ctl)
         ip_addr = ctl.String
-        print("IP changed to: " .. ip_addr)
+        print("[CONFIG] IP changed to: " .. ip_addr)
         ReopenSocket()
     end
 
@@ -832,16 +892,40 @@ if Controls then
         local v = ValidatePort(ctl.String)
         if v then
             udp_port = v
-            print("Port changed to: " .. udp_port)
+            print("[CONFIG] Port changed to: " .. udp_port)
             ReopenSocket()
+        else
+            print("[CONFIG ERROR] Invalid port: " .. tostring(ctl.String))
         end
     end
 
+    -- Health check timer - reconnect if too many errors
+    local healthCheckTimer = Timer.New()
+    healthCheckTimer.EventHandler = function()
+        if errorCount >= 5 then
+            print(string.format("[HEALTH CHECK] Error count high (%d), forcing reconnect...", errorCount))
+            ReopenSocket()
+        end
+        if commandCounter > 0 and commandCounter % 50 == 0 then
+            print(string.format("[STATS] Commands: %d | Errors: %d | Last Error: %s", 
+                commandCounter, errorCount, lastError or "none"))
+        end
+    end
+    healthCheckTimer:Start(10)  -- Check every 10 seconds
+
     function Cleanup()
+        print("[CLEANUP] Stopping plugin...")
+        if healthCheckTimer then 
+            pcall(function() healthCheckTimer:Stop() end)
+        end
         for _, t in pairs(debounceTimers) do
             if t then pcall(function() t:Stop() end) end
         end
-        if socket then pcall(function() socket:Close() end) end
+        if socket then 
+            print("[CLEANUP] Closing socket...")
+            pcall(function() socket:Close() end) 
+        end
+        print("[CLEANUP] Complete")
     end
 
     Initialize()
