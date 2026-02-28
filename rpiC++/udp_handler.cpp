@@ -196,21 +196,34 @@ void UDPHandler::dispatch(const std::string& raw_json) {
             }
             
         } else if (cmd == "orientation") {
+            // DEPRECATED: orientation command now maps to rotation for backward compatibility
             std::string value = doc.value("value", "landscape");
             std::transform(value.begin(), value.end(), value.begin(), ::tolower);
             
-            Orientation new_orient = (value == "portrait") ? PORTRAIT : LANDSCAPE;
+            Rotation new_rotation;
+            if (value == "portrait") {
+                new_rotation = ROTATION_90;  // Portrait = 90° rotation
+                std::cout << "[UDP] Orientation 'portrait' command → mapped to rotation 90°" << std::endl;
+            } else {
+                new_rotation = ROTATION_0;   // Landscape = 0° rotation
+                std::cout << "[UDP] Orientation 'landscape' command → mapped to rotation 0°" << std::endl;
+            }
+            
             {
                 std::lock_guard<std::mutex> lock(config_mutex_);
-                orientation_ = new_orient;
+                rotation_ = new_rotation;
+                orientation_ = (value == "portrait") ? PORTRAIT : LANDSCAPE;  // Keep for legacy
             }
             
-            if (orientation_callback_) {
-                orientation_callback_(new_orient);
+            if (rotation_callback_) {
+                rotation_callback_(new_rotation);
             }
             
-            // Reapply current layout for new orientation
+            std::cout << "[UDP] ⚠ WARNING: 'orientation' command is deprecated, use 'rotation' instead" << std::endl;
+            
+            // Reapply current layout for new rotation
             applyLayout(current_layout_);
+            saveConfig();
             saveConfig();
             
         } else if (cmd == "rotation") {
@@ -284,16 +297,21 @@ void UDPHandler::applyLayout(int preset) {
     
     current_layout_ = preset;
     
+    // Select base layout based on rotation (rotation changes effective canvas dimensions)
+    // 0° and 180° use landscape (64×32), 90° and 270° use portrait (32×64)
     const std::vector<LayoutRect>* zones;
-    if (orientation_ == PORTRAIT) {
+    bool use_portrait_layout = (rotation_ == ROTATION_90 || rotation_ == ROTATION_270);
+    
+    if (use_portrait_layout) {
         zones = &LAYOUT_PORTRAIT[preset];
     } else {
         zones = &LAYOUT_LANDSCAPE[preset];
     }
     
     std::cout << "[UDP] LAYOUT preset=" << preset 
-             << " (" << zones->size() << " segment(s)) in "
-             << (orientation_ == PORTRAIT ? "portrait" : "landscape") << " mode" << std::endl;
+             << " (" << zones->size() << " segment(s))"
+             << " rotation=" << static_cast<int>(rotation_) << "°"
+             << " [using " << (use_portrait_layout ? "portrait" : "landscape") << " coords]" << std::endl;
     
     for (int i = 0; i < MAX_SEGMENTS; i++) {
         if (i < (int)zones->size()) {
