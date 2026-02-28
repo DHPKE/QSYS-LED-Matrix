@@ -45,7 +45,7 @@
 // ─── Display ─────────────────────────────────────────────────────────────────
 #define MAX_SEGMENTS      4
 #define MAX_TEXT_LENGTH   128
-#define EFFECT_INTERVAL   50   // milliseconds between effect updates (20 fps)
+#define EFFECT_INTERVAL   100   // milliseconds between effect updates (10 fps)
 
 // Orientation: 0=landscape (64×32), 1=portrait (32×64)
 enum Orientation {

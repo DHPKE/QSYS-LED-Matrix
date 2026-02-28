@@ -210,6 +210,9 @@ int main(int argc, char* argv[]) {
     
     // ── 10. Main render loop ─────────────────────────────────────────────────
     auto last_effect = std::chrono::steady_clock::now();
+    auto last_render = std::chrono::steady_clock::now();
+    const int TARGET_FPS = 30;  // Reduced from ~60 to 30fps
+    const int FRAME_TIME_MS = 1000 / TARGET_FPS;
     
     while (!interrupt_received) {
         auto now = std::chrono::steady_clock::now();
@@ -217,24 +220,35 @@ int main(int argc, char* argv[]) {
         // Dismiss IP splash on first command
         if (ip_splash_active && g_udp_handler->hasReceivedCommand()) {
             ip_splash_active = false;
+            sm.markAllDirty();  // Force re-render
             std::cout << "[SPLASH] First command received — IP splash dismissed" << std::endl;
         }
         
-        // Update effects and render at fixed interval
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_effect);
-        if (elapsed.count() >= EFFECT_INTERVAL) {
+        // Update effects at fixed interval
+        bool effects_updated = false;
+        auto effect_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_effect);
+        if (effect_elapsed.count() >= EFFECT_INTERVAL) {
             sm.updateEffects();
+            effects_updated = true;
             last_effect = now;
-            
+        }
+        
+        // Only render if something changed or effects updated
+        bool needs_render = effects_updated || sm.isDirty();
+        
+        auto render_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_render);
+        if (needs_render && render_elapsed.count() >= FRAME_TIME_MS) {
             try {
                 renderer.renderAll();
+                last_render = now;
             } catch (const std::exception& e) {
                 std::cerr << "[RENDER] Exception: " << e.what() << std::endl;
             }
         }
         
-        // Sleep to yield CPU
-        std::this_thread::sleep_for(std::chrono::milliseconds(EFFECT_INTERVAL));
+        // Sleep to yield CPU (longer sleep when idle)
+        int sleep_ms = needs_render ? 1 : 10;  // 1ms when active, 10ms when idle
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     }
     
     // ── Cleanup ──────────────────────────────────────────────────────────────

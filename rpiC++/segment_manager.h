@@ -62,6 +62,7 @@ public:
     void clearAll();
     void markAllDirty();
     void clearDirtyFlags();
+    bool isDirty();  // Check if any segment needs rendering
     void configure(int seg_id, int x, int y, int w, int h);
     void activate(int seg_id, bool active);
     void setFrame(int seg_id, bool enabled, const std::string& color = "#FFFFFF", int width = 2);

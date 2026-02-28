@@ -149,6 +149,14 @@ void SegmentManager::clearDirtyFlags() {
     }
 }
 
+bool SegmentManager::isDirty() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    for (const auto& seg : segments_) {
+        if (seg.is_dirty) return true;
+    }
+    return false;
+}
+
 void SegmentManager::configure(int seg_id, int x, int y, int w, int h) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     Segment* seg = getSegment(seg_id);
