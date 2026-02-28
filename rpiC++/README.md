@@ -55,6 +55,7 @@ That's it! The script will:
 
 ### Network
 - **UDP JSON Protocol** on port 21324
+- **Web Config UI** on port 8080 (DHCP/Static IP, UDP port)
 - **DHCP Auto-Config** with static IP fallback
 - **IP Splash Screen** on startup (dismisses on first command)
 
