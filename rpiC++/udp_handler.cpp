@@ -368,7 +368,20 @@ void UDPHandler::saveConfig() {
     mkdir(dir, 0755);
     free(path_copy);
     
+    // Read existing config first to preserve network settings
     json config;
+    std::ifstream existing_file(CONFIG_FILE);
+    if (existing_file.is_open()) {
+        try {
+            existing_file >> config;
+        } catch (...) {
+            // If parse fails, start with empty config
+            config = json::object();
+        }
+        existing_file.close();
+    }
+    
+    // Update only LED matrix settings (preserve network settings like mode, staticIP, etc.)
     {
         std::lock_guard<std::mutex> lock(config_mutex_);
         config["orientation"] = (orientation_ == PORTRAIT) ? "portrait" : "landscape";
@@ -380,7 +393,7 @@ void UDPHandler::saveConfig() {
     std::ofstream file(CONFIG_FILE);
     if (file.is_open()) {
         file << config.dump(2);
-        std::cout << "[CONFIG] Saved to " << CONFIG_FILE << std::endl;
+        std::cout << "[CONFIG] Saved to " << CONFIG_FILE << " (network settings preserved)" << std::endl;
     } else {
         std::cerr << "[CONFIG] Failed to save" << std::endl;
     }
