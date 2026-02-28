@@ -187,6 +187,14 @@ cp led-matrix.service /etc/systemd/system/
 if [ -f "led-matrix-network.service" ]; then
     cp led-matrix-network.service /etc/systemd/system/
 fi
+
+# Install sudoers file for reboot permission
+if [ -f "led-matrix-sudoers" ]; then
+    cp led-matrix-sudoers /etc/sudoers.d/led-matrix
+    chmod 440 /etc/sudoers.d/led-matrix
+    echo "✓ Sudoers file installed (reboot permission)"
+fi
+
 systemctl daemon-reload
 echo "✓ Systemd services installed"
 

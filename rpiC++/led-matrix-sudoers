@@ -1,0 +1,3 @@
+# Allow led-matrix service (running as root/daemon) to reboot without password
+root ALL=(ALL) NOPASSWD: /sbin/reboot
+daemon ALL=(ALL) NOPASSWD: /sbin/reboot

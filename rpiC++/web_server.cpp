@@ -149,6 +149,24 @@ std::string WebServer::handleRequest(const std::string& method, const std::strin
         return response.str();
     }
     
+    if (path == "/api/reboot" && method == "POST") {
+        std::cout << "[WEB] Reboot requested via web UI" << std::endl;
+        // Fork to avoid killing the response
+        if (fork() == 0) {
+            sleep(1); // Give time for response to send
+            system("sudo reboot");
+            exit(0);
+        }
+        std::string json_str = "{\"status\":\"ok\"}";
+        std::ostringstream response;
+        response << "HTTP/1.1 200 OK\r\n";
+        response << "Content-Type: application/json\r\n";
+        response << "Content-Length: " << json_str.length() << "\r\n";
+        response << "Connection: close\r\n\r\n";
+        response << json_str;
+        return response.str();
+    }
+    
     // 404
     std::string not_found = "<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>";
     std::ostringstream response;
@@ -271,6 +289,26 @@ std::string WebServer::getConfigPage() {
         .btn-primary:active {
             transform: translateY(0);
         }
+        .btn-reboot {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reboot:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.3);
+        }
+        .btn-reboot:active {
+            transform: translateY(0);
+        }
         .status {
             margin-top: 20px;
             padding: 12px;
@@ -341,6 +379,8 @@ std::string WebServer::getConfigPage() {
             
             <button type="submit" class="btn-primary">💾 Save & Apply</button>
         </form>
+        
+        <button id="rebootBtn" class="btn-reboot" onclick="rebootDevice()">🔄 Reboot Device</button>
         
         <div class="status" id="status"></div>
     </div>
@@ -424,6 +464,28 @@ std::string WebServer::getConfigPage() {
             setTimeout(() => {
                 status.className = 'status';
             }, 5000);
+        }
+        
+        async function rebootDevice() {
+            if (!confirm('Reboot the LED Matrix controller? Display will be offline for ~30 seconds.')) {
+                return;
+            }
+            
+            try {
+                showStatus('🔄 Rebooting...', 'success');
+                await fetch('/api/reboot', { method: 'POST' });
+                setTimeout(() => {
+                    showStatus('⏳ Device rebooting... Page will reload in 45 seconds', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 45000);
+                }, 500);
+            } catch (e) {
+                showStatus('Reboot command sent (connection closed)', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 45000);
+            }
         }
     </script>
 </body>
