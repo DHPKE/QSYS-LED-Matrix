@@ -17,18 +17,18 @@
 
 // GPIO Configuration
 #define HARDWARE_MAPPING "regular"  // "regular", "adafruit-hat", "adafruit-hat-pwm"
-#define GPIO_SLOWDOWN   3           // 0-4: RPi Zero 2W use 3, RPi 3 use 1-2, RPi 4 use 2-3
-#define PWM_BITS        8           // 1-11: Color depth (11=best, 8=good compromise)
+#define GPIO_SLOWDOWN   4           // 0-4: RPi Zero 2W use 3-4, RPi 3 use 1-2, RPi 4 use 2-4 (higher=more stable)
+#define PWM_BITS        11          // 1-11: Color depth (11=best quality)
 #define BRIGHTNESS      50          // 0-100: Initial brightness percentage
 
 // Additional matrix options
 #define SCAN_MODE           0       // 0=progressive, 1=interlaced
 #define ROW_ADDR_TYPE       0       // 0-5: Address line config
 #define MULTIPLEXING        0       // 0-17: Multiplex type
-#define PWM_LSB_NANOSECONDS 200     // Timing for LSB (100-300 typical)
+#define PWM_LSB_NANOSECONDS 130     // Timing for LSB (130 is stable for most panels)
 #define PWM_DITHER_BITS     0       // 0-2: Dithering for speed boost
 #define LED_RGB_SEQUENCE    "RGB"   // "RGB", "RBG", "GRB", etc.
-#define REFRESH_LIMIT       200     // Hz: 0=no limit, 200=stable
+#define REFRESH_LIMIT       0       // Hz: 0=no limit (more stable than fixed limit)
 
 // ─── Network ─────────────────────────────────────────────────────────────────
 #define UDP_PORT       21324

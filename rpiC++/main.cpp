@@ -141,9 +141,13 @@ int main(int argc, char* argv[]) {
     matrix_options.led_rgb_sequence = LED_RGB_SEQUENCE;
     matrix_options.limit_refresh_rate_hz = REFRESH_LIMIT;
     matrix_options.disable_hardware_pulsing = true;  // Avoid audio conflict
+    matrix_options.show_refresh_rate = false;        // Disable refresh overlay
+    matrix_options.inverse_colors = false;           // Normal color display
     
     runtime_opt.gpio_slowdown = GPIO_SLOWDOWN;
     runtime_opt.drop_privileges = 1;  // Drop root after init
+    runtime_opt.daemon = 0;            // Run in foreground
+    runtime_opt.do_gpio_init = true;   // Initialize GPIO properly
     
     g_matrix = RGBMatrix::CreateFromOptions(matrix_options, runtime_opt);
     if (!g_matrix) {
