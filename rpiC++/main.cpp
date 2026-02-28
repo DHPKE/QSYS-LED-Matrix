@@ -236,13 +236,9 @@ int main(int argc, char* argv[]) {
             sm.updateEffects();
             effects_updated = true;
             last_effect = now;
-        }
-        
-        // Only render if something changed AND enough time passed
-        bool needs_render = effects_updated || sm.isDirty();
-        
-        auto render_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_render);
-        if (needs_render && render_elapsed.count() >= MIN_RENDER_INTERVAL_MS) {
+            
+            // Render on effect timer (like Python version)
+            // This gives consistent 10fps rendering regardless of command flood
             try {
                 renderer.renderAll();
                 last_render = now;
@@ -252,8 +248,8 @@ int main(int argc, char* argv[]) {
         }
         
         // Sleep to yield CPU
-        // With 33ms render throttle, we can afford longer sleeps
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // Python version uses effect timer, so we can afford longer sleep
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     
     // ── Cleanup ──────────────────────────────────────────────────────────────
