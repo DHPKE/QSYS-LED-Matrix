@@ -32,7 +32,7 @@ echo ""
 
 # ─── 1. System Dependencies ──────────────────────────────────────────────────
 
-echo "==[ Step 1/7: Installing System Dependencies ]=="
+echo "==[ Step 1/8: Installing System Dependencies ]=="
 echo "This may take a few minutes on first run..."
 echo ""
 
@@ -55,7 +55,7 @@ echo ""
 
 # ─── 2. Disable Audio (prevents interference) ─────────────────────────────────
 
-echo "==[ Step 2/7: Disabling Audio (prevents LED flicker) ]=="
+echo "==[ Step 2/8: Disabling Audio (prevents LED flicker) ]=="
 
 if ! grep -q "^dtparam=audio=off" /boot/firmware/config.txt 2>/dev/null; then
     if ! grep -q "^dtparam=audio=off" /boot/config.txt 2>/dev/null; then
@@ -85,7 +85,7 @@ echo ""
 
 # ─── 3. Install RGB LED Matrix Library ───────────────────────────────────────
 
-echo "==[ Step 3/7: Installing rpi-rgb-led-matrix Library ]=="
+echo "==[ Step 3/8: Installing rpi-rgb-led-matrix Library ]=="
 
 if [ -f "/usr/local/include/led-matrix.h" ] && [ -f "/usr/local/lib/librgbmatrix.a" ]; then
     echo "✓ rpi-rgb-led-matrix already installed"
@@ -119,7 +119,7 @@ echo ""
 
 # ─── 4. Build LED Matrix Controller ──────────────────────────────────────────
 
-echo "==[ Step 4/7: Building LED Matrix Controller ]=="
+echo "==[ Step 4/8: Building LED Matrix Controller ]=="
 
 if [ ! -f "led-matrix" ]; then
     echo "Building controller..."
@@ -142,7 +142,7 @@ echo ""
 
 # ─── 5. Install Service ──────────────────────────────────────────────────────
 
-echo "==[ Step 5/7: Installing Systemd Service ]=="
+echo "==[ Step 5/8: Installing Systemd Service ]=="
 
 # Stop existing service if running
 systemctl stop led-matrix 2>/dev/null || true

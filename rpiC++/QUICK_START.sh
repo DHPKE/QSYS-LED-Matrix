@@ -1,6 +1,5 @@
 #!/bin/bash
 # QUICK_START.sh - One-command setup for fresh Raspbian Lite 64
-# This is now just a wrapper around install.sh
 
 cat << 'EOF'
 ╔══════════════════════════════════════════════════════════════╗
@@ -8,11 +7,13 @@ cat << 'EOF'
 ╚══════════════════════════════════════════════════════════════╝
 
 This will install everything from scratch on Raspbian Lite 64:
-  • System dependencies (build tools, libraries)
+  • System dependencies (build tools, libraries, fonts)
   • rpi-rgb-led-matrix library
   • LED matrix controller (build from source)
-  • Systemd service (auto-start on boot)
+  • Systemd services (auto-start on boot)
+  • Web config UI (port 8080)
   • Audio disable (prevents LED flicker)
+  • Optional CPU isolation
 
 Requirements:
   - Raspberry Pi (Zero 2W, 3, 4, or 5)
@@ -25,5 +26,18 @@ EOF
 
 read
 
-# Just call the full installer
+echo ""
+echo "Running pre-installation check..."
+./pre-install-check.sh
+
+if [ $? -ne 0 ]; then
+    echo "❌ Pre-check failed - cannot continue"
+    exit 1
+fi
+
+echo ""
+echo "Starting installation..."
+echo ""
+
+# Run the full installer
 sudo ./install.sh
