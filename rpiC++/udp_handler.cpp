@@ -136,6 +136,14 @@ void UDPHandler::dispatch(const std::string& raw_json) {
         // std::cout << "[UDP] Executing command: " << cmd 
         //          << " (group=" << cmd_group << ", my_group=" << my_group << ")" << std::endl;
         
+        // Auto-disable frame on segment 1 when first command arrives (unless it's a frame command)
+        if (cmd != "frame" && doc.contains("seg")) {
+            int seg = doc.value("seg", 0);
+            if (seg == 1) {
+                sm_->setFrame(seg, false, "FFFFFF", 2);
+            }
+        }
+        
         if (cmd == "text") {
             int seg = doc.value("seg", 0);
             std::string text = doc.value("text", "");

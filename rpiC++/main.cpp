@@ -81,11 +81,31 @@ std::string ensureNetwork() {
     std::cout << "[NET] Waiting up to " << DHCP_TIMEOUT_S << "s for DHCP on " 
              << FALLBACK_IFACE << "..." << std::endl;
     
+    // Check if fallback IP is already configured (from previous run or manual config)
+    std::string current_ip = getIP(FALLBACK_IFACE);
+    bool has_fallback = (current_ip == FALLBACK_IP);
+    
+    if (has_fallback) {
+        std::cout << "[NET] ! Fallback IP " << FALLBACK_IP << " already configured" << std::endl;
+        std::cout << "[NET]   Flushing and waiting for DHCP..." << std::endl;
+        
+        // Flush existing IP to allow DHCP negotiation
+        std::string cmd_flush = "ip addr flush dev " + std::string(FALLBACK_IFACE);
+        system(cmd_flush.c_str());
+        
+        // Ensure interface is up
+        std::string cmd_up = "ip link set " + std::string(FALLBACK_IFACE) + " up";
+        system(cmd_up.c_str());
+        
+        // Give DHCP client a moment to restart negotiation
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+    
     // Wait for DHCP
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(DHCP_TIMEOUT_S);
     while (std::chrono::steady_clock::now() < deadline) {
         std::string ip = getIP(FALLBACK_IFACE);
-        if (!ip.empty() && ip.substr(0, 4) != "127.") {
+        if (!ip.empty() && ip.substr(0, 4) != "127." && ip != FALLBACK_IP) {
             std::cout << "[NET] ✓ DHCP address: " << ip << std::endl;
             return ip;
         }

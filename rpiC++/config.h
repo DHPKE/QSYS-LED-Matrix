@@ -39,7 +39,7 @@
 #define FALLBACK_IP      "10.20.30.40"
 #define FALLBACK_NETMASK "255.255.255.0"
 #define FALLBACK_GATEWAY "10.20.30.1"
-#define FALLBACK_IFACE   "eth0"
+#define FALLBACK_IFACE   "eth1"
 #define DHCP_TIMEOUT_S   15
 
 // ─── Display ─────────────────────────────────────────────────────────────────

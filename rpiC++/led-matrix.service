@@ -1,6 +1,6 @@
 [Unit]
 Description=RGB LED Matrix Controller
-After=network-online.target
+After=network-online.target NetworkManager-wait-online.service
 Wants=network-online.target
 
 [Service]
