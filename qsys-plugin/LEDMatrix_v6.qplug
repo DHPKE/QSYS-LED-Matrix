@@ -856,7 +856,6 @@ if Controls then
         SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
     end
 
-    Controls.orientation.EventHandler = function(ctl)
     -- Rotation handler
     Controls.apply_rotation.EventHandler = function()
         local rotation = tonumber(Controls.rotation.String) or 0
