@@ -217,7 +217,7 @@ int main(int argc, char* argv[]) {
     auto last_render = std::chrono::steady_clock::now();
     const int TARGET_FPS = 30;  // Reduced from ~60 to 30fps
     const int FRAME_TIME_MS = 1000 / TARGET_FPS;
-    const int MIN_RENDER_INTERVAL_MS = 33;  // Force minimum 33ms between renders (30fps max)
+    const int MIN_RENDER_INTERVAL_MS = 100;  // Render at most 10fps (saves CPU, text doesn't need 30fps)
     
     while (!interrupt_received) {
         auto now = std::chrono::steady_clock::now();
