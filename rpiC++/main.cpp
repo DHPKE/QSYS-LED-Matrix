@@ -21,8 +21,8 @@
 using namespace rgb_matrix;
 
 // Global pointers for signal handlers
-static RGBMatrix* g_matrix = nullptr;
-static UDPHandler* g_udp_handler = nullptr;
+RGBMatrix* g_matrix = nullptr;
+UDPHandler* g_udp_handler = nullptr;
 static volatile bool interrupt_received = false;
 
 static void InterruptHandler(int signo) {
