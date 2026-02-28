@@ -247,9 +247,9 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Sleep to yield CPU
-        // Python version uses effect timer, so we can afford longer sleep
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        // Sleep to yield CPU and allow matrix clean refresh cycles
+        // Match Python: sleep for full EFFECT_INTERVAL
+        std::this_thread::sleep_for(std::chrono::milliseconds(EFFECT_INTERVAL));
     }
     
     // ── Cleanup ──────────────────────────────────────────────────────────────
