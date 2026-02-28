@@ -114,7 +114,8 @@ void SegmentManager::updateText(int seg_id, const std::string& text,
     if (!effect.empty()) {
         seg->effect = parseEffect(effect);
     }
-    seg->is_active = true;
+    // Note: is_active is controlled by layout command only!
+    // Updating text doesn't activate segments outside current layout.
     seg->is_dirty = true;
 }
 
@@ -165,7 +166,7 @@ void SegmentManager::configure(int seg_id, int x, int y, int w, int h) {
         seg->y = y;
         seg->width = w;
         seg->height = h;
-        seg->is_active = true;
+        // Note: is_active is controlled by activate() call (from layout command)
         seg->is_dirty = true;
         
         // Mark all segments dirty for full redraw

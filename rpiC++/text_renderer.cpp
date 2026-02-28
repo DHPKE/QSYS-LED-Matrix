@@ -149,11 +149,13 @@ void TextRenderer::renderAll() {
     // Clear canvas
     canvas_->Fill(0, 0, 0);
     
-    // Render all active segments
+    // Render all segments that are in the current layout
     int rendered_count = 0;
     for (const auto& seg : snapshots) {
         if (!seg.is_active) continue;
-        if (seg.width <= 0 || seg.height <= 0) continue;
+        
+        // Skip segments not in current layout (1x1 dummy rects)
+        if (seg.width <= 1 || seg.height <= 1) continue;
         
         renderSegment(seg);
         rendered_count++;
