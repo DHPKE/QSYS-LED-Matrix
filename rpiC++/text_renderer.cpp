@@ -146,7 +146,7 @@ void TextRenderer::renderAll() {
         }
     }
     
-    // Clear canvas
+    // Clear back buffer (won't be visible until SwapOnVSync)
     canvas_->Fill(0, 0, 0);
     
     // Render all segments that are in the current layout

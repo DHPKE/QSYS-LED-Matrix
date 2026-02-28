@@ -213,6 +213,7 @@ int main(int argc, char* argv[]) {
     auto last_render = std::chrono::steady_clock::now();
     const int TARGET_FPS = 30;  // Reduced from ~60 to 30fps
     const int FRAME_TIME_MS = 1000 / TARGET_FPS;
+    const int MIN_RENDER_INTERVAL_MS = 33;  // Force minimum 33ms between renders (30fps max)
     
     while (!interrupt_received) {
         auto now = std::chrono::steady_clock::now();
@@ -233,11 +234,11 @@ int main(int argc, char* argv[]) {
             last_effect = now;
         }
         
-        // Only render if something changed or effects updated
+        // Only render if something changed AND enough time passed
         bool needs_render = effects_updated || sm.isDirty();
         
         auto render_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_render);
-        if (needs_render && render_elapsed.count() >= FRAME_TIME_MS) {
+        if (needs_render && render_elapsed.count() >= MIN_RENDER_INTERVAL_MS) {
             try {
                 renderer.renderAll();
                 last_render = now;
