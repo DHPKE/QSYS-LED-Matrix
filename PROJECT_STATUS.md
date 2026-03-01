@@ -1,20 +1,125 @@
 # QSYS-LED-Matrix — Project Status
-> Last updated: 2026-02-20  |  Commit: fe36667
+> Last updated: 2026-03-01  |  Commit: fbcb3bb
 
 ---
 
-## Hardware
+## Current Hardware Configuration
 
+### Raspberry Pi CM4
 | Item | Value |
 |---|---|
-| Board | WT32-ETH01 (ESP32 + LAN8720) |
+| Board | Raspberry Pi Compute Module 4 |
 | Panel | 64 × 32 HUB75 LED Matrix |
-| IP (DHCP) | 10.1.1.22 (or whatever DHCP hands out) |
-| IP (fallback, no DHCP) | **10.10.10.99 / 24** |
+| IP (Static) | **10.1.1.25 / 24** |
+| eth0 | DOWN (10.20.30.40 fallback) |
+| eth1 | UP (10.1.1.25 static) |
 | UDP Port | 21324 |
-| Web UI | http://\<IP\>/ |
-| mDNS | wt32-led-matrix.local |
-| Upload port | COM3 @ 921600 |
+| Web UI | http://10.1.1.25:8080/ |
+| Runtime User | daemon (rgbmatrix drops privileges) |
+| Python | 3.13.5 |
+| Dependencies | numpy 2.2.4, pillow, rgbmatrix |
+
+---
+
+## Python Implementation (Current) — `rpi/`
+
+### Recent Updates (2026-03-01)
+- ✅ Full 4-way rotation (0°/90°/180°/270°)
+- ✅ Test mode with 5-color scrolling bars
+- ✅ IP splash at forced 0° rotation
+- ✅ Static IP configuration via NetworkManager
+- ✅ WebUI hostname change
+- ✅ WebUI reboot button
+- ✅ Helper scripts for privileged operations
+- ✅ Enhanced IP detection (only UP interfaces)
+
+### Key Files
+
+| File | Role |
+|---|---|
+| `main.py` | Service entry point, UDP listener, IP splash, main loop |
+| `config.py` | Constants, layout presets (landscape + portrait) |
+| `segment_manager.py` | 8-segment RAM model, dirty tracking, effects |
+| `text_renderer.py` | PIL-based rendering, rotation support, transparent backgrounds |
+| `udp_handler.py` | JSON UDP parser, layout application, callbacks |
+| `web_server.py` | HTTP server (port 8080), network config, hostname, reboot |
+| `configure-network.sh` | NetworkManager static IP / DHCP helper |
+| `set-hostname.sh` | Hostname change helper |
+| `reboot-device.sh` | System reboot helper |
+| `install.sh` | Automated installation script |
+
+### Features
+
+**Rotation:**
+- 0° / 90° / 180° / 270° rotation
+- Persists to `/var/lib/led-matrix/config.json`
+- Requires service restart to apply
+- IP splash forced to 0° for easy reading
+
+**Layouts:**
+- Landscape presets (64×32) for 0° and 180°
+- Portrait presets (32×64) for 90° and 270°
+- Auto-selects correct preset based on rotation
+
+**Test Mode:**
+- 5 color bars (Red, Green, Blue, Yellow, White)
+- Scrolls left-to-right at 60fps
+- Text overlay with transparent background
+- 4-state cycle: hostname top → blank → IP bottom → blank
+- Forced to 0° rotation
+- Toggle via WebUI or `/tmp/led-matrix-testmode`
+
+**WebUI (port 8080):**
+- Network configuration (DHCP / static IP)
+- Hostname change
+- Reboot button
+- Test mode toggle
+- Minimal UI (matrix control via Q-SYS UDP)
+
+**Helper Scripts:**
+- Run with sudo via `/etc/sudoers.d/led-matrix`
+- Daemon user can execute (rgbmatrix drops privileges)
+- See `rpi/HELPER-SCRIPTS.md` for details
+
+### Service Configuration
+
+**File:** `/etc/systemd/system/led-matrix.service`
+```ini
+[Service]
+ExecStart=/usr/bin/python3 /opt/led-matrix/main.py
+WorkingDirectory=/opt/led-matrix
+Restart=always
+RestartSec=2
+User=root  # rgbmatrix drops to daemon
+```
+
+**Config Storage:** `/var/lib/led-matrix/config.json`
+```json
+{"orientation": "landscape", "rotation": 0, "group_id": 0}
+```
+
+### IP Detection
+
+Priority order:
+1. eth* interfaces (eth0, eth1, ...)
+2. wlan* interfaces (wlan0, ...)
+3. Other interfaces
+
+Only shows IPs from interfaces that are:
+- **UP** (has LOWER_UP or state UP)
+- **NOT DOWN** (no state DOWN flag)
+- **NOT NO-CARRIER** (has link)
+
+Example:
+- eth0: `state DOWN, NO-CARRIER` → ignored (10.20.30.40)
+- eth1: `state UP, LOWER_UP` → used (10.1.1.25) ✅
+
+---
+
+## Legacy ESP32 Firmware — `src/` (Deprecated)
+
+> **Note:** The project has migrated to Python on Raspberry Pi CM4.
+> ESP32 code is preserved for reference but no longer actively developed.
 
 ---
 
