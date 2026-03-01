@@ -233,6 +233,15 @@ class UDPHandler:
 
     def dispatch(self, raw: str):
         """Parse a raw JSON string and apply the command (thread-safe)."""
+        # Check if test mode is active - if so, ignore all UDP commands
+        try:
+            with open("/tmp/led-matrix-testmode", "r") as f:
+                if f.read().strip() == "1":
+                    # Test mode active - ignore all commands silently
+                    return
+        except FileNotFoundError:
+            pass  # No test mode file = normal operation
+        
         logger.info(f"[UDP] Received: {raw}")
         try:
             doc = json.loads(raw)
@@ -256,6 +265,7 @@ class UDPHandler:
         
         cmd = doc.get("cmd", "")
         logger.info(f"[UDP] Executing command: {cmd} (group={cmd_group}, my_group={my_group})")
+
 
         if cmd == "text":
             seg     = int(doc.get("seg", 0))

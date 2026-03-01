@@ -383,9 +383,108 @@ def main():
 
     # ── 10. Main render loop ──────────────────────────────────────────────
     last_effect = time.monotonic()
+    test_mode_active = False
+    test_mode_was_active = False
+    test_bar_offset = 0
+    test_cycle_state = 0
+    last_cycle_switch = time.monotonic()
+    last_hostname_fetch = time.monotonic()
+    last_ip_fetch = time.monotonic()
+    hostname = socket.gethostname()
+    test_device_ip = current_ip_ref[0]
 
     while True:
         now = time.monotonic()
+        
+        # ── Check for test mode ──────────────────────────────────────────
+        try:
+            with open("/tmp/led-matrix-testmode", "r") as f:
+                test_mode_active = (f.read().strip() == "1")
+        except FileNotFoundError:
+            test_mode_active = False
+        
+        # Clear display when entering test mode
+        if test_mode_active and not test_mode_was_active:
+            logger.info("[TEST] Entering test mode - clearing display")
+            sm.clear_all()
+            if matrix:
+                matrix.Clear()
+            test_bar_offset = 0
+            test_cycle_state = 0
+            last_cycle_switch = now
+        
+        test_mode_was_active = test_mode_active
+        
+        # ── Test mode rendering ──────────────────────────────────────────
+        if test_mode_active:
+            # Refresh hostname every 10 seconds
+            if now - last_hostname_fetch >= 10:
+                hostname = socket.gethostname()
+                last_hostname_fetch = now
+            
+            # Refresh IP every 10 seconds
+            if now - last_ip_fetch >= 10:
+                test_device_ip = text_renderer._get_first_up_ip() or "No IP"
+                last_ip_fetch = now
+            
+            # 4-state cycle: 0=hostname top, 1=blank, 2=IP bottom, 3=blank
+            if now - last_cycle_switch >= 1.0:
+                test_cycle_state = (test_cycle_state + 1) % 4
+                last_cycle_switch = now
+                
+                # Update segments for new cycle state
+                sm.clear_all()
+                
+                if test_cycle_state == 0:
+                    # Hostname in upper half
+                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
+                    sm.activate(0, True)
+                    sm.set_frame(0, enabled=False)
+                    sm.update_text(0, hostname, color="000000", bgcolor="010101", align="C")
+                elif test_cycle_state == 2:
+                    # IP in lower half
+                    sm.configure(0, 0, MATRIX_HEIGHT // 2, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
+                    sm.activate(0, True)
+                    sm.set_frame(0, enabled=False)
+                    sm.update_text(0, test_device_ip, color="000000", bgcolor="010101", align="C")
+                # States 1 and 3 are blank (no segments)
+            
+            # Draw vertical color bars (full height)
+            bar_width = MATRIX_WIDTH // 5  # ~13px bars
+            colors = [
+                (255, 0, 0),    # Red
+                (0, 255, 0),    # Green
+                (0, 0, 255),    # Blue
+                (0, 255, 255),  # Cyan
+                (255, 0, 255),  # Magenta
+                (255, 255, 0),  # Yellow
+                (255, 255, 255),# White
+                (0, 0, 0)       # Black
+            ]
+            
+            # Move bars slowly from left to right
+            test_bar_offset = (test_bar_offset + 1) % (bar_width * len(colors))
+            
+            # Draw color bars directly to matrix
+            if matrix:
+                for x in range(MATRIX_WIDTH):
+                    bar_index = ((x + test_bar_offset) // bar_width) % len(colors)
+                    r, g, b = colors[bar_index]
+                    for y in range(MATRIX_HEIGHT):
+                        matrix.SetPixel(x, y, r, g, b)
+            
+            # Mark dirty and render text on top of bars
+            sm.mark_all_dirty()
+            if renderer:
+                try:
+                    renderer.render_all()
+                except Exception as exc:
+                    logger.error(f"[TEST] Render exception: {exc}")
+            
+            time.sleep(0.033)  # 30fps
+            continue
+
+        # ── Normal mode rendering ────────────────────────────────────────
 
         # Dismiss IP splash on first received command.
         # Do NOT call sm.clear_all() here — the command has already written its

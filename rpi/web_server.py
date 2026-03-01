@@ -154,6 +154,26 @@ HTML_PAGE = r"""<!DOCTYPE html>
         .btn-reboot:active {
             transform: translateY(0);
         }
+        .btn-test {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: linear-gradient(135deg, rgb(255, 193, 7) 0%, rgb(255, 152, 0) 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-test:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 193, 7, 0.4);
+        }
+        .btn-test:active {
+            transform: translateY(0);
+        }
         .status {
             margin-top: 20px;
             padding: 12px;
@@ -242,6 +262,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         </form>
         
         <button type="button" class="btn-reboot" onclick="rebootDevice()">🔄 Reboot Device</button>
+        <button type="button" class="btn-test" id="testModeBtn" onclick="toggleTestMode()">🎨 Toggle Test Mode</button>
         
         <div class="status" id="status"></div>
     </div>
@@ -338,6 +359,30 @@ HTML_PAGE = r"""<!DOCTYPE html>
                 status.textContent = '🔄 Rebooting... Please wait 30 seconds.';
             } catch (e) {
                 console.log('Reboot initiated (connection lost as expected)');
+            }
+        }
+        
+        // Toggle test mode
+        async function toggleTestMode() {
+            try {
+                const resp = await fetch('/api/testmode', { method: 'POST' });
+                const result = await resp.json();
+                
+                const status = document.getElementById('status');
+                const btn = document.getElementById('testModeBtn');
+                
+                if (result.success) {
+                    status.className = 'status success';
+                    status.textContent = '✓ ' + result.message;
+                    btn.textContent = result.enabled ? '⏹️ Disable Test Mode' : '🎨 Enable Test Mode';
+                } else {
+                    status.className = 'status error';
+                    status.textContent = '✗ Failed: ' + (result.error || 'Unknown error');
+                }
+            } catch (e) {
+                const status = document.getElementById('status');
+                status.className = 'status error';
+                status.textContent = '✗ Connection error: ' + e.message;
             }
         }
         
@@ -460,6 +505,46 @@ class WebServerHandler(BaseHTTPRequestHandler):
                 subprocess.Popen(["sudo", "reboot"])
             except Exception as e:
                 logger.error(f"[WEB] Reboot failed: {e}")
+        
+        elif parsed.path == "/api/testmode":
+            # Toggle test mode
+            try:
+                # Read current state
+                test_mode_enabled = False
+                try:
+                    with open("/tmp/led-matrix-testmode", "r") as f:
+                        test_mode_enabled = (f.read().strip() == "1")
+                except FileNotFoundError:
+                    pass
+                
+                # Toggle state
+                test_mode_enabled = not test_mode_enabled
+                
+                # Write new state
+                with open("/tmp/led-matrix-testmode", "w") as f:
+                    f.write("1" if test_mode_enabled else "0")
+                
+                logger.info(f"[WEB] Test mode {'enabled' if test_mode_enabled else 'disabled'}")
+                
+                response = {
+                    "success": True,
+                    "enabled": test_mode_enabled,
+                    "message": "Test mode " + ("enabled" if test_mode_enabled else "disabled")
+                }
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
+            
+            except Exception as e:
+                logger.error(f"[WEB] Test mode toggle failed: {e}")
+                response = {"success": False, "error": str(e)}
+                
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
         
         else:
             self.send_error(404)
