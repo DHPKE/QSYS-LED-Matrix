@@ -336,17 +336,19 @@ def main():
             sm.mark_all_dirty()
 
     def on_display_change(enabled: bool):
-        nonlocal display_enabled, canvas
+        nonlocal display_enabled, canvas, matrix
         logger.info(f"[MAIN] Display → {'ENABLED' if enabled else 'DISABLED'}")
         
         if not enabled:
             # Clear display when disabled
             display_enabled = False
-            if canvas:
+            if canvas and matrix:
                 canvas.Clear()
-            if matrix:
+                canvas = matrix.SwapOnVSync(canvas)  # Swap cleared buffer to display
+                logger.info("[MAIN] Display blanked (buffer swapped)")
+            elif matrix:
                 matrix.Clear()
-                logger.info("[MAIN] Matrix and canvas cleared")
+                logger.info("[MAIN] Matrix cleared (no canvas)")
         else:
             # Re-enable display and force immediate re-render
             display_enabled = True
@@ -357,6 +359,8 @@ def main():
                 try:
                     renderer.render_all()
                     logger.info("[MAIN] Forced immediate re-render")
+                except Exception as exc:
+                    logger.error(f"[MAIN] Re-render exception: {exc}")
                 except Exception as exc:
                     logger.error(f"[MAIN] Re-render exception: {exc}")
 
