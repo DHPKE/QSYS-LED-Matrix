@@ -547,13 +547,11 @@ def main():
                     # Hostname
                     sm.activate(0, True)
                     sm.update_text(0, hostname, color="FFFFFF", bgcolor="010101", align="C")
-                    sm.mark_dirty(0)
                     logger.info(f"[TEST] Displaying hostname: '{hostname}'")
                 elif test_cycle_state == 2:
                     # IP
                     sm.activate(0, True)
                     sm.update_text(0, test_device_ip, color="FFFFFF", bgcolor="010101", align="C")
-                    sm.mark_dirty(0)
                     logger.info(f"[TEST] Displaying IP: '{test_device_ip}'")
                 else:
                     # Blank (deactivate segment, just show bars)
