@@ -393,6 +393,7 @@ def main():
     last_ip_fetch = time.monotonic()
     hostname = socket.gethostname()
     test_device_ip = current_ip_ref[0]
+    frame_counter = 0
 
     while True:
         now = time.monotonic()
@@ -404,15 +405,24 @@ def main():
         except FileNotFoundError:
             test_mode_active = False
         
-        # Clear display when entering test mode
+        # Clear display and force 0° rotation when entering test mode
         if test_mode_active and not test_mode_was_active:
-            logger.info("[TEST] Entering test mode - clearing display")
+            logger.info("[TEST] Entering test mode - clearing display, forcing 0° rotation")
             sm.clear_all()
             if matrix:
                 matrix.Clear()
+            if renderer:
+                renderer.set_rotation_override(0)  # Force 0° rotation for test mode
             test_bar_offset = 0
             test_cycle_state = 0
             last_cycle_switch = now
+            frame_counter = 0
+        
+        # Restore rotation when exiting test mode
+        if not test_mode_active and test_mode_was_active:
+            logger.info("[TEST] Exiting test mode - restoring rotation")
+            if renderer:
+                renderer.set_rotation_override(None)  # Restore configured rotation
         
         test_mode_was_active = test_mode_active
         
@@ -463,8 +473,10 @@ def main():
                 (0, 0, 0)       # Black
             ]
             
-            # Move bars slowly from left to right
-            test_bar_offset = (test_bar_offset + 1) % (bar_width * len(colors))
+            # Move bars every 2 frames for smoother animation
+            frame_counter += 1
+            if frame_counter % 2 == 0:
+                test_bar_offset = (test_bar_offset + 1) % (bar_width * len(colors))
             
             # Draw color bars directly to matrix
             if matrix:
@@ -482,7 +494,7 @@ def main():
                 except Exception as exc:
                     logger.error(f"[TEST] Render exception: {exc}")
             
-            time.sleep(0.033)  # 30fps
+            time.sleep(0.016)  # ~60fps for smoother bars
             continue
 
         # ── Normal mode rendering ────────────────────────────────────────
