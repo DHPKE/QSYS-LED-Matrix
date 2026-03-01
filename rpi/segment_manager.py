@@ -47,7 +47,7 @@ class Segment:
     """Single display zone."""
     __slots__ = (
         "id", "x", "y", "width", "height",
-        "text", "color", "bgcolor",
+        "text", "color", "bgcolor", "font",
         "align", "effect", "effect_speed",
         "scroll_offset", "last_scroll_update",
         "blink_state", "last_blink_update",
@@ -64,6 +64,7 @@ class Segment:
         self.text   = ""
         self.color  = "#FFFFFF"
         self.bgcolor = "#000000"
+        self.font   = "arial"  # Default font
         self.align  = TextAlign.CENTER
         self.effect = TextEffect.NONE
         self.effect_speed = DEFAULT_SCROLL_SPEED
@@ -87,6 +88,7 @@ class Segment:
             "text":    self.text,
             "color":   self.color,
             "bgcolor": self.bgcolor,
+            "font":    self.font,
             "align":   self.align.value,
             "effect":  self.effect.value,
             "active":  self.is_active,
@@ -105,6 +107,7 @@ class Segment:
             'text': self.text,
             'color': self.color,
             'bgcolor': self.bgcolor,
+            'font': self.font,
             'align': self.align,
             'effect': self.effect,
             'blink_state': self.blink_state,
@@ -176,7 +179,7 @@ class SegmentManager:
 
     def update_text(self, seg_id: int, text: str, color: str = None,
                     bgcolor: str = None, align: str = None,
-                    effect: str = None, intensity: int = 255):
+                    effect: str = None, font: str = None, intensity: int = 255):
         with self._lock:
             seg = self.get_segment(seg_id)
             if seg is None:
@@ -190,6 +193,8 @@ class SegmentManager:
                 seg.align = _parse_align(align)
             if effect is not None:
                 seg.effect = _parse_effect(effect)
+            if font is not None:
+                seg.font = font.lower()
             seg.is_active = True
             seg.is_dirty  = True
 

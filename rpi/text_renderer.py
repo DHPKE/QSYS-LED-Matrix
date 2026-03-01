@@ -19,7 +19,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from config import (MATRIX_WIDTH, MATRIX_HEIGHT,
-                    FONT_PATH, FONT_PATH_FALLBACK,
+                    FONT_PATHS, FONT_FALLBACK,
                     GROUP_COLORS, GROUP_INDICATOR_SIZE)
 from segment_manager import SegmentManager, TextAlign, TextEffect
 import udp_handler
@@ -39,18 +39,35 @@ _color_cache: dict[str, tuple[int, int, int]] = {}
 _text_measurement_cache: dict[tuple, tuple[int, int]] = {}
 
 
-def _load_font(size: int) -> ImageFont.ImageFont:
-    for path in (FONT_PATH, FONT_PATH_FALLBACK):
-        key = (path, size)
-        if key in _font_cache:
-            return _font_cache[key]
-        if os.path.exists(path):
-            try:
-                font = ImageFont.truetype(path, size)
-                _font_cache[key] = font
-                return font
-            except Exception:
-                pass
+def _load_font(font_name: str, size: int) -> ImageFont.ImageFont:
+    """Load a font by name and size. Uses FONT_PATHS mapping and caches results."""
+    # Get font path from mapping, fallback to arial if not found
+    font_path = FONT_PATHS.get(font_name.lower(), FONT_PATHS.get("arial", FONT_FALLBACK))
+    
+    key = (font_path, size)
+    if key in _font_cache:
+        return _font_cache[key]
+    
+    if os.path.exists(font_path):
+        try:
+            font = ImageFont.truetype(font_path, size)
+            _font_cache[key] = font
+            return font
+        except Exception as e:
+            logger.warning(f"[FONT] Failed to load {font_path}: {e}")
+    
+    # Try fallback
+    if os.path.exists(FONT_FALLBACK):
+        try:
+            key_fallback = (FONT_FALLBACK, size)
+            if key_fallback in _font_cache:
+                return _font_cache[key_fallback]
+            font = ImageFont.truetype(FONT_FALLBACK, size)
+            _font_cache[key_fallback] = font
+            return font
+        except Exception:
+            pass
+    
     # Last resort: PIL built-in bitmap font (no size argument)
     return ImageFont.load_default()
 
@@ -70,19 +87,19 @@ def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     return rgb
 
 
-def _fit_text(text: str, max_w: int, max_h: int, debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
+def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
     """Return (font, font_size) for the largest size that fits within max_w × max_h.
     Uses cached measurements for performance."""
     
     # Try to use cached measurement first
     for size in _FONT_SIZES:
-        cache_key = (text, size)
+        cache_key = (text, font_name, size)
         
         if cache_key in _text_measurement_cache:
             tw, th = _text_measurement_cache[cache_key]
         else:
             # Measure and cache
-            font = _load_font(size)
+            font = _load_font(font_name, size)
             bbox = font.getbbox(text) if hasattr(font, "getbbox") else (0, 0, len(text) * size, size)
             tw = bbox[2] - bbox[0]
             th = bbox[3] - bbox[1]
@@ -92,12 +109,12 @@ def _fit_text(text: str, max_w: int, max_h: int, debug_seg_id: int = -1) -> tupl
         if tw <= max_w and th <= max_h:
             if debug_seg_id >= 0:
                 logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → size {size} ({tw}×{th} in {max_w}×{max_h})")
-            return _load_font(size), size
+            return _load_font(font_name, size), size
     
     # Fallback: smallest size
     if debug_seg_id >= 0:
         logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {_FONT_SIZES[-1]} (text too long)")
-    return _load_font(_FONT_SIZES[-1]), _FONT_SIZES[-1]
+    return _load_font(font_name, _FONT_SIZES[-1]), _FONT_SIZES[-1]
 
 
 class TextRenderer:
@@ -302,7 +319,7 @@ class TextRenderer:
         avail_w = max(1, snap['width']  - 2)  # 1px margin left and right
         avail_h = max(1, snap['height'] - 2)  # 1px margin top and bottom
 
-        font, font_size = _fit_text(text, avail_w, avail_h, snap['id'])
+        font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), debug_seg_id=snap['id'])
         if not font:
             return
 
@@ -396,7 +413,7 @@ class TextRenderer:
         # Auto-fit font with 1px margin on all borders
         avail_w = max(1, seg.width  - 2)  # 1px margin left and right
         avail_h = max(1, seg.height - 2)  # 1px margin top and bottom
-        font, font_size = _fit_text(text, avail_w, avail_h, debug_seg_id=seg.id)
+        font, font_size = _fit_text(text, avail_w, avail_h, font_name=seg.font, debug_seg_id=seg.id)
 
         # Measure text
         try:

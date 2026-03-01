@@ -176,8 +176,17 @@ DHCP_TIMEOUT_S   = 15          # Seconds to wait for DHCP before applying fallba
 # ──────────────────────────────────────────────────────────────────────────────
 MAX_TEXT_LENGTH    = 128
 DEFAULT_SCROLL_SPEED = 50   # pixels per second
-FONT_PATH          = "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"
-FONT_PATH_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+# Font mapping (Q-SYS plugin font names -> font file paths)
+FONT_PATHS = {
+    "arial":     "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf",
+    "verdana":   "/usr/share/fonts/truetype/msttcorefonts/Verdana_Bold.ttf",
+    "digital12": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",  # Digital fallback
+    "mono9":     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",       # Mono fallback
+}
+
+# Fallback font if requested font not found
+FONT_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Persistence
