@@ -306,6 +306,10 @@ class UDPHandler:
             value = int(doc.get("value", 0))
             logger.info(f"[UDP] Rotation command -> value={value}°")
             if set_rotation(value):
+                # Re-apply current layout with new rotation
+                # (90°/270° need portrait layouts, 0°/180° need landscape)
+                if hasattr(self, '_current_layout') and self._current_layout:
+                    self._apply_layout(self._current_layout)
                 # Force redraw with new rotation
                 self._sm.mark_all_dirty()
 
@@ -341,8 +345,12 @@ class UDPHandler:
 
     def _apply_layout(self, preset: int):
         """Apply a numbered layout preset from config.LAYOUT_PRESETS or LAYOUT_PRESETS_PORTRAIT."""
-        # Use portrait layouts if in portrait mode
-        if self._orientation == "portrait":
+        # Determine if we need portrait layouts based on rotation
+        # 90° and 270° rotations require portrait dimensions (32×64)
+        rotation = get_rotation()
+        use_portrait_layout = (self._orientation == "portrait") or (rotation in (90, 270))
+        
+        if use_portrait_layout:
             zones = LAYOUT_PRESETS_PORTRAIT.get(preset)
         else:
             zones = LAYOUT_PRESETS.get(preset)
@@ -354,7 +362,8 @@ class UDPHandler:
         # Remember the current layout preset number
         self._current_layout = preset
         
-        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s)) in {self._orientation} mode")
+        layout_type = "portrait (32×64)" if use_portrait_layout else "landscape (64×32)"
+        logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s)) {layout_type} (rotation={rotation}°)")
         for i in range(MAX_SEGMENTS):
             if i < len(zones):
                 x, y, w, h = zones[i]
