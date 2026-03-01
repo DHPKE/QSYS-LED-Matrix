@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.6.0 - Fixed to use correct Q-SYS HttpClient API (Upload/Download, not New)
 -- Version 6.5.3 - Disabled HTTP health check (HttpClient not available in all Q-SYS cores)
 -- Version 6.5.2 - Fixed HttpClient constructor syntax (use constructor, set properties after)
 -- Version 6.5.1 - Added HttpClient availability checks and error handling
@@ -7,9 +8,8 @@
 -- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
 -- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
--- NOTE: Reboot and Test Mode buttons require HttpClient support in Q-SYS core.
---       If HttpClient is not available, use the WebUI at http://IP:8080/
---       Connection status is based on UDP send success only.
+-- NOTE: Uses HttpClient.Upload() and HttpClient.Download() per Q-SYS API
+--       https://q-syshelp.qsc.com/DeveloperHelp/Content/Code_Examples/HTTPClient.htm
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
 --   {" {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
@@ -50,9 +50,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.5.3",
-    Id = "dhpke.olimex.led.matrix.6.5.3",
-    Description = "RPi 64x32 LED Matrix - Disabled HTTP health check (not all cores support HttpClient)",
+    Version = "6.6.0",
+    Id = "dhpke.olimex.led.matrix.6.6.0",
+    Description = "RPi 64x32 LED Matrix - Fixed HttpClient API (Upload/Download)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -839,92 +839,65 @@ if Controls then
         end
     end
 
-    -- ✅ Reboot button - NOTE: Requires HttpClient (may not be available in all Q-SYS cores)
+    -- ✅ Reboot button using Q-SYS HttpClient.Upload()
     Controls.reboot_panel.EventHandler = function()
-        print("[REBOOT] Reboot button pressed")
+        print("[REBOOT] Sending HTTP POST to /api/reboot")
+        Controls.last_command.String = "Rebooting panel..."
         
         -- Check if HttpClient is available
         if not HttpClient then
-            print("[REBOOT] HttpClient not available - use WebUI at http://IP:8080/ to reboot")
+            print("[REBOOT] HttpClient not available - use WebUI at http://IP:8080/")
             Controls.last_command.String = "HttpClient unavailable - use WebUI"
             return
         end
         
-        Controls.last_command.String = "Rebooting panel..."
-        
-        -- Create HttpClient
-        local ok, http = pcall(function()
-            local client = HttpClient.New()
-            client.Url = string.format("http://%s:8080/api/reboot", ip_addr)
-            client.Method = "POST"
-            client.Timeout = 2
-            return client
-        end)
-        
-        if not ok then
-            print("[REBOOT ERROR] Failed to create HttpClient: " .. tostring(http))
-            Controls.last_command.String = "ERROR: Use WebUI to reboot"
-            return
-        end
-        
-        -- Set EventHandler AFTER creation
-        http.EventHandler = function(tbl, code, data, err)
-            if code == 200 or code == 0 then
-                print("✓ [REBOOT] Command sent successfully")
-                Controls.last_command.String = "Panel rebooting (offline ~30s)"
-            else
-                print(string.format("⚠ [REBOOT] Response code=%s, err=%s", tostring(code), tostring(err)))
-                Controls.last_command.String = "Reboot command sent"
+        -- Use HttpClient.Upload for POST requests (Q-SYS API)
+        HttpClient.Upload({
+            Url = string.format("http://%s:8080/api/reboot", ip_addr),
+            Method = "POST",
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 then
+                    print("✓ [REBOOT] Command sent successfully")
+                    Controls.last_command.String = "Panel rebooting (offline ~30s)"
+                else
+                    print(string.format("⚠ [REBOOT] Response code=%s, err=%s", tostring(code), tostring(err or "none")))
+                    Controls.last_command.String = "Reboot command sent"
+                end
             end
-        end
-        
-        http:Send()
+        })
     end
 
-    -- Test Mode Toggle Handler - NOTE: Requires HttpClient
+    -- Test Mode Toggle Handler using Q-SYS HttpClient.Upload()
     Controls.test_mode.EventHandler = function(ctl)
         local enabled = ctl.Boolean
         print(string.format("[TEST] Test mode toggle: %s", enabled and "ON" or "OFF"))
+        Controls.last_command.String = "Toggling test mode..."
         
         -- Check if HttpClient is available
         if not HttpClient then
-            print("[TEST] HttpClient not available - use WebUI at http://IP:8080/ to toggle")
+            print("[TEST] HttpClient not available - use WebUI at http://IP:8080/")
             Controls.last_command.String = "HttpClient unavailable - use WebUI"
             ctl.Boolean = not enabled  -- Revert toggle
             return
         end
         
-        Controls.last_command.String = "Toggling test mode..."
-        
-        -- Create HttpClient
-        local ok, http = pcall(function()
-            local client = HttpClient.New()
-            client.Url = string.format("http://%s:8080/api/testmode", ip_addr)
-            client.Method = "POST"
-            client.Timeout = 2
-            return client
-        end)
-        
-        if not ok then
-            print("[TEST ERROR] Failed to create HttpClient: " .. tostring(http))
-            Controls.last_command.String = "ERROR: Use WebUI to toggle"
-            ctl.Boolean = not enabled  -- Revert toggle
-            return
-        end
-        
-        -- Set EventHandler AFTER creation
-        http.EventHandler = function(tbl, code, data, err)
-            if code == 200 then
-                print(string.format("✓ [TEST] Test mode %s", enabled and "enabled" or "disabled"))
-                Controls.last_command.String = string.format("Test mode %s", enabled and "ON" or "OFF")
-            else
-                print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err)))
-                Controls.last_command.String = "Test mode toggle failed"
-                ctl.Boolean = not enabled
+        -- Use HttpClient.Upload for POST requests (Q-SYS API)
+        HttpClient.Upload({
+            Url = string.format("http://%s:8080/api/testmode", ip_addr),
+            Method = "POST",
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 then
+                    print(string.format("✓ [TEST] Test mode %s", enabled and "enabled" or "disabled"))
+                    Controls.last_command.String = string.format("Test mode %s", enabled and "ON" or "OFF")
+                else
+                    print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err or "none")))
+                    Controls.last_command.String = "Test mode toggle failed"
+                    ctl.Boolean = not enabled  -- Revert on failure
+                end
             end
-        end
-        
-        http:Send()
+        })
     end
 
     Controls.ip_address.EventHandler = function(ctl)
@@ -942,10 +915,33 @@ if Controls then
 
     local healthCheckTimer = Timer.New()
     healthCheckTimer.EventHandler = function()
-        -- HttpClient not available in this Q-SYS core - health check disabled
-        -- Connection status will be based on UDP send success only
+        -- Check if HttpClient is available
+        if not HttpClient then
+            return  -- Silent skip
+        end
+        
+        -- Ping the web server using HttpClient.Download (Q-SYS API)
+        HttpClient.Download({
+            Url = string.format("http://%s:8080/", ip_addr),
+            Method = "GET",
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 or code == 404 then
+                    -- Panel is reachable
+                    Controls.connection_status.Value = 0
+                    errorCount = 0
+                else
+                    -- Panel unreachable
+                    Controls.connection_status.Value = 2
+                    errorCount = errorCount + 1
+                    if errorCount >= 5 then
+                        ReopenSocket()
+                    end
+                end
+            end
+        })
     end
-    healthCheckTimer:Start(10)  -- Keep timer but do nothing
+    healthCheckTimer:Start(5)  -- Check every 5 seconds
 
     function Cleanup()
         if healthCheckTimer then 
