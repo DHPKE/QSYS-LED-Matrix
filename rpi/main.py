@@ -329,13 +329,26 @@ def main():
             # During startup, just mark dirty
             sm.mark_all_dirty()
 
+    def on_display_change(enabled: bool):
+        nonlocal display_enabled
+        display_enabled = enabled
+        logger.info(f"[MAIN] Display → {'ENABLED' if enabled else 'DISABLED'}")
+        if not enabled:
+            # Clear display when disabled
+            if matrix:
+                matrix.Clear()
+        else:
+            # Re-render when enabled
+            sm.mark_all_dirty()
+
     # ── 5. Load saved configuration ───────────────────────────────────────
     _load_config()
 
     # ── 6. Start UDP listener ────────────────────────────────────────────
     udp = UDPHandler(sm, 
                      brightness_callback=on_brightness_change,
-                     orientation_callback=on_orientation_change)
+                     orientation_callback=on_orientation_change,
+                     display_callback=on_display_change)
     udp.start()
     
     # Apply the correct layout based on loaded orientation
@@ -591,6 +604,11 @@ def main():
             continue
 
         # ── Normal mode rendering ────────────────────────────────────────
+
+        # Skip rendering if display is disabled
+        if not display_enabled:
+            time.sleep(EFFECT_INTERVAL)
+            continue
 
         # Dismiss IP splash on first received command.
         # Do NOT call sm.clear_all() here — the command has already written its

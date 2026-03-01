@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.7.0 - Added display enable/disable control, improved test mode restoration
 -- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
 -- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
 -- Version 6.6.1 - Added Data parameter to HttpClient.Upload (required even for empty POST)
@@ -53,9 +54,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.6.3",
-    Id = "dhpke.olimex.led.matrix.6.6.3",
-    Description = "RPi 64x32 LED Matrix - Segment defaults updated",
+    Version = "6.7.0",
+    Id = "dhpke.olimex.led.matrix.6.7.0",
+    Description = "RPi 64x32 LED Matrix - Display enable/disable + test mode fixes",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -115,6 +116,7 @@ function GetControls(props)
     table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="display_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="test_mode", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -397,17 +399,22 @@ function GetControlLayout(props)
     layout["apply_rotation"] = { PrettyName="Global~ApplyRot", Style="Button",
         ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
         Position={218, y+30}, Size={120, 36} }
-    layout["reboot_panel"] = { PrettyName="Global~Reboot", Style="Button",
-        ButtonStyle="Trigger", Legend="Reboot Panel", Color={200, 80, 80},
+    
+    layout["display_enable"] = { PrettyName="Global~Display", Style="Button",
+        ButtonStyle="Toggle", Legend="Display Enable", Color=C_BTN_G,
         Position={344, y+30}, Size={110, 36} }
     
     layout["test_mode"] = { PrettyName="Global~TestMode", Style="Button",
         ButtonStyle="Toggle", Legend="Test Mode", Color={255, 193, 7},
         Position={460, y+30}, Size={100, 36} }
     
+    layout["reboot_panel"] = { PrettyName="Global~Reboot", Style="Button",
+        ButtonStyle="Trigger", Legend="Reboot Panel", Color={200, 80, 80},
+        Position={566, y+30}, Size={64, 36} }
+    
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
-        Position={566, y+30}, Size={W-572, 36} }
+        Position={636, y+30}, Size={W-642, 36} }
 
     return layout, graphics
 end
@@ -589,6 +596,10 @@ if Controls then
         end
         if Controls.last_command.String == "" then
             Controls.last_command.String = "Ready"
+        end
+        -- Initialize display_enable to ON by default
+        if Controls.display_enable.Boolean == nil then
+            Controls.display_enable.Boolean = true
         end
         Controls.layout_preset.String = LayoutChoices[1]
 
@@ -871,6 +882,37 @@ if Controls then
                 end
             end
         })
+    end
+
+    -- Display Enable/Disable Toggle Handler
+    Controls.display_enable.EventHandler = function(ctl)
+        local enabled = ctl.Boolean
+        print(string.format("[DISPLAY] Toggle: %s", enabled and "ON" or "OFF"))
+        Controls.last_command.String = string.format("Display %s", enabled and "enabling..." or "disabling...")
+        
+        -- Send UDP command to enable/disable display
+        local payload = {
+            cmd = "display",
+            enabled = enabled,
+            group = activeGroup
+        }
+        local ok, json_str = pcall(function() return rapidjson.encode(payload) end)
+        if not ok then
+            print("[DISPLAY ERROR] JSON encode failed")
+            Controls.last_command.String = "JSON error"
+            return
+        end
+        
+        socket.Data = json_str
+        print(string.format("[DISPLAY] Sending: %s", json_str))
+        local result = socket:Send()
+        if result == 0 then
+            print(string.format("✓ [DISPLAY] Command sent: %s", enabled and "ENABLED" or "DISABLED"))
+            Controls.last_command.String = string.format("Display %s", enabled and "ON" or "OFF")
+        else
+            print(string.format("⚠ [DISPLAY] Send failed: %s", result))
+            Controls.last_command.String = "Display toggle failed"
+        end
     end
 
     -- Test Mode Toggle Handler using Q-SYS HttpClient.Upload()
