@@ -567,12 +567,12 @@ iface eth1 inet dhcp
             
             # Schedule reboot after response is sent using threading
             import threading
-            import os
             def delayed_reboot():
                 import time
                 time.sleep(1)  # Allow HTTP response to complete
                 logger.info("[WEB] Executing reboot command")
-                os.system("/usr/sbin/reboot")
+                # Use sudo helper script (daemon user needs sudoers rule)
+                subprocess.run(["sudo", "/opt/led-matrix/reboot-device.sh"])
             
             thread = threading.Thread(target=delayed_reboot, daemon=True)
             thread.start()
