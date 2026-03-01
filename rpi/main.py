@@ -438,6 +438,30 @@ def main():
                 test_device_ip = text_renderer._get_first_up_ip() or "No IP"
                 last_ip_fetch = now
             
+            # Draw 5 vertical color bars (full height, full width)
+            # Each bar is 1/5 of display width, scrolling left to right
+            bar_width = MATRIX_WIDTH // 5  # 64/5 = ~13px per bar
+            colors = [
+                (255, 0, 0),    # Red
+                (0, 255, 0),    # Green
+                (0, 0, 255),    # Blue
+                (255, 255, 0),  # Yellow
+                (255, 255, 255) # White
+            ]
+            
+            # Move bars every 2 frames for smooth animation
+            frame_counter += 1
+            if frame_counter % 2 == 0:
+                test_bar_offset = (test_bar_offset + 1) % (bar_width * len(colors))
+            
+            # Draw color bars directly to matrix (full height)
+            if matrix:
+                for x in range(MATRIX_WIDTH):
+                    bar_index = ((x + test_bar_offset) // bar_width) % len(colors)
+                    r, g, b = colors[bar_index]
+                    for y in range(MATRIX_HEIGHT):
+                        matrix.SetPixel(x, y, r, g, b)
+            
             # 4-state cycle: 0=hostname top, 1=blank, 2=IP bottom, 3=blank
             if now - last_cycle_switch >= 1.0:
                 test_cycle_state = (test_cycle_state + 1) % 4
@@ -447,44 +471,20 @@ def main():
                 sm.clear_all()
                 
                 if test_cycle_state == 0:
-                    # Hostname in upper half
+                    # Hostname in upper half - text overlays bars
                     sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
                     sm.activate(0, True)
                     sm.set_frame(0, enabled=False)
+                    # Use transparent background (010101) so bars show through
                     sm.update_text(0, hostname, color="000000", bgcolor="010101", align="C")
                 elif test_cycle_state == 2:
-                    # IP in lower half
+                    # IP in lower half - text overlays bars
                     sm.configure(0, 0, MATRIX_HEIGHT // 2, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
                     sm.activate(0, True)
                     sm.set_frame(0, enabled=False)
+                    # Use transparent background (010101) so bars show through
                     sm.update_text(0, test_device_ip, color="000000", bgcolor="010101", align="C")
-                # States 1 and 3 are blank (no segments)
-            
-            # Draw vertical color bars (full height)
-            bar_width = MATRIX_WIDTH // 5  # ~13px bars
-            colors = [
-                (255, 0, 0),    # Red
-                (0, 255, 0),    # Green
-                (0, 0, 255),    # Blue
-                (0, 255, 255),  # Cyan
-                (255, 0, 255),  # Magenta
-                (255, 255, 0),  # Yellow
-                (255, 255, 255),# White
-                (0, 0, 0)       # Black
-            ]
-            
-            # Move bars every 2 frames for smoother animation
-            frame_counter += 1
-            if frame_counter % 2 == 0:
-                test_bar_offset = (test_bar_offset + 1) % (bar_width * len(colors))
-            
-            # Draw color bars directly to matrix
-            if matrix:
-                for x in range(MATRIX_WIDTH):
-                    bar_index = ((x + test_bar_offset) // bar_width) % len(colors)
-                    r, g, b = colors[bar_index]
-                    for y in range(MATRIX_HEIGHT):
-                        matrix.SetPixel(x, y, r, g, b)
+                # States 1 and 3 are blank (no segments, just bars)
             
             # Mark dirty and render text on top of bars
             sm.mark_all_dirty()
@@ -494,7 +494,7 @@ def main():
                 except Exception as exc:
                     logger.error(f"[TEST] Render exception: {exc}")
             
-            time.sleep(0.016)  # ~60fps for smoother bars
+            time.sleep(0.016)  # ~60fps for smooth bars
             continue
 
         # ── Normal mode rendering ────────────────────────────────────────

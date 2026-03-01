@@ -280,11 +280,15 @@ class TextRenderer:
         fg = _hex_to_rgb(snap['color'])
         bg = _hex_to_rgb(snap['bgcolor'])
 
-        # Fill background
-        self._draw.rectangle(
-            [snap['x'], snap['y'], snap['x'] + snap['width'] - 1, snap['y'] + snap['height'] - 1],
-            fill=bg
-        )
+        # Skip background fill if bgcolor is (1,1,1) - transparent marker for test mode
+        skip_background = (bg == (1, 1, 1))
+        
+        if not skip_background:
+            # Fill background
+            self._draw.rectangle(
+                [snap['x'], snap['y'], snap['x'] + snap['width'] - 1, snap['y'] + snap['height'] - 1],
+                fill=bg
+            )
 
         text = snap['text']
         if not text:
