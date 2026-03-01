@@ -176,8 +176,8 @@ DHCP_TIMEOUT_S   = 15          # Seconds to wait for DHCP before applying fallba
 # ──────────────────────────────────────────────────────────────────────────────
 MAX_TEXT_LENGTH    = 128
 DEFAULT_SCROLL_SPEED = 50   # pixels per second
-FONT_PATH          = "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"
-FONT_PATH_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT_PATH          = "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"
+FONT_PATH_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Persistence
