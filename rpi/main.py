@@ -354,7 +354,16 @@ def main():
     
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
     sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
-    sm.mark_all_dirty()  # Trigger initial render
+    sm.mark_all_dirty()  # Mark for rendering
+    
+    # Force immediate render of IP splash at 0° rotation
+    if renderer:
+        try:
+            renderer.render_all()
+            logger.info(f"[SPLASH] Rendered IP splash at 0° rotation: {current_ip_ref[0]}")
+        except Exception as exc:
+            logger.error(f"[SPLASH] Render exception: {exc}")
+    
     logger.info(f"[SPLASH] Showing IP address: {current_ip_ref[0]} (rotation locked to 0°)")
     
     # Start network monitor thread
