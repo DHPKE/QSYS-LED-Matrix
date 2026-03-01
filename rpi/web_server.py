@@ -501,8 +501,10 @@ class WebServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(response).encode())
             
             # Schedule reboot after response is sent
+            # Use systemctl reboot which works reliably
             try:
-                subprocess.Popen(["sudo", "reboot"])
+                subprocess.Popen(["/usr/bin/systemctl", "reboot"])
+                logger.info("[WEB] Reboot command sent")
             except Exception as e:
                 logger.error(f"[WEB] Reboot failed: {e}")
         
