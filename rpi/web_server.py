@@ -495,49 +495,32 @@ class WebServerHandler(BaseHTTPRequestHandler):
                     except Exception as e:
                         logger.error(f"[WEB] Failed to set hostname: {e}")
                 
-                # Apply network configuration if in static mode
-                if config.get("mode") == "static":
-                    # Write network config to /etc/network/interfaces.d/eth1
-                    # This requires the service to run as root
+                # Apply network configuration
+                if config.get("mode") in ("static", "dhcp"):
                     try:
+                        mode = config.get("mode")
                         ip = config.get("ip", "")
                         netmask = config.get("netmask", "")
                         gateway = config.get("gateway", "")
                         dns = config.get("dns", "")
                         
-                        if ip and netmask:
-                            # Calculate CIDR from netmask
-                            import ipaddress
-                            cidr = ipaddress.IPv4Network(f"0.0.0.0/{netmask}").prefixlen
-                            
-                            network_config = f"""# Static IP configuration for eth1
-auto eth1
-iface eth1 inet static
-    address {ip}/{cidr}
-"""
-                            if gateway:
-                                network_config += f"    gateway {gateway}\n"
-                            if dns:
-                                network_config += f"    dns-nameservers {dns}\n"
-                            
-                            with open("/etc/network/interfaces.d/eth1", "w") as f:
-                                f.write(network_config)
-                            logger.info(f"[WEB] Static IP config written: {ip}/{cidr}")
+                        # Build command arguments
+                        cmd = ["sudo", "/opt/led-matrix/configure-network.sh", mode]
+                        if mode == "static":
+                            cmd.extend([ip, netmask, gateway, dns])
+                        
+                        # Execute network config script
+                        result = subprocess.run(
+                            cmd,
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        logger.info(f"[WEB] Network config: {mode} - {result.stdout.strip()}")
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"[WEB] Failed to configure network: {e.stderr}")
                     except Exception as e:
-                        logger.error(f"[WEB] Failed to write network config: {e}")
-                
-                elif config.get("mode") == "dhcp":
-                    # Write DHCP config
-                    try:
-                        network_config = """# DHCP configuration for eth1
-auto eth1
-iface eth1 inet dhcp
-"""
-                        with open("/etc/network/interfaces.d/eth1", "w") as f:
-                            f.write(network_config)
-                        logger.info("[WEB] DHCP config written")
-                    except Exception as e:
-                        logger.error(f"[WEB] Failed to write network config: {e}")
+                        logger.error(f"[WEB] Failed to configure network: {e}")
                 
                 response = {"success": True, "message": "Configuration saved (requires reboot for network changes)"}
                 

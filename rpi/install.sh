@@ -314,7 +314,7 @@ SUDOERS_FILE="/etc/sudoers.d/led-matrix"
 # Always recreate to ensure all scripts are included
 cat <<'EOF' | sudo tee "$SUDOERS_FILE" > /dev/null
 # Allow daemon user to run network config, hostname change, and reboot scripts
-daemon ALL=(ALL) NOPASSWD: /opt/led-matrix/network-config.sh
+daemon ALL=(ALL) NOPASSWD: /opt/led-matrix/configure-network.sh
 daemon ALL=(root) NOPASSWD: /opt/led-matrix/set-hostname.sh
 daemon ALL=(root) NOPASSWD: /opt/led-matrix/reboot-device.sh
 EOF
