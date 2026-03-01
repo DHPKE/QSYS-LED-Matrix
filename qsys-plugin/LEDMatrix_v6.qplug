@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
 -- Version 6.6.1 - Added Data parameter to HttpClient.Upload (required even for empty POST)
 -- Version 6.6.0 - Fixed to use correct Q-SYS HttpClient API (Upload/Download, not New)
 -- Version 6.5.3 - Disabled HTTP health check (HttpClient not available in all Q-SYS cores)
@@ -51,9 +52,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.6.1",
-    Id = "dhpke.olimex.led.matrix.6.6.1",
-    Description = "RPi 64x32 LED Matrix - Fixed HttpClient Data parameter",
+    Version = "6.6.2",
+    Id = "dhpke.olimex.led.matrix.6.6.2",
+    Description = "RPi 64x32 LED Matrix - Color names updated + segment defaults",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -424,11 +425,11 @@ if Controls then
     local updatingGroups = false
 
     local ColorNames = {
-        ["White"]   = "FFFFFF", ["Red"]     = "FF0000", ["Lime"]    = "00FF00",
-        ["Blue"]    = "0000FF", ["Yellow"]  = "FFFF00", ["Magenta"] = "FF00FF",
-        ["Cyan"]    = "00FFFF", ["Orange"]  = "FFA500", ["Purple"]  = "800080",
-        ["Green"]   = "008000", ["Gold"]    = "FFD700",
-        ["Gray"]    = "808080", ["Black"]   = "000000"
+        ["White"]   = "FFFFFF", ["Red"]      = "FF0000", ["Green"]     = "00FF00",
+        ["Blue"]    = "0000FF", ["Yellow"]   = "FFFF00", ["Magenta"]   = "FF00FF",
+        ["Cyan"]    = "00FFFF", ["Orange"]   = "FFA500", ["Purple"]    = "800080",
+        ["DarkGreen"] = "008000", ["Gold"]   = "FFD700",
+        ["Gray"]    = "808080", ["Black"]    = "000000"
     }
     local FontMap  = { ["Arial"]="arial", ["Verdana"]="verdana", ["Digital"]="digital12", ["Mono"]="mono9" }
     local AlignMap = { ["Left"]="L", ["Center"]="C", ["Right"]="R" }
@@ -596,15 +597,15 @@ if Controls then
         end
         Controls.active_group.String = "All"
 
-        local colorChoices  = {"White","Red","Lime","Blue","Yellow","Magenta","Cyan",
-                               "Orange","Purple","Green","Gold","Gray","Black"}
-        local bgChoices     = {"Black","White","Red","Lime","Blue","Yellow","Magenta","Cyan",
-                               "Orange","Purple","Green","Gold","Gray"}
+        local colorChoices  = {"White","Red","Green","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","DarkGreen","Gold","Gray","Black"}
+        local bgChoices     = {"Black","White","Red","Green","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","DarkGreen","Gold","Gray"}
         local fontChoices   = {"Arial","Verdana","Digital","Mono"}
         local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}
         local effectChoices = {"none","scroll","blink","fade"}
-        local defaultColors = {"White","Lime","Red","Yellow"}
+        local defaultColors = {"Red","Green","Red","Yellow"}  -- Seg1=Red, Seg2=Green, Seg3=Red, Seg4=Yellow
 
         for seg = 0, 3 do
             local s = "seg" .. (seg+1) .. "_"
