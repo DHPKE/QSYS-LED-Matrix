@@ -481,6 +481,13 @@ def main():
             sm.clear_all()
             if matrix:
                 matrix.Clear()
+            
+            # Configure segment 0 for full-screen test mode display
+            sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT)
+            sm.activate(0, True)
+            sm.set_frame(0, enabled=False)
+            logger.info("[TEST] Configured segment 0 for full-screen (64x32)")
+            
             if renderer:
                 renderer.set_rotation_override(0)  # Force 0° rotation for test mode
             test_bar_offset = 0
@@ -529,33 +536,30 @@ def main():
                 test_device_ip = _get_first_up_ip() or "No IP"
                 last_ip_fetch = now
             
-            # 4-state cycle: 0=hostname top, 1=blank, 2=IP bottom, 3=blank
+            # 4-state cycle: 0=hostname, 1=blank, 2=IP, 3=blank
             if now - last_cycle_switch >= 1.0:
                 test_cycle_state = (test_cycle_state + 1) % 4
                 last_cycle_switch = now
                 
-                # Update segments for new cycle state
-                sm.clear_all()
-                
+                # Update segment 0 text based on cycle state
+                # Segment 0 is already configured as full-screen on entry to test mode
                 if test_cycle_state == 0:
-                    # Hostname - use full screen for better readability
-                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT)
+                    # Hostname
                     sm.activate(0, True)
-                    sm.set_frame(0, enabled=False)
                     sm.update_text(0, hostname, color="FFFFFF", bgcolor="010101", align="C")
-                    sm.mark_all_dirty()
+                    sm.mark_dirty(0)
                     logger.info(f"[TEST] Displaying hostname: '{hostname}'")
                 elif test_cycle_state == 2:
-                    # IP - use full screen for better readability
-                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT)
+                    # IP
                     sm.activate(0, True)
-                    sm.set_frame(0, enabled=False)
                     sm.update_text(0, test_device_ip, color="FFFFFF", bgcolor="010101", align="C")
-                    sm.mark_all_dirty()
+                    sm.mark_dirty(0)
                     logger.info(f"[TEST] Displaying IP: '{test_device_ip}'")
                 else:
+                    # Blank (deactivate segment, just show bars)
+                    sm.activate(0, False)
                     logger.info(f"[TEST] Blank cycle (state {test_cycle_state})")
-                # States 1 and 3 are blank (no segments, just bars)
+                # States 1 and 3 are blank (no text, just bars)
             
             # RENDER TEST MODE PATTERN
             # Import PIL here for test mode rendering
