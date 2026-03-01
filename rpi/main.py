@@ -342,7 +342,8 @@ def main():
             sm.mark_all_dirty()
 
     # ── 5. Load saved configuration ───────────────────────────────────────
-    _load_config()
+    from udp_handler import _load_config as load_udp_config
+    load_udp_config()
 
     # ── 6. Start UDP listener ────────────────────────────────────────────
     udp = UDPHandler(sm, 
