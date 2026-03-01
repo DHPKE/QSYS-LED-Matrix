@@ -1,10 +1,15 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 6.5.2 - Fixed HttpClient.New() syntax (use constructor, set properties after)
+-- Version 6.5.3 - Disabled HTTP health check (HttpClient not available in all Q-SYS cores)
+-- Version 6.5.2 - Fixed HttpClient constructor syntax (use constructor, set properties after)
 -- Version 6.5.1 - Added HttpClient availability checks and error handling
 -- Version 6.5.0 - Added HTTP health check for accurate connection status
 -- Version 6.4.0 - Added test mode toggle button
 -- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
 -- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
+--
+-- NOTE: Reboot and Test Mode buttons require HttpClient support in Q-SYS core.
+--       If HttpClient is not available, use the WebUI at http://IP:8080/
+--       Connection status is based on UDP send success only.
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
 --   {" {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
@@ -45,9 +50,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.5.2",
-    Id = "dhpke.olimex.led.matrix.6.5.2",
-    Description = "RPi 64x32 LED Matrix - Fixed HttpClient constructor syntax",
+    Version = "6.5.3",
+    Id = "dhpke.olimex.led.matrix.6.5.3",
+    Description = "RPi 64x32 LED Matrix - Disabled HTTP health check (not all cores support HttpClient)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -834,19 +839,20 @@ if Controls then
         end
     end
 
-    -- ✅ FIXED: Reboot using HttpClient instead of os.execute
+    -- ✅ Reboot button - NOTE: Requires HttpClient (may not be available in all Q-SYS cores)
     Controls.reboot_panel.EventHandler = function()
-        print("[REBOOT] Sending HTTP POST to /api/reboot")
-        Controls.last_command.String = "Rebooting panel..."
+        print("[REBOOT] Reboot button pressed")
         
         -- Check if HttpClient is available
         if not HttpClient then
-            print("[REBOOT ERROR] HttpClient not available in this Q-SYS context")
-            Controls.last_command.String = "ERROR: HttpClient not available"
+            print("[REBOOT] HttpClient not available - use WebUI at http://IP:8080/ to reboot")
+            Controls.last_command.String = "HttpClient unavailable - use WebUI"
             return
         end
         
-        -- Create HttpClient - Q-SYS creates a new instance each time
+        Controls.last_command.String = "Rebooting panel..."
+        
+        -- Create HttpClient
         local ok, http = pcall(function()
             local client = HttpClient.New()
             client.Url = string.format("http://%s:8080/api/reboot", ip_addr)
@@ -857,7 +863,7 @@ if Controls then
         
         if not ok then
             print("[REBOOT ERROR] Failed to create HttpClient: " .. tostring(http))
-            Controls.last_command.String = "ERROR: " .. tostring(http)
+            Controls.last_command.String = "ERROR: Use WebUI to reboot"
             return
         end
         
@@ -867,34 +873,30 @@ if Controls then
                 print("✓ [REBOOT] Command sent successfully")
                 Controls.last_command.String = "Panel rebooting (offline ~30s)"
             else
-                print(string.format("⚠ [REBOOT] Response code=%s, err=%s (panel may still reboot)", tostring(code), tostring(err)))
+                print(string.format("⚠ [REBOOT] Response code=%s, err=%s", tostring(code), tostring(err)))
                 Controls.last_command.String = "Reboot command sent"
             end
         end
         
         http:Send()
-        
-        -- Update status immediately (don't wait for response)
-        Timer.CallAfter(function()
-            Controls.last_command.String = "Reboot initiated..."
-        end, 0.1)
     end
 
-    -- Test Mode Toggle Handler
+    -- Test Mode Toggle Handler - NOTE: Requires HttpClient
     Controls.test_mode.EventHandler = function(ctl)
         local enabled = ctl.Boolean
-        print(string.format("[TEST] Toggle test mode: %s", enabled and "ON" or "OFF"))
-        Controls.last_command.String = "Toggling test mode..."
+        print(string.format("[TEST] Test mode toggle: %s", enabled and "ON" or "OFF"))
         
         -- Check if HttpClient is available
         if not HttpClient then
-            print("[TEST ERROR] HttpClient not available in this Q-SYS context")
-            Controls.last_command.String = "ERROR: HttpClient not available"
+            print("[TEST] HttpClient not available - use WebUI at http://IP:8080/ to toggle")
+            Controls.last_command.String = "HttpClient unavailable - use WebUI"
             ctl.Boolean = not enabled  -- Revert toggle
             return
         end
         
-        -- Create HttpClient to toggle test mode
+        Controls.last_command.String = "Toggling test mode..."
+        
+        -- Create HttpClient
         local ok, http = pcall(function()
             local client = HttpClient.New()
             client.Url = string.format("http://%s:8080/api/testmode", ip_addr)
@@ -905,7 +907,7 @@ if Controls then
         
         if not ok then
             print("[TEST ERROR] Failed to create HttpClient: " .. tostring(http))
-            Controls.last_command.String = "ERROR: " .. tostring(http)
+            Controls.last_command.String = "ERROR: Use WebUI to toggle"
             ctl.Boolean = not enabled  -- Revert toggle
             return
         end
@@ -918,7 +920,6 @@ if Controls then
             else
                 print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err)))
                 Controls.last_command.String = "Test mode toggle failed"
-                -- Revert button state on failure
                 ctl.Boolean = not enabled
             end
         end
@@ -941,42 +942,10 @@ if Controls then
 
     local healthCheckTimer = Timer.New()
     healthCheckTimer.EventHandler = function()
-        -- Check if HttpClient is available (may not be in all Q-SYS contexts)
-        if not HttpClient then
-            return  -- Silent skip if not available
-        end
-        
-        -- Ping the web server to verify panel is reachable
-        local ok, http = pcall(function()
-            local client = HttpClient.New()
-            client.Url = string.format("http://%s:8080/", ip_addr)
-            client.Method = "GET"
-            client.Timeout = 2
-            return client
-        end)
-        
-        if not ok then
-            return  -- Silent fail
-        end
-        
-        http.EventHandler = function(tbl, code, data, err)
-            if code == 200 or code == 404 then
-                -- Panel is reachable (200 = OK, 404 = endpoint exists but not root)
-                Controls.connection_status.Value = 0
-                errorCount = 0
-            else
-                -- Panel unreachable or error
-                Controls.connection_status.Value = 2
-                if errorCount >= 5 then
-                    print("[HEALTH] Panel unreachable, reopening socket...")
-                    ReopenSocket()
-                end
-            end
-        end
-        
-        http:Send()
+        -- HttpClient not available in this Q-SYS core - health check disabled
+        -- Connection status will be based on UDP send success only
     end
-    healthCheckTimer:Start(5)  -- Check every 5 seconds
+    healthCheckTimer:Start(10)  -- Keep timer but do nothing
 
     function Cleanup()
         if healthCheckTimer then 
