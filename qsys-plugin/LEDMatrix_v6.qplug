@@ -41,9 +41,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.2.4",
-    Id = "dhpke.olimex.led.matrix.6.2.4",
-    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot (HttpClient fix v2)",
+    Version = "6.3.0",
+    Id = "dhpke.olimex.led.matrix.6.3.0",
+    Description = "RPi 64x32 LED Matrix - frame color auto-sync toggle",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -91,7 +91,7 @@ function GetControls(props)
         table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, { Name=string.format("seg%d_frame",  n), ControlType="Button", ButtonType="Toggle",  Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_frame_color", n), ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-        table.insert(controls, { Name=string.format("seg%d_frame_link", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_frame_link", n), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
         table.insert(controls, {
             Name=string.format("seg%d_active", n),
             ControlType="Indicator", IndicatorType="LED",
@@ -159,7 +159,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.2.4",
+        Type="Text", Text="LED Matrix Controller  v6.3.0",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -366,7 +366,7 @@ function GetControlLayout(props)
             IsReadOnly=false,
             Position={92, r3}, Size={110, CH} }
         layout[sn.."frame_link"] = { PrettyName=grp.."~LinkColor", Style="Button",
-            ButtonStyle="Trigger", Legend="→", Color={80,120,180},
+            ButtonStyle="Toggle", Legend="→", Color={80,120,180}, OffColor={60,60,60}, UnlinkOffColor=true,
             Position={208, r3}, Size={32, BH}, FontSize=18 }
     end
 
@@ -750,7 +750,20 @@ if Controls then
         end
 
         Controls[s.."text"].EventHandler       = AutoSend
-        Controls[s.."text_color"].EventHandler = AutoSend
+        Controls[s.."text_color"].EventHandler = function(ctl)
+            -- Send text update
+            AutoSend()
+            -- If frame link is enabled, sync frame color to text color
+            if Controls[s.."frame_link"].Boolean then
+                Controls[s.."frame_color"].String = ctl.String
+                if Controls[s.."frame"].Boolean then
+                    local color = ColorNames[ctl.String] or "FFFFFF"
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                    }))
+                end
+            end
+        end
         Controls[s.."bg_color"].EventHandler   = AutoSend
         Controls[s.."font"].EventHandler       = AutoSend
         Controls[s.."align"].EventHandler      = AutoSend
@@ -774,13 +787,16 @@ if Controls then
             end
         end
         
-        Controls[s.."frame_link"].EventHandler = function()
-            Controls[s.."frame_color"].String = Controls[s.."text_color"].String
-            if Controls[s.."frame"].Boolean then
-                local color = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
-                SendCommand(buildJson({
-                    cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
-                }))
+        Controls[s.."frame_link"].EventHandler = function(ctl)
+            -- When enabled, sync frame color to text color and keep it synced
+            if ctl.Boolean then
+                Controls[s.."frame_color"].String = Controls[s.."text_color"].String
+                if Controls[s.."frame"].Boolean then
+                    local color = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                    }))
+                end
             end
         end
     end
