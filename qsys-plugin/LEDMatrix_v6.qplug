@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.6.1 - Added Data parameter to HttpClient.Upload (required even for empty POST)
 -- Version 6.6.0 - Fixed to use correct Q-SYS HttpClient API (Upload/Download, not New)
 -- Version 6.5.3 - Disabled HTTP health check (HttpClient not available in all Q-SYS cores)
 -- Version 6.5.2 - Fixed HttpClient constructor syntax (use constructor, set properties after)
@@ -50,9 +51,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.6.0",
-    Id = "dhpke.olimex.led.matrix.6.6.0",
-    Description = "RPi 64x32 LED Matrix - Fixed HttpClient API (Upload/Download)",
+    Version = "6.6.1",
+    Id = "dhpke.olimex.led.matrix.6.6.1",
+    Description = "RPi 64x32 LED Matrix - Fixed HttpClient Data parameter",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -852,9 +853,11 @@ if Controls then
         end
         
         -- Use HttpClient.Upload for POST requests (Q-SYS API)
+        -- Note: Data parameter is required even for empty POST body
         HttpClient.Upload({
             Url = string.format("http://%s:8080/api/reboot", ip_addr),
             Method = "POST",
+            Data = "",  -- Empty string for POST with no body
             Timeout = 2,
             EventHandler = function(tbl, code, data, err)
                 if code == 200 then
@@ -883,9 +886,11 @@ if Controls then
         end
         
         -- Use HttpClient.Upload for POST requests (Q-SYS API)
+        -- Note: Data parameter is required even for empty POST body
         HttpClient.Upload({
             Url = string.format("http://%s:8080/api/testmode", ip_addr),
             Method = "POST",
+            Data = "",  -- Empty string for POST with no body
             Timeout = 2,
             EventHandler = function(tbl, code, data, err)
                 if code == 200 then
