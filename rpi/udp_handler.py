@@ -18,6 +18,7 @@ Supported JSON commands (identical protocol to the ESP32 firmware):
 import socket
 import json
 import threading
+import time
 import logging
 import os
 
@@ -206,6 +207,8 @@ class UDPHandler:
         # Set to True on the first successfully dispatched command so
         # main.py can dismiss the IP splash screen.
         self._first_command_received = False
+        # Track last command time for watchdog (auto-blank if inactive)
+        self._last_command_time = time.time()
 
     # ─── Public API ────────────────────────────────────────────────────────
 
@@ -234,9 +237,16 @@ class UDPHandler:
     def get_current_layout(self) -> int:
         """Return the current layout preset number."""
         return self._current_layout
+    
+    def get_last_command_time(self) -> float:
+        """Return timestamp of last received command (for watchdog)."""
+        return self._last_command_time
 
     def dispatch(self, raw: str):
         """Parse a raw JSON string and apply the command (thread-safe)."""
+        # Update last command time for watchdog
+        self._last_command_time = time.time()
+        
         # Check if test mode is active - if so, ignore all UDP commands
         try:
             with open("/tmp/led-matrix-testmode", "r") as f:

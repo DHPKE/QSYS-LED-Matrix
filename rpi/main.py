@@ -462,6 +462,11 @@ def main():
     
     # Display enable/disable state
     display_enabled = True
+    
+    # Watchdog: Auto-blank if no UDP commands received for 30 seconds
+    last_udp_command_time = time.monotonic()
+    watchdog_blanked = False
+    WATCHDOG_TIMEOUT = 30.0  # seconds
 
     while True:
         now = time.monotonic()
@@ -636,8 +641,24 @@ def main():
 
         # ── Normal mode rendering ────────────────────────────────────────
 
-        # Skip rendering if display is disabled
-        if not display_enabled:
+        # Watchdog: Auto-blank if no UDP commands for 30 seconds (Q-SYS plugin disabled)
+        time_since_last_command = now - udp.get_last_command_time()
+        if time_since_last_command > WATCHDOG_TIMEOUT and not watchdog_blanked and not ip_splash_active:
+            logger.warning(f"[WATCHDOG] No UDP commands for {WATCHDOG_TIMEOUT}s - blanking display")
+            if canvas and matrix:
+                canvas.Clear()
+                canvas = matrix.SwapOnVSync(canvas)
+            elif matrix:
+                matrix.Clear()
+            watchdog_blanked = True
+        elif time_since_last_command <= WATCHDOG_TIMEOUT and watchdog_blanked:
+            # Commands resumed - restore display
+            logger.info("[WATCHDOG] Commands resumed - restoring display")
+            watchdog_blanked = False
+            sm.mark_all_dirty()
+
+        # Skip rendering if display is disabled or watchdog blanked
+        if not display_enabled or watchdog_blanked:
             time.sleep(EFFECT_INTERVAL)
             continue
 
