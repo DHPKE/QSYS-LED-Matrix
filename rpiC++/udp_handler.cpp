@@ -196,12 +196,16 @@ void UDPHandler::dispatch(const std::string& raw_json) {
                 
                 std::lock_guard<std::mutex> lock(config_mutex_);
                 brightness_ = val;
-                if (brightness_callback_) {
-                    brightness_callback_(val);
-                }
-                // Don't markAllDirty() - brightness change doesn't need full redraw
-                // and SetBrightness() blocks the UDP thread
                 saveConfig();
+                
+                // Trigger service restart to apply brightness
+                // SetBrightness() causes freeze, so we restart instead
+                std::cout << "[UDP] Brightness changed to " << (val * 100 / 255) 
+                         << "% - triggering restart..." << std::endl;
+                
+                if (brightness_callback_) {
+                    brightness_callback_(val); // This will trigger shutdown in main.cpp
+                }
             }
             
         } else if (cmd == "orientation") {

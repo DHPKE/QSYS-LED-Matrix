@@ -224,12 +224,17 @@ int main(int argc, char* argv[]) {
              << g_matrix->height() << ")" << std::endl;
     
     // ── 4. Brightness callback ───────────────────────────────────────────────
-    // DISABLED: SetBrightness() causes service freeze (rpi-rgb-led-matrix bug)
-    // Brightness can only be set at startup via config file
+    // SetBrightness() causes freeze, so brightness changes trigger restart instead
+    // Config is already saved by UDPHandler before calling this callback
     auto on_brightness_change = [](int value_255) {
         int pct = std::max(0, std::min(100, (value_255 * 100) / 255));
-        std::cout << "[MAIN] ⚠ Brightness change ignored (" << pct << "%) - runtime changes disabled (causes freeze)" << std::endl;
-        std::cout << "[MAIN] To change brightness: edit /var/lib/led-matrix/config.json and restart service" << std::endl;
+        std::cout << "[MAIN] Brightness change to " << pct << "% - restarting service..." << std::endl;
+        
+        // Give time for config to be fully written
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        
+        // Trigger clean shutdown - systemd will restart us with new brightness
+        interrupt_received = true;
     };
     
     // ── 5. Orientation callback ──────────────────────────────────────────────
