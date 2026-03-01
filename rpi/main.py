@@ -335,7 +335,6 @@ def main():
     from udp_handler import get_orientation
     initial_orientation = get_orientation()
     logger.info(f"[MAIN] Initial orientation: {initial_orientation}")
-    udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for current orientation
 
     # ── 7. Start web server ──────────────────────────────────────────────
     web = WebServer(sm, udp)
@@ -348,6 +347,10 @@ def main():
     ip_splash_active = True
     if renderer:
         renderer.set_rotation_override(0)  # Force 0° rotation for IP splash
+    
+    # Apply layout AFTER rotation override so segments match the 0° canvas
+    udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for IP splash at 0°
+    
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
     sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
     sm.mark_all_dirty()  # Trigger initial render
@@ -392,6 +395,8 @@ def main():
             ip_splash_active = False
             if renderer:
                 renderer.set_rotation_override(None)  # Restore configured rotation
+                # Re-apply layout for the actual rotation (might have changed from 0° to 90°/270°)
+                udp._apply_layout(udp._current_layout if hasattr(udp, '_current_layout') else 1)
             logger.info("[SPLASH] First command received — IP splash dismissed, rotation restored")
 
         # Update effects and render at fixed interval
