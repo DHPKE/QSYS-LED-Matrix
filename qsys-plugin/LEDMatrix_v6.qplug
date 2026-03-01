@@ -597,10 +597,6 @@ if Controls then
         if Controls.last_command.String == "" then
             Controls.last_command.String = "Ready"
         end
-        -- Initialize display_enable to ON by default
-        if Controls.display_enable.Boolean == nil then
-            Controls.display_enable.Boolean = true
-        end
         Controls.layout_preset.String = LayoutChoices[1]
 
         Controls.group0_select.Boolean = true
@@ -658,6 +654,12 @@ if Controls then
         end
 
         ReopenSocket()
+        
+        -- Initialize display_enable to ON by default (after socket is ready)
+        if Controls.display_enable.Boolean == nil then
+            Controls.display_enable.Boolean = true
+        end
+        
         print("=== Plugin Ready ===")
     end
 
@@ -886,6 +888,11 @@ if Controls then
 
     -- Display Enable/Disable Toggle Handler
     Controls.display_enable.EventHandler = function(ctl)
+        if not socket then
+            print("[DISPLAY] Socket not ready yet")
+            return
+        end
+        
         local enabled = ctl.Boolean
         print(string.format("[DISPLAY] Toggle: %s", enabled and "ON" or "OFF"))
         Controls.last_command.String = string.format("Display %s", enabled and "enabling..." or "disabling...")
