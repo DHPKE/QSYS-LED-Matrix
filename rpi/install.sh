@@ -307,17 +307,18 @@ fi
 echo ""
 
 # ── 8. Configure sudoers for daemon user ──────────────────────────────────
-echo "[8/9] Configuring sudoers for network configuration..."
+echo "[8/9] Configuring sudoers for daemon user..."
 
 SUDOERS_FILE="/etc/sudoers.d/led-matrix"
 
-if [ -f "$SUDOERS_FILE" ]; then
-    echo "  ℹ  Sudoers configuration already exists"
-else
-    echo "daemon ALL=(ALL) NOPASSWD: /opt/led-matrix/network-config.sh" | sudo tee "$SUDOERS_FILE" > /dev/null
-    sudo chmod 0440 "$SUDOERS_FILE"
-    echo "  ✓ Sudoers configured for daemon user"
-fi
+# Always recreate to ensure both scripts are included
+cat <<'EOF' | sudo tee "$SUDOERS_FILE" > /dev/null
+# Allow daemon user to run network config and hostname change scripts
+daemon ALL=(ALL) NOPASSWD: /opt/led-matrix/network-config.sh
+daemon ALL=(root) NOPASSWD: /opt/led-matrix/set-hostname.sh
+EOF
+sudo chmod 0440 "$SUDOERS_FILE"
+echo "  ✓ Sudoers configured for daemon user (network config + hostname)"
 echo ""
 
 # ── 9. Systemd service ─────────────────────────────────────────────────────
