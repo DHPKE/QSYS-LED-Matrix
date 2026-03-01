@@ -283,7 +283,7 @@ LAYOUT_PRESETS_PORTRAIT = {
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────────────────────────────────────
-LOG_LEVEL = "WARNING"   # DEBUG | INFO | WARNING | ERROR
+LOG_LEVEL = "DEBUG"   # DEBUG | INFO | WARNING | ERROR
                         # Use WARNING or ERROR to reduce CPU overhead from logging
 
 # ──────────────────────────────────────────────────────────────────────────────
