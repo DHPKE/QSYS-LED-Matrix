@@ -448,11 +448,16 @@ def main():
             last_ip_fetch = now
             logger.info(f"[TEST] Hostname: {hostname}, IP: {test_device_ip}")
         
-        # Restore rotation when exiting test mode
+        # Restore rotation and trigger full re-render when exiting test mode
         if not test_mode_active and test_mode_was_active:
-            logger.info("[TEST] Exiting test mode - restoring rotation")
+            logger.info("[TEST] Exiting test mode - restoring rotation and layout")
+            if matrix:
+                matrix.Clear()  # Clear test mode artifacts
             if renderer:
                 renderer.set_rotation_override(None)  # Restore configured rotation
+            # Mark all active segments as dirty to force re-render
+            sm.mark_all_dirty()
+            logger.info("[TEST] Marked all segments dirty for re-render")
         
         test_mode_was_active = test_mode_active
         
