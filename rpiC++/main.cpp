@@ -30,8 +30,8 @@ RGBMatrix* g_matrix = nullptr;
 UDPHandler* g_udp_handler = nullptr;
 static volatile bool interrupt_received = false;
 
-// Atomic brightness change flag (to avoid blocking UDP thread)
-static std::atomic<int> g_pending_brightness{-1};
+// Brightness changes are DISABLED - SetBrightness() causes the service to freeze
+// Set brightness at startup only via config file
 
 static void InterruptHandler(int signo) {
     interrupt_received = true;
@@ -224,11 +224,12 @@ int main(int argc, char* argv[]) {
              << g_matrix->height() << ")" << std::endl;
     
     // ── 4. Brightness callback ───────────────────────────────────────────────
-    // Don't call SetBrightness() here - it blocks! Just queue the change.
+    // DISABLED: SetBrightness() causes service freeze (rpi-rgb-led-matrix bug)
+    // Brightness can only be set at startup via config file
     auto on_brightness_change = [](int value_255) {
         int pct = std::max(0, std::min(100, (value_255 * 100) / 255));
-        g_pending_brightness.store(pct);
-        std::cout << "[MAIN] Brightness change queued: " << pct << "%" << std::endl;
+        std::cout << "[MAIN] ⚠ Brightness change ignored (" << pct << "%) - runtime changes disabled (causes freeze)" << std::endl;
+        std::cout << "[MAIN] To change brightness: edit /var/lib/led-matrix/config.json and restart service" << std::endl;
     };
     
     // ── 5. Orientation callback ──────────────────────────────────────────────
@@ -247,7 +248,13 @@ int main(int argc, char* argv[]) {
     // ── 6. Rotation callback ─────────────────────────────────────────────────
     auto on_rotation_change = [](Rotation rotation) {
         int angle = static_cast<int>(rotation);
-        std::cout << "[MAIN] Rotation changed to " << angle << "° (will apply on next restart)" << std::endl;
+        std::cout << "[MAIN] Rotation changed to " << angle << "° - restarting service..." << std::endl;
+        
+        // Trigger service restart to apply new rotation
+        // systemd will restart us automatically
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Give time for config save
+        std::cout << "[MAIN] Initiating restart for rotation change" << std::endl;
+        interrupt_received = true; // Trigger clean shutdown
     };
     
     // ── 7. Start UDP listener ────────────────────────────────────────────────
@@ -293,13 +300,6 @@ int main(int argc, char* argv[]) {
     
     while (!interrupt_received) {
         auto now = std::chrono::steady_clock::now();
-        
-        // Apply pending brightness change (non-blocking from main thread)
-        int pending_brightness = g_pending_brightness.exchange(-1);
-        if (pending_brightness >= 0) {
-            g_matrix->SetBrightness(pending_brightness);
-            std::cout << "[MAIN] Brightness applied: " << pending_brightness << "%" << std::endl;
-        }
         
         // Check for test mode
         static bool test_mode_active = false;
