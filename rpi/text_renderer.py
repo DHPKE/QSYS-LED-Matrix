@@ -181,11 +181,21 @@ class TextRenderer:
         self._render_group_indicator(canvas_width, canvas_height)
         
         # Step 5: Apply rotation if needed and push to matrix
+        from udp_handler import get_rotation
+        rotation = get_rotation()
+        
+        # Portrait orientation (90° rotation)
         if orientation == "portrait":
             rotated_img = self._image.rotate(-90, expand=True)
-            self._canvas.SetImage(rotated_img)
         else:
-            self._canvas.SetImage(self._image)
+            rotated_img = self._image
+        
+        # Additional rotation (0, 90, 180, 270)
+        if rotation != 0:
+            # Rotate clockwise (negative for PIL rotate which is counter-clockwise)
+            rotated_img = rotated_img.rotate(-rotation, expand=False)
+        
+        self._canvas.SetImage(rotated_img)
         
         # Step 6: Swap canvas (vsync)
         self._canvas = self._matrix.SwapOnVSync(self._canvas)

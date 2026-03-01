@@ -79,7 +79,7 @@ MATRIX_REFRESH_LIMIT    = 200         # Hz; 0 = no limit, 200 = stable refresh
                                       # Limiting refresh reduces flicker and power usage
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Display Orientation
+# Display Orientation & Rotation
 # ──────────────────────────────────────────────────────────────────────────────
 ORIENTATION = "landscape"  # "landscape" (64×32) or "portrait" (32×64)
                             # Portrait mode rotates the display 90° clockwise
@@ -88,6 +88,15 @@ ORIENTATION = "landscape"  # "landscape" (64×32) or "portrait" (32×64)
                             # automatically applied to ensure segment dimensions match
                             # the new canvas size. Use layout presets or send new
                             # segment configs after changing orientation.
+
+ROTATION = 0                # Display rotation in degrees: 0, 90, 180, 270
+                            # Rotates the entire display output
+                            # 0   = Normal (no rotation)
+                            # 90  = Rotate 90° clockwise
+                            # 180 = Upside down
+                            # 270 = Rotate 90° counter-clockwise (270° CW)
+                            # Can be changed dynamically via UDP or WebUI
+                            # No restart required (uses PIL Image.rotate)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Group Configuration
