@@ -417,6 +417,12 @@ def main():
             test_cycle_state = 0
             last_cycle_switch = now
             frame_counter = 0
+            # Force immediate refresh of hostname and IP
+            hostname = socket.gethostname()
+            test_device_ip = _get_first_up_ip() or "No IP"
+            last_hostname_fetch = now
+            last_ip_fetch = now
+            logger.info(f"[TEST] Hostname: {hostname}, IP: {test_device_ip}")
         
         # Restore rotation when exiting test mode
         if not test_mode_active and test_mode_was_active:
@@ -453,6 +459,7 @@ def main():
                     sm.set_frame(0, enabled=False)
                     sm.update_text(0, hostname, color="FFFFFF", bgcolor="010101", align="C")
                     sm.mark_all_dirty()
+                    logger.info(f"[TEST] Displaying hostname: '{hostname}' (seg: 0,0,{MATRIX_WIDTH},{MATRIX_HEIGHT//2})")
                 elif test_cycle_state == 2:
                     # IP in lower half
                     sm.configure(0, 0, MATRIX_HEIGHT // 2, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
@@ -460,6 +467,9 @@ def main():
                     sm.set_frame(0, enabled=False)
                     sm.update_text(0, test_device_ip, color="FFFFFF", bgcolor="010101", align="C")
                     sm.mark_all_dirty()
+                    logger.info(f"[TEST] Displaying IP: '{test_device_ip}' (seg: 0,{MATRIX_HEIGHT//2},{MATRIX_WIDTH},{MATRIX_HEIGHT//2})")
+                else:
+                    logger.info(f"[TEST] Blank cycle (state {test_cycle_state})")
                 # States 1 and 3 are blank (no segments, just bars)
             
             # RENDER TEST MODE PATTERN
