@@ -9,7 +9,16 @@ GATEWAY="$4"
 DNS="$5"
 
 INTERFACE="eth1"
-CONNECTION_NAME="Wired connection 1"
+
+# Detect connection name for eth1
+CONNECTION_NAME=$(nmcli -t -f NAME,DEVICE con show | grep ":$INTERFACE$" | cut -d: -f1)
+
+if [ -z "$CONNECTION_NAME" ]; then
+    echo "Error: No NetworkManager connection found for $INTERFACE"
+    exit 1
+fi
+
+echo "Using connection: $CONNECTION_NAME"
 
 if [ "$MODE" == "dhcp" ]; then
     echo "Configuring $INTERFACE for DHCP..."
