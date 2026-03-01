@@ -79,7 +79,7 @@ function GetControls(props)
     -- Segment controls (seg1 .. seg4)
     for seg = 0, 3 do
         local n = seg + 1
-        table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=false, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_text_color", n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_bg_color",   n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_align",      n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
