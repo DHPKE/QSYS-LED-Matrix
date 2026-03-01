@@ -336,16 +336,29 @@ def main():
             sm.mark_all_dirty()
 
     def on_display_change(enabled: bool):
-        nonlocal display_enabled
-        display_enabled = enabled
+        nonlocal display_enabled, canvas
         logger.info(f"[MAIN] Display → {'ENABLED' if enabled else 'DISABLED'}")
+        
         if not enabled:
             # Clear display when disabled
+            display_enabled = False
+            if canvas:
+                canvas.Clear()
             if matrix:
                 matrix.Clear()
+                logger.info("[MAIN] Matrix and canvas cleared")
         else:
-            # Re-render when enabled
+            # Re-enable display and force immediate re-render
+            display_enabled = True
             sm.mark_all_dirty()
+            logger.info("[MAIN] Marked all segments dirty for re-render")
+            # Force immediate render (don't wait for next interval)
+            if renderer:
+                try:
+                    renderer.render_all()
+                    logger.info("[MAIN] Forced immediate re-render")
+                except Exception as exc:
+                    logger.error(f"[MAIN] Re-render exception: {exc}")
 
     # ── 5. Load saved configuration ───────────────────────────────────────
     from udp_handler import _load_config as load_udp_config
