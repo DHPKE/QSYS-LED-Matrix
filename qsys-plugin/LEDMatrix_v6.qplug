@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.4.0 - Added test mode toggle button
 -- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
 -- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
@@ -41,7 +42,7 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.3.0",
+    Version = "6.4.0",
     Id = "dhpke.olimex.led.matrix.6.3.0",
     Description = "RPi 64x32 LED Matrix - frame color auto-sync toggle",
     ShowDebug = true,
@@ -104,6 +105,7 @@ function GetControls(props)
     table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="test_mode", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
     return controls
@@ -388,9 +390,13 @@ function GetControlLayout(props)
         ButtonStyle="Trigger", Legend="Reboot Panel", Color={200, 80, 80},
         Position={344, y+30}, Size={110, 36} }
     
+    layout["test_mode"] = { PrettyName="Global~TestMode", Style="Button",
+        ButtonStyle="Toggle", Legend="Test Mode", Color={255, 193, 7},
+        Position={460, y+30}, Size={100, 36} }
+    
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
-        Position={460, y+30}, Size={W-466, 36} }
+        Position={566, y+30}, Size={W-572, 36} }
 
     return layout, graphics
 end
@@ -852,6 +858,33 @@ if Controls then
         Timer.CallAfter(function()
             Controls.last_command.String = "Reboot initiated..."
         end, 0.1)
+    end
+
+    -- Test Mode Toggle Handler
+    Controls.test_mode.EventHandler = function(ctl)
+        local enabled = ctl.Boolean
+        print(string.format("[TEST] Toggle test mode: %s", enabled and "ON" or "OFF"))
+        Controls.last_command.String = "Toggling test mode..."
+        
+        -- Create HttpClient to toggle test mode
+        local http = HttpClient.New{
+            Url = string.format("http://%s:8080/api/testmode", ip_addr),
+            Method = "POST",
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 then
+                    print(string.format("✓ [TEST] Test mode %s", enabled and "enabled" or "disabled"))
+                    Controls.last_command.String = string.format("Test mode %s", enabled and "ON" or "OFF")
+                else
+                    print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err)))
+                    Controls.last_command.String = "Test mode toggle failed"
+                    -- Revert button state on failure
+                    ctl.Boolean = not enabled
+                end
+            end
+        }
+        
+        http:Send()
     end
 
     Controls.ip_address.EventHandler = function(ctl)
