@@ -89,6 +89,54 @@ def _get_ip(iface: str = "eth0") -> str:
     return ""
 
 
+def _get_first_up_ip() -> str:
+    """
+    Return the first non-loopback IPv4 address from an UP interface.
+    Prefers eth interfaces, then wlan, then any other.
+    Only returns IPs from interfaces that are actually UP (not DOWN or NO-CARRIER).
+    """
+    try:
+        # Get list of all interfaces with their state
+        out = subprocess.check_output(
+            ["ip", "-4", "addr", "show"],
+            stderr=subprocess.DEVNULL, text=True)
+        
+        interfaces = {}
+        current_iface = None
+        is_up = False
+        
+        for line in out.splitlines():
+            line_stripped = line.strip()
+            
+            # Line like: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ..."
+            if not line.startswith(" ") and ":" in line:
+                parts = line.split(":")
+                if len(parts) >= 2:
+                    current_iface = parts[1].strip()
+                    # Check if interface is UP (not just configured, but actually up)
+                    is_up = "UP" in line and "LOWER_UP" in line and "NO-CARRIER" not in line
+            
+            # Line like: "    inet 10.1.1.25/24 ..."
+            elif line_stripped.startswith("inet ") and current_iface:
+                ip = line_stripped.split()[1].split("/")[0]
+                if not ip.startswith("127.") and is_up:
+                    interfaces[current_iface] = ip
+        
+        # Priority: eth* > wlan* > others
+        for prefix in ["eth", "wlan", ""]:
+            for iface in sorted(interfaces.keys()):
+                if iface.startswith(prefix):
+                    logger.info(f"[NET] Selected IP {interfaces[iface]} from {iface} (UP)")
+                    return interfaces[iface]
+        
+        logger.warning("[NET] No UP interface with IP found")
+        return ""
+        
+    except Exception as e:
+        logger.error(f"[NET] Error scanning interfaces: {e}")
+        return ""
+
+
 def _apply_fallback_ip(ip: str, netmask: str, gateway: str, iface: str):
     """Configure a static IP address via `ip` commands (requires root)."""
     try:
@@ -125,10 +173,17 @@ def _wait_for_dhcp(iface: str, timeout_s: float) -> str:
 
 def _ensure_network() -> str:
     """
-    Wait for DHCP on FALLBACK_IFACE; apply static fallback if it times out.
+    Scan for first UP interface with IP address.
+    If none found, wait for DHCP on FALLBACK_IFACE.
     Returns the IP address string to display on-screen.
     """
-    logger.info(f"[NET] Waiting up to {DHCP_TIMEOUT_S}s for DHCP on {FALLBACK_IFACE}…")
+    # First, try to get IP from any UP interface
+    ip = _get_first_up_ip()
+    if ip:
+        return ip
+    
+    # No UP interfaces yet, wait for DHCP on fallback interface
+    logger.info(f"[NET] No UP interface found, waiting up to {DHCP_TIMEOUT_S}s for DHCP on {FALLBACK_IFACE}…")
     ip = _wait_for_dhcp(FALLBACK_IFACE, DHCP_TIMEOUT_S)
     if ip:
         logger.info(f"[NET] ✓ DHCP address: {ip}")
@@ -148,10 +203,11 @@ def _ensure_network() -> str:
 def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
     """
     Background thread: monitor network IP and update splash screen if it changes.
+    Scans all UP interfaces for IP changes.
     Runs until the first UDP command is received, then exits.
     """
     import threading
-    last_ip = _get_ip(FALLBACK_IFACE)
+    last_ip = _get_first_up_ip()
     logger.info(f"[NET-MON] Starting network monitor (current IP: {last_ip})")
     
     while True:
@@ -162,7 +218,7 @@ def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
             logger.info("[NET-MON] First command received, stopping network monitor")
             break
             
-        current_ip = _get_ip(FALLBACK_IFACE)
+        current_ip = _get_first_up_ip()
         
         # IP changed (and not empty)
         if current_ip and current_ip != last_ip:
