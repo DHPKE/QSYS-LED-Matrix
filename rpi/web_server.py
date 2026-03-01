@@ -500,13 +500,18 @@ class WebServerHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(response).encode())
             
-            # Schedule reboot after response is sent
-            # Use shell command with nohup to detach from web server process
-            try:
-                subprocess.Popen(["/bin/bash", "-c", "sleep 1 && /usr/sbin/reboot"])
-                logger.info("[WEB] Reboot command sent")
-            except Exception as e:
-                logger.error(f"[WEB] Reboot failed: {e}")
+            # Schedule reboot after response is sent using threading
+            import threading
+            import os
+            def delayed_reboot():
+                import time
+                time.sleep(1)  # Allow HTTP response to complete
+                logger.info("[WEB] Executing reboot command")
+                os.system("/usr/sbin/reboot")
+            
+            thread = threading.Thread(target=delayed_reboot, daemon=True)
+            thread.start()
+            logger.info("[WEB] Reboot scheduled")
         
         elif parsed.path == "/api/testmode":
             # Toggle test mode
