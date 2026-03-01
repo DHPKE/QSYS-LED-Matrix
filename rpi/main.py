@@ -346,10 +346,18 @@ def main():
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
     # Force rotation to 0° for the IP splash (ignore configured rotation).
     ip_splash_active = True
-    if renderer:
-        renderer.set_rotation_override(0)  # Force 0° rotation for IP splash
     
-    # Apply layout AFTER rotation override so segments match the 0° canvas
+    # Save current rotation and temporarily set to 0° for layout application
+    from udp_handler import get_rotation, set_rotation
+    saved_rotation = get_rotation()
+    set_rotation(0)  # Temporarily force 0° so layout uses landscape presets
+    
+    # Set renderer rotation override to 0°
+    if renderer:
+        renderer.set_rotation_override(0)
+        logger.info("[SPLASH] Rotation override set to 0° (saved rotation: {}°)".format(saved_rotation))
+    
+    # Apply layout at 0° rotation (landscape presets)
     udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for IP splash at 0°
     
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
@@ -552,8 +560,14 @@ def main():
         # race and blank the display until the next command arrives.
         if ip_splash_active and udp.has_received_command():
             ip_splash_active = False
+            
+            # Restore saved rotation to global config
+            from udp_handler import set_rotation
+            set_rotation(saved_rotation)
+            logger.info(f"[SPLASH] Restored rotation to {saved_rotation}°")
+            
             if renderer:
-                renderer.set_rotation_override(None)  # Restore configured rotation
+                renderer.set_rotation_override(None)  # Clear renderer override
                 # Re-apply layout for the actual rotation (might have changed from 0° to 90°/270°)
                 udp._apply_layout(udp._current_layout if hasattr(udp, '_current_layout') else 1)
             logger.info("[SPLASH] First command received — IP splash dismissed, rotation restored")
