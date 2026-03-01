@@ -1,7 +1,7 @@
 #!/bin/bash
 # Deploy updated Python files to the Pi and restart service
 
-PI_IP="10.1.1.25"
+PI_IP="10.1.1.99"
 PI_USER="node"
 PI_PASS="node"
 

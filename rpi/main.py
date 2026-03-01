@@ -106,6 +106,7 @@ def _get_first_up_ip() -> str:
         current_iface = None
         is_up = False
         
+        logger.debug("[NET] Parsing interface list:")
         for line in out.splitlines():
             line_stripped = line.strip()
             
@@ -123,12 +124,17 @@ def _get_first_up_ip() -> str:
                     has_state_down = "state DOWN" in line
                     
                     is_up = (has_lower_up or has_state_up) and not has_no_carrier and not has_state_down
+                    logger.debug(f"[NET]   {current_iface}: LOWER_UP={has_lower_up}, state_UP={has_state_up}, NO_CARRIER={has_no_carrier}, state_DOWN={has_state_down} → is_up={is_up}")
             
             # Line like: "    inet 10.1.1.25/24 ..."
             elif line_stripped.startswith("inet ") and current_iface:
                 ip = line_stripped.split()[1].split("/")[0]
+                logger.debug(f"[NET]   {current_iface} has IP {ip}, is_up={is_up}, loopback={ip.startswith('127.')}")
                 if not ip.startswith("127.") and is_up:
                     interfaces[current_iface] = ip
+                    logger.debug(f"[NET]   → Added {current_iface}: {ip}")
+        
+        logger.info(f"[NET] Found UP interfaces: {interfaces}")
         
         # Priority: eth* > wlan* > others
         for prefix in ["eth", "wlan", ""]:
