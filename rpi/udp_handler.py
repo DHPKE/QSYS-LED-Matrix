@@ -183,13 +183,16 @@ class UDPHandler:
 
     def __init__(self, segment_manager: SegmentManager,
                  brightness_callback=None,
-                 orientation_callback=None):
+                 orientation_callback=None,
+                 display_callback=None):
         """
         :param segment_manager: shared SegmentManager instance
         :param brightness_callback: optional callable(int 0-255) invoked when
                brightness changes so the display can be updated immediately.
         :param orientation_callback: optional callable(str) invoked when
                orientation changes ('landscape' or 'portrait').
+        :param display_callback: optional callable(bool) invoked when
+               display enable/disable state changes.
         """
         self._sm   = segment_manager
         self._sock = None
@@ -197,6 +200,7 @@ class UDPHandler:
         self._thread  = None
         self._brightness_callback = brightness_callback
         self._orientation_callback = orientation_callback
+        self._display_callback = display_callback
         self._orientation = get_orientation()  # Track current orientation for layout presets
         self._current_layout = 1  # Track current layout preset number (applies to both orientations)
         # Set to True on the first successfully dispatched command so
@@ -347,6 +351,13 @@ class UDPHandler:
             width   = int(doc.get("width", 2))
             logger.info(f"[UDP] Frame command -> seg={seg}, enabled={enabled}, color={color}, width={width}")
             self._sm.set_frame(seg, enabled, color, width)
+
+        elif cmd == "display":
+            # Enable or disable display
+            enabled = bool(doc.get("enabled", True))
+            logger.info(f"[UDP] Display command -> enabled={enabled}")
+            if hasattr(self, '_display_callback') and self._display_callback:
+                self._display_callback(enabled)
 
         else:
             logger.warning(f"[UDP] Unknown cmd: {cmd}")

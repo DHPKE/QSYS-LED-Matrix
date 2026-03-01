@@ -273,3 +273,51 @@ class SegmentManager:
                 elif seg.effect == TextEffect.BLINK:
                     # Use master blink state for synchronized blinking
                     seg.blink_state = self._master_blink_state
+
+    def get_all_segments_state(self) -> list:
+        """Get complete state of all segments for backup/restore"""
+        with self._lock:
+            states = []
+            for seg in self._segments:
+                state = {
+                    'id': seg.id,
+                    'x': seg.x,
+                    'y': seg.y,
+                    'width': seg.width,
+                    'height': seg.height,
+                    'text': seg.text,
+                    'color': seg.color,
+                    'bgcolor': seg.bgcolor,
+                    'align': seg.align.value,
+                    'effect': seg.effect.value,
+                    'effect_speed': seg.effect_speed,
+                    'is_active': seg.is_active,
+                    'frame_enabled': seg.frame_enabled,
+                    'frame_color': seg.frame_color,
+                    'frame_width': seg.frame_width,
+                }
+                states.append(state)
+            return states
+
+    def restore_segments_state(self, states: list):
+        """Restore segments from saved state"""
+        with self._lock:
+            for state in states:
+                seg_id = state.get('id', 0)
+                if 0 <= seg_id < MAX_SEGMENTS:
+                    seg = self._segments[seg_id]
+                    seg.x = state.get('x', seg.x)
+                    seg.y = state.get('y', seg.y)
+                    seg.width = state.get('width', seg.width)
+                    seg.height = state.get('height', seg.height)
+                    seg.text = state.get('text', '')
+                    seg.color = state.get('color', '#FFFFFF')
+                    seg.bgcolor = state.get('bgcolor', '#000000')
+                    seg.align = _parse_align(state.get('align', 'C'))
+                    seg.effect = _parse_effect(state.get('effect', 'none'))
+                    seg.effect_speed = state.get('effect_speed', DEFAULT_SCROLL_SPEED)
+                    seg.is_active = state.get('is_active', False)
+                    seg.frame_enabled = state.get('frame_enabled', False)
+                    seg.frame_color = state.get('frame_color', '#FFFFFF')
+                    seg.frame_width = state.get('frame_width', 2)
+                    seg.is_dirty = True

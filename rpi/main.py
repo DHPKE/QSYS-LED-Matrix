@@ -418,6 +418,13 @@ def main():
     hostname = socket.gethostname()
     test_device_ip = current_ip_ref[0]
     frame_counter = 0
+    
+    # Store state before entering test mode for restoration
+    saved_layout_preset = 1
+    saved_segments_state = []
+    
+    # Display enable/disable state
+    display_enabled = True
 
     while True:
         now = time.monotonic()
@@ -431,7 +438,15 @@ def main():
         
         # Clear display and force 0° rotation when entering test mode
         if test_mode_active and not test_mode_was_active:
-            logger.info("[TEST] Entering test mode - clearing display, forcing 0° rotation")
+            logger.info("[TEST] Entering test mode - saving state, clearing display, forcing 0° rotation")
+            
+            # Save current layout preset and segment states
+            from udp_handler import _load_config
+            config = _load_config()
+            saved_layout_preset = config.get("layout_preset", 1)
+            saved_segments_state = sm.get_all_segments_state()
+            logger.info(f"[TEST] Saved layout preset: {saved_layout_preset}, segments: {len(saved_segments_state)}")
+            
             sm.clear_all()
             if matrix:
                 matrix.Clear()
@@ -448,16 +463,26 @@ def main():
             last_ip_fetch = now
             logger.info(f"[TEST] Hostname: {hostname}, IP: {test_device_ip}")
         
-        # Restore rotation and trigger full re-render when exiting test mode
+        # Restore rotation, layout, and segments when exiting test mode
         if not test_mode_active and test_mode_was_active:
-            logger.info("[TEST] Exiting test mode - restoring rotation and layout")
+            logger.info("[TEST] Exiting test mode - restoring state")
             if matrix:
                 matrix.Clear()  # Clear test mode artifacts
             if renderer:
                 renderer.set_rotation_override(None)  # Restore configured rotation
-            # Mark all active segments as dirty to force re-render
+            
+            # Reapply saved layout preset
+            logger.info(f"[TEST] Reapplying layout preset: {saved_layout_preset}")
+            udp._apply_layout(saved_layout_preset)
+            
+            # Restore segment states
+            if saved_segments_state:
+                sm.restore_segments_state(saved_segments_state)
+                logger.info(f"[TEST] Restored {len(saved_segments_state)} segments")
+            
+            # Mark all segments dirty to force re-render
             sm.mark_all_dirty()
-            logger.info("[TEST] Marked all segments dirty for re-render")
+            logger.info("[TEST] State restored, ready for normal operation")
         
         test_mode_was_active = test_mode_active
         
