@@ -288,11 +288,14 @@ def main():
     # ── 8. IP address splash screen ──────────────────────────────────────
     # Display the device IP on segment 0 (full-screen, white on black) until
     # the first UDP command arrives — mirrors the ESP32 firmware behaviour.
+    # Force rotation to 0° for the IP splash (ignore configured rotation).
     ip_splash_active = True
+    if renderer:
+        renderer.set_rotation_override(0)  # Force 0° rotation for IP splash
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
     sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
     sm.mark_all_dirty()  # Trigger initial render
-    logger.info(f"[SPLASH] Showing IP address: {current_ip_ref[0]}")
+    logger.info(f"[SPLASH] Showing IP address: {current_ip_ref[0]} (rotation locked to 0°)")
     
     # Start network monitor thread
     import threading
@@ -331,7 +334,9 @@ def main():
         # race and blank the display until the next command arrives.
         if ip_splash_active and udp.has_received_command():
             ip_splash_active = False
-            logger.info("[SPLASH] First command received — IP splash dismissed")
+            if renderer:
+                renderer.set_rotation_override(None)  # Restore configured rotation
+            logger.info("[SPLASH] First command received — IP splash dismissed, rotation restored")
 
         # Update effects and render at fixed interval
         if now - last_effect >= EFFECT_INTERVAL:

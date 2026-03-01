@@ -129,6 +129,17 @@ class TextRenderer:
         # Cache group indicator color to prevent flashing
         self._cached_group_id = udp_handler.get_group_id()
         self._cached_group_color = GROUP_COLORS.get(self._cached_group_id, (0, 0, 0))
+        # Rotation override: when set to a value, ignores get_rotation()
+        self._rotation_override = None
+
+    def set_rotation_override(self, rotation: Optional[int]):
+        """
+        Override rotation temporarily (e.g., for IP splash screen at 0°).
+        Set to None to use the configured rotation from get_rotation().
+        
+        :param rotation: 0, 90, 180, 270, or None to disable override
+        """
+        self._rotation_override = rotation
 
     def render_all(self):
         """Composite all active segments and push to the matrix canvas.
@@ -182,7 +193,12 @@ class TextRenderer:
         
         # Step 5: Apply rotation if needed and push to matrix
         from udp_handler import get_rotation
-        rotation = get_rotation()
+        
+        # Use override rotation if set, otherwise use configured rotation
+        if self._rotation_override is not None:
+            rotation = self._rotation_override
+        else:
+            rotation = get_rotation()
         
         # Portrait orientation (90° rotation)
         if orientation == "portrait":
