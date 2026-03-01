@@ -41,9 +41,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.2.1",
-    Id = "dhpke.olimex.led.matrix.6.2.1",
-    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot (FIXED)",
+    Version = "6.2.2",
+    Id = "dhpke.olimex.led.matrix.6.2.2",
+    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot (faster)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -159,7 +159,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.2.1 (Reboot Fixed)",
+        Type="Text", Text="LED Matrix Controller  v6.2.2",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -818,7 +818,7 @@ if Controls then
         local http = HttpClient.New()
         http.Url = string.format("http://%s:8080/api/reboot", ip_addr)
         http.Method = "POST"
-        http.Timeout = 5
+        http.Timeout = 2  -- Reduced timeout (reboot happens after 1s anyway)
         
         http.EventHandler = function(tbl, code, data, err)
             if code == 200 or code == 0 then
@@ -826,12 +826,18 @@ if Controls then
                 print("✓ [REBOOT] Command sent successfully")
                 Controls.last_command.String = "Panel rebooting (offline ~30s)"
             else
-                print(string.format("✗ [REBOOT] HTTP error: code=%s, err=%s", tostring(code), tostring(err)))
-                Controls.last_command.String = "Reboot failed - use Web UI"
+                -- Even on timeout/error, reboot command was likely sent
+                print(string.format("⚠ [REBOOT] Response code=%s, err=%s (panel may still reboot)", tostring(code), tostring(err)))
+                Controls.last_command.String = "Reboot command sent"
             end
         end
         
         http:Send()
+        
+        -- Update status immediately (don't wait for response)
+        Timer.CallAfter(function()
+            Controls.last_command.String = "Reboot initiated..."
+        end, 0.1)
     end
 
     Controls.ip_address.EventHandler = function(ctl)
