@@ -473,10 +473,8 @@ def main():
         if test_mode_active and not test_mode_was_active:
             logger.info("[TEST] Entering test mode - saving state, clearing display, forcing 0° rotation")
             
-            # Save current layout preset and segment states
-            from udp_handler import _load_config
-            config = _load_config()
-            saved_layout_preset = config.get("layout_preset", 1)
+            # Save current layout preset (from UDP handler) and segment states
+            saved_layout_preset = udp.get_current_layout() if udp else 1
             saved_segments_state = sm.get_all_segments_state()
             logger.info(f"[TEST] Saved layout preset: {saved_layout_preset}, segments: {len(saved_segments_state)}")
             
