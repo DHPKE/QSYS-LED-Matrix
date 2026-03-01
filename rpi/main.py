@@ -435,7 +435,7 @@ def main():
             
             # Refresh IP every 10 seconds
             if now - last_ip_fetch >= 10:
-                test_device_ip = text_renderer._get_first_up_ip() or "No IP"
+                test_device_ip = _get_first_up_ip() or "No IP"
                 last_ip_fetch = now
             
             # 4-state cycle: 0=hostname top, 1=blank, 2=IP bottom, 3=blank
