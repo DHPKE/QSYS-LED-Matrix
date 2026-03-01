@@ -241,68 +241,37 @@ DHCPCD_EOF
 fi
 echo ""
 
-# ── 7. Install network configuration helper ──────────────────────────────
-echo "[7/9] Installing network configuration helper..."
+# ── 7. Install helper scripts ─────────────────────────────────────────────
+echo "[7/9] Installing helper scripts..."
 
-# Copy network-config.sh helper
-if [ -f "$SCRIPT_DIR/network-config.sh" ]; then
-    sudo cp "$SCRIPT_DIR/network-config.sh" /opt/led-matrix/
-    sudo chmod +x /opt/led-matrix/network-config.sh
-    echo "  ✓ network-config.sh installed"
+# Create /opt/led-matrix directory if it doesn't exist
+sudo mkdir -p /opt/led-matrix
+
+# Copy configure-network.sh helper
+if [ -f "$SCRIPT_DIR/configure-network.sh" ]; then
+    sudo cp "$SCRIPT_DIR/configure-network.sh" /opt/led-matrix/
+    sudo chmod +x /opt/led-matrix/configure-network.sh
+    echo "  ✓ configure-network.sh installed"
 else
-    echo "  ⚠  network-config.sh not found in source directory"
-    echo "  Creating default network-config.sh..."
-    
-    cat <<'NETCONFIG_EOF' | sudo tee /opt/led-matrix/network-config.sh > /dev/null
-#!/bin/bash
-# Network configuration helper for LED Matrix WebUI
-# Called via sudo by daemon user to modify network settings
+    echo "  ⚠  configure-network.sh not found - skipping"
+fi
 
-set -e
+# Copy set-hostname.sh helper
+if [ -f "$SCRIPT_DIR/set-hostname.sh" ]; then
+    sudo cp "$SCRIPT_DIR/set-hostname.sh" /opt/led-matrix/
+    sudo chmod +x /opt/led-matrix/set-hostname.sh
+    echo "  ✓ set-hostname.sh installed"
+else
+    echo "  ⚠  set-hostname.sh not found - skipping"
+fi
 
-MODE="$1"
-IP="$2"
-SUBNET="${3:-24}"
-
-case "$MODE" in
-    dhcp)
-        # Remove static configuration, enable DHCP
-        sudo sed -i '/^interface eth0$/,/^$/d' /etc/dhcpcd.conf
-        echo "DHCP enabled on eth0"
-        sudo systemctl restart dhcpcd
-        ;;
-    static)
-        # Validate inputs
-        if [[ ! "$IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            echo "Error: Invalid IP address format"
-            exit 1
-        fi
-        if [[ ! "$SUBNET" =~ ^[0-9]{1,2}$ ]] || [ "$SUBNET" -lt 8 ] || [ "$SUBNET" -gt 30 ]; then
-            echo "Error: Invalid subnet (must be 8-30)"
-            exit 1
-        fi
-        
-        # Remove existing eth0 configuration
-        sudo sed -i '/^interface eth0$/,/^$/d' /etc/dhcpcd.conf
-        
-        # Add new static configuration
-        cat << EOF | sudo tee -a /etc/dhcpcd.conf > /dev/null
-
-interface eth0
-static ip_address=${IP}/${SUBNET}
-EOF
-        echo "Static IP configured: ${IP}/${SUBNET}"
-        sudo systemctl restart dhcpcd
-        ;;
-    *)
-        echo "Usage: $0 {dhcp|static} [ip] [subnet]"
-        exit 1
-        ;;
-esac
-NETCONFIG_EOF
-
-    sudo chmod +x /opt/led-matrix/network-config.sh
-    echo "  ✓ Default network-config.sh created"
+# Copy reboot-device.sh helper
+if [ -f "$SCRIPT_DIR/reboot-device.sh" ]; then
+    sudo cp "$SCRIPT_DIR/reboot-device.sh" /opt/led-matrix/
+    sudo chmod +x /opt/led-matrix/reboot-device.sh
+    echo "  ✓ reboot-device.sh installed"
+else
+    echo "  ⚠  reboot-device.sh not found - skipping"
 fi
 echo ""
 
