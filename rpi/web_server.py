@@ -501,9 +501,9 @@ class WebServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(response).encode())
             
             # Schedule reboot after response is sent
-            # Use systemctl reboot which works reliably
+            # Use shell command with nohup to detach from web server process
             try:
-                subprocess.Popen(["/usr/bin/systemctl", "reboot"])
+                subprocess.Popen(["/bin/bash", "-c", "sleep 1 && /usr/sbin/reboot"])
                 logger.info("[WEB] Reboot command sent")
             except Exception as e:
                 logger.error(f"[WEB] Reboot failed: {e}")
