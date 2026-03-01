@@ -7,6 +7,7 @@ import logging
 import socket
 import subprocess
 import json
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
@@ -471,10 +472,67 @@ class WebServerHandler(BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length).decode()
                 config = json.loads(body)
                 
-                # For now, just acknowledge - actual network config would require root
                 logger.info(f"[WEB] Config update requested: {config}")
                 
-                response = {"success": True, "message": "Configuration saved (requires reboot)"}
+                # Apply hostname if provided
+                if "hostname" in config and config["hostname"]:
+                    new_hostname = config["hostname"]
+                    # Validate hostname (alphanumeric and hyphens only)
+                    if not all(c.isalnum() or c == '-' for c in new_hostname):
+                        raise ValueError("Invalid hostname - use only letters, numbers, and hyphens")
+                    
+                    try:
+                        # Set hostname immediately
+                        os.system(f"/usr/bin/hostnamectl set-hostname {new_hostname}")
+                        logger.info(f"[WEB] Hostname set to: {new_hostname}")
+                    except Exception as e:
+                        logger.error(f"[WEB] Failed to set hostname: {e}")
+                
+                # Apply network configuration if in static mode
+                if config.get("mode") == "static":
+                    # Write network config to /etc/network/interfaces.d/eth1
+                    # This requires the service to run as root
+                    try:
+                        ip = config.get("ip", "")
+                        netmask = config.get("netmask", "")
+                        gateway = config.get("gateway", "")
+                        dns = config.get("dns", "")
+                        
+                        if ip and netmask:
+                            # Calculate CIDR from netmask
+                            import ipaddress
+                            cidr = ipaddress.IPv4Network(f"0.0.0.0/{netmask}").prefixlen
+                            
+                            network_config = f"""# Static IP configuration for eth1
+auto eth1
+iface eth1 inet static
+    address {ip}/{cidr}
+"""
+                            if gateway:
+                                network_config += f"    gateway {gateway}\n"
+                            if dns:
+                                network_config += f"    dns-nameservers {dns}\n"
+                            
+                            with open("/etc/network/interfaces.d/eth1", "w") as f:
+                                f.write(network_config)
+                            logger.info(f"[WEB] Static IP config written: {ip}/{cidr}")
+                    except Exception as e:
+                        logger.error(f"[WEB] Failed to write network config: {e}")
+                
+                elif config.get("mode") == "dhcp":
+                    # Write DHCP config
+                    try:
+                        network_config = """# DHCP configuration for eth1
+auto eth1
+iface eth1 inet dhcp
+"""
+                        with open("/etc/network/interfaces.d/eth1", "w") as f:
+                            f.write(network_config)
+                        logger.info("[WEB] DHCP config written")
+                    except Exception as e:
+                        logger.error(f"[WEB] Failed to write network config: {e}")
+                
+                response = {"success": True, "message": "Configuration saved (requires reboot for network changes)"}
                 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
