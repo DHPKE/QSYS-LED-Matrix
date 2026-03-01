@@ -148,7 +148,7 @@ fi
 
 # Verify Python binding sources exist BEFORE building
 echo "  Checking Python binding sources..."
-if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
+if [ ! -f "bindings/python/rgbmatrix/core.pyx" ]; then
     echo "  ERROR: Python binding source files not found in cloned repo"
     echo "  Files in bindings/python/:"
     ls -la bindings/python/ || true
@@ -162,7 +162,7 @@ if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
     cd ~/rpi-rgb-led-matrix
     
     # Verify again after reclone
-    if [ ! -f "bindings/python/rgbmatrix/core.cpp" ]; then
+    if [ ! -f "bindings/python/rgbmatrix/core.pyx" ]; then
         echo "  ERROR: Python bindings still missing after reclone"
         echo "  There may be a network issue or repository problem"
         exit 1
@@ -180,12 +180,12 @@ cd ~/rpi-rgb-led-matrix/bindings/python
 
 # Debug: show current directory and file structure
 echo "  Current directory: $(pwd)"
-echo "  Checking for core.cpp..."
-if [ -f "rgbmatrix/core.cpp" ]; then
-    echo "  ✓ core.cpp exists"
-    ls -la rgbmatrix/core.cpp
+echo "  Checking for core.pyx..."
+if [ -f "rgbmatrix/core.pyx" ]; then
+    echo "  ✓ core.pyx exists"
+    ls -la rgbmatrix/core.pyx
 else
-    echo "  ✗ core.cpp NOT FOUND"
+    echo "  ✗ core.pyx NOT FOUND"
     echo "  Files in rgbmatrix/:"
     ls -la rgbmatrix/ || echo "    Directory doesn't exist!"
     exit 1
