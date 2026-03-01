@@ -478,7 +478,14 @@ def main():
             saved_segments_state = sm.get_all_segments_state()
             logger.info(f"[TEST] Saved layout preset: {saved_layout_preset}, segments: {len(saved_segments_state)}")
             
+            # Clear all segment text
             sm.clear_all()
+            
+            # Deactivate ALL segments first (to prevent rendering over segment 0)
+            for seg_id in range(4):
+                sm.activate(seg_id, False)
+            logger.info("[TEST] Deactivated all segments")
+            
             if matrix:
                 matrix.Clear()
             
