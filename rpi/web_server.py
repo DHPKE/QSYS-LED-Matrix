@@ -482,14 +482,16 @@ class WebServerHandler(BaseHTTPRequestHandler):
                         raise ValueError("Invalid hostname - use only letters, numbers, and hyphens")
                     
                     try:
-                        # Set hostname immediately by writing to /etc/hostname
-                        with open("/etc/hostname", "w") as f:
-                            f.write(new_hostname + "\n")
-                        
-                        # Also update running hostname
-                        subprocess.run(["/usr/bin/hostname", new_hostname], check=True)
-                        
+                        # Use helper script with sudo (daemon user can execute via sudoers rule)
+                        result = subprocess.run(
+                            ["sudo", "/opt/led-matrix/set-hostname.sh", new_hostname],
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
                         logger.info(f"[WEB] Hostname set to: {new_hostname}")
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"[WEB] Failed to set hostname: {e.stderr}")
                     except Exception as e:
                         logger.error(f"[WEB] Failed to set hostname: {e}")
                 
