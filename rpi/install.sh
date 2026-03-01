@@ -93,6 +93,7 @@ sudo apt-get install -y \
     python3-pip \
     python3-setuptools \
     python3-pillow \
+    python3-numpy \
     fonts-dejavu-core \
     git \
     build-essential \
