@@ -19,7 +19,8 @@
 #define HARDWARE_MAPPING "regular"  // "regular", "adafruit-hat", "adafruit-hat-pwm"
 #define GPIO_SLOWDOWN   3           // Match Python version
 #define PWM_BITS        8           // Match Python version
-#define BRIGHTNESS      50          // 0-100: Initial brightness percentage
+#define BRIGHTNESS      50          // 0-100: Initial brightness percentage (capped at 50% in runtime)
+#define MAX_BRIGHTNESS_LIMIT 128    // Maximum brightness (50% of 255) to prevent power issues
 
 // Additional matrix options
 #define SCAN_MODE           0       // 0=progressive, 1=interlaced

@@ -186,6 +186,14 @@ void UDPHandler::dispatch(const std::string& raw_json) {
         } else if (cmd == "brightness") {
             int val = doc.value("value", -1);
             if (val >= 0 && val <= 255) {
+                // Cap brightness at 50% (128/255) to prevent power issues
+                const int MAX_BRIGHTNESS = 128;
+                if (val > MAX_BRIGHTNESS) {
+                    std::cout << "[UDP] Brightness capped: requested=" << val 
+                             << ", applying=" << MAX_BRIGHTNESS << " (50% max)" << std::endl;
+                    val = MAX_BRIGHTNESS;
+                }
+                
                 std::lock_guard<std::mutex> lock(config_mutex_);
                 brightness_ = val;
                 if (brightness_callback_) {
