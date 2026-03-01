@@ -180,6 +180,8 @@ class SegmentManager:
     def update_text(self, seg_id: int, text: str, color: str = None,
                     bgcolor: str = None, align: str = None,
                     effect: str = None, font: str = None, intensity: int = 255):
+        """Update segment text and properties WITHOUT activating the segment.
+        Segments are only activated by layout presets."""
         with self._lock:
             seg = self.get_segment(seg_id)
             if seg is None:
@@ -195,7 +197,8 @@ class SegmentManager:
                 seg.effect = _parse_effect(effect)
             if font is not None:
                 seg.font = font.lower()
-            seg.is_active = True
+            # Do NOT activate segment here - only layout presets activate segments
+            # seg.is_active = True  # REMOVED
             seg.is_dirty  = True
 
     def clear_segment(self, seg_id: int):
