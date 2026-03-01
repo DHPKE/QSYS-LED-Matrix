@@ -482,8 +482,8 @@ class WebServerHandler(BaseHTTPRequestHandler):
                         raise ValueError("Invalid hostname - use only letters, numbers, and hyphens")
                     
                     try:
-                        # Set hostname immediately
-                        os.system(f"/usr/bin/hostnamectl set-hostname {new_hostname}")
+                        # Set hostname immediately using subprocess
+                        subprocess.run(["/usr/bin/hostnamectl", "set-hostname", new_hostname], check=True)
                         logger.info(f"[WEB] Hostname set to: {new_hostname}")
                     except Exception as e:
                         logger.error(f"[WEB] Failed to set hostname: {e}")
