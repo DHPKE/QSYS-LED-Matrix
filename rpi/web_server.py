@@ -447,10 +447,66 @@ class WebServerHandler(BaseHTTPRequestHandler):
         
         elif parsed.path == "/api/config":
             # Return current configuration
+            # Detect connection name (try netplan-eth0 first, fallback to auto-detect)
+            connection_name = "netplan-eth0"
+            try:
+                # Test if this connection exists
+                subprocess.run(
+                    ["nmcli", "-t", "-f", "ipv4.method", "connection", "show", connection_name],
+                    capture_output=True, check=True, text=True, timeout=5
+                )
+            except:
+                # Auto-detect active connection on eth1
+                try:
+                    result = subprocess.run(
+                        ["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
+                        capture_output=True, check=True, text=True, timeout=5
+                    )
+                    for line in result.stdout.strip().split('\n'):
+                        if line and line != "lo":
+                            connection_name = line.split(':')[-1] if ':' in line else line
+                            break
+                except:
+                    connection_name = "netplan-eth0"  # Fallback
+            
+            # Get current network configuration from NetworkManager
+            mode = "dhcp"
+            ip_addr = ""
+            gateway = ""
+            dns = ""
+            
+            try:
+                result = subprocess.run(
+                    ["nmcli", "-t", "-f", "ipv4.method,ipv4.addresses,ipv4.gateway,ipv4.dns", 
+                     "connection", "show", connection_name],
+                    capture_output=True, check=True, text=True, timeout=5
+                )
+                
+                for line in result.stdout.strip().split('\n'):
+                    if line.startswith("ipv4.method:"):
+                        method = line.split(':', 1)[1]
+                        mode = "static" if method == "manual" else "dhcp"
+                    elif line.startswith("ipv4.addresses:"):
+                        addr = line.split(':', 1)[1]
+                        if addr:
+                            ip_addr = addr.split('/')[0]  # Remove /24 suffix
+                    elif line.startswith("ipv4.gateway:"):
+                        gateway = line.split(':', 1)[1]
+                    elif line.startswith("ipv4.dns:"):
+                        dns = line.split(':', 1)[1]
+                        
+                logger.info(f"[WEB] Detected config: mode={mode}, ip={ip_addr}, gw={gateway}, dns={dns}")
+            except Exception as e:
+                logger.warning(f"[WEB] Failed to read network config: {e}, assuming DHCP")
+                mode = "dhcp"
+            
             config = {
                 "current_ip": _get_current_ip(),
                 "hostname": socket.gethostname(),
-                "mode": "dhcp"  # Simplified - assume DHCP
+                "mode": mode,
+                "ip": ip_addr if mode == "static" else "",
+                "gateway": gateway if mode == "static" else "",
+                "dns": dns if mode == "static" else ""
             }
             
             self.send_response(200)
