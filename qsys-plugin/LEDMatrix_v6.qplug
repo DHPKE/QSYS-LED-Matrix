@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.5.2 - Fixed HttpClient.New() syntax (use constructor, set properties after)
 -- Version 6.5.1 - Added HttpClient availability checks and error handling
 -- Version 6.5.0 - Added HTTP health check for accurate connection status
 -- Version 6.4.0 - Added test mode toggle button
@@ -44,9 +45,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.5.1",
-    Id = "dhpke.olimex.led.matrix.6.5.1",
-    Description = "RPi 64x32 LED Matrix - HttpClient safety checks",
+    Version = "6.5.2",
+    Id = "dhpke.olimex.led.matrix.6.5.2",
+    Description = "RPi 64x32 LED Matrix - Fixed HttpClient constructor syntax",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -847,26 +848,28 @@ if Controls then
         
         -- Create HttpClient - Q-SYS creates a new instance each time
         local ok, http = pcall(function()
-            return HttpClient.New{
-                Url = string.format("http://%s:8080/api/reboot", ip_addr),
-                Method = "POST",
-                Timeout = 2,
-                EventHandler = function(tbl, code, data, err)
-                    if code == 200 or code == 0 then
-                        print("✓ [REBOOT] Command sent successfully")
-                        Controls.last_command.String = "Panel rebooting (offline ~30s)"
-                    else
-                        print(string.format("⚠ [REBOOT] Response code=%s, err=%s (panel may still reboot)", tostring(code), tostring(err)))
-                        Controls.last_command.String = "Reboot command sent"
-                    end
-                end
-            }
+            local client = HttpClient.New()
+            client.Url = string.format("http://%s:8080/api/reboot", ip_addr)
+            client.Method = "POST"
+            client.Timeout = 2
+            return client
         end)
         
         if not ok then
             print("[REBOOT ERROR] Failed to create HttpClient: " .. tostring(http))
             Controls.last_command.String = "ERROR: " .. tostring(http)
             return
+        end
+        
+        -- Set EventHandler AFTER creation
+        http.EventHandler = function(tbl, code, data, err)
+            if code == 200 or code == 0 then
+                print("✓ [REBOOT] Command sent successfully")
+                Controls.last_command.String = "Panel rebooting (offline ~30s)"
+            else
+                print(string.format("⚠ [REBOOT] Response code=%s, err=%s (panel may still reboot)", tostring(code), tostring(err)))
+                Controls.last_command.String = "Reboot command sent"
+            end
         end
         
         http:Send()
@@ -893,22 +896,11 @@ if Controls then
         
         -- Create HttpClient to toggle test mode
         local ok, http = pcall(function()
-            return HttpClient.New{
-                Url = string.format("http://%s:8080/api/testmode", ip_addr),
-                Method = "POST",
-                Timeout = 2,
-                EventHandler = function(tbl, code, data, err)
-                    if code == 200 then
-                        print(string.format("✓ [TEST] Test mode %s", enabled and "enabled" or "disabled"))
-                        Controls.last_command.String = string.format("Test mode %s", enabled and "ON" or "OFF")
-                    else
-                        print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err)))
-                        Controls.last_command.String = "Test mode toggle failed"
-                        -- Revert button state on failure
-                        ctl.Boolean = not enabled
-                    end
-                end
-            }
+            local client = HttpClient.New()
+            client.Url = string.format("http://%s:8080/api/testmode", ip_addr)
+            client.Method = "POST"
+            client.Timeout = 2
+            return client
         end)
         
         if not ok then
@@ -916,6 +908,19 @@ if Controls then
             Controls.last_command.String = "ERROR: " .. tostring(http)
             ctl.Boolean = not enabled  -- Revert toggle
             return
+        end
+        
+        -- Set EventHandler AFTER creation
+        http.EventHandler = function(tbl, code, data, err)
+            if code == 200 then
+                print(string.format("✓ [TEST] Test mode %s", enabled and "enabled" or "disabled"))
+                Controls.last_command.String = string.format("Test mode %s", enabled and "ON" or "OFF")
+            else
+                print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err)))
+                Controls.last_command.String = "Test mode toggle failed"
+                -- Revert button state on failure
+                ctl.Boolean = not enabled
+            end
         end
         
         http:Send()
@@ -938,22 +943,20 @@ if Controls then
     healthCheckTimer.EventHandler = function()
         -- Check if HttpClient is available (may not be in all Q-SYS contexts)
         if not HttpClient then
-            print("[HEALTH] HttpClient not available, skipping health check")
-            return
+            return  -- Silent skip if not available
         end
         
         -- Ping the web server to verify panel is reachable
         local ok, http = pcall(function()
-            return HttpClient.New{
-                Url = string.format("http://%s:8080/", ip_addr),
-                Method = "GET",
-                Timeout = 2
-            }
+            local client = HttpClient.New()
+            client.Url = string.format("http://%s:8080/", ip_addr)
+            client.Method = "GET"
+            client.Timeout = 2
+            return client
         end)
         
         if not ok then
-            print("[HEALTH] Failed to create HttpClient: " .. tostring(http))
-            return
+            return  -- Silent fail
         end
         
         http.EventHandler = function(tbl, code, data, err)
@@ -970,6 +973,8 @@ if Controls then
                 end
             end
         end
+        
+        http:Send()
     end
     healthCheckTimer:Start(5)  -- Check every 5 seconds
 
