@@ -453,21 +453,21 @@ def main():
                 sm.clear_all()
                 
                 if test_cycle_state == 0:
-                    # Hostname in upper half
-                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
+                    # Hostname - use full screen for better readability
+                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT)
                     sm.activate(0, True)
                     sm.set_frame(0, enabled=False)
                     sm.update_text(0, hostname, color="FFFFFF", bgcolor="010101", align="C")
                     sm.mark_all_dirty()
-                    logger.info(f"[TEST] Displaying hostname: '{hostname}' (seg: 0,0,{MATRIX_WIDTH},{MATRIX_HEIGHT//2})")
+                    logger.info(f"[TEST] Displaying hostname: '{hostname}'")
                 elif test_cycle_state == 2:
-                    # IP in lower half
-                    sm.configure(0, 0, MATRIX_HEIGHT // 2, MATRIX_WIDTH, MATRIX_HEIGHT // 2)
+                    # IP - use full screen for better readability
+                    sm.configure(0, 0, 0, MATRIX_WIDTH, MATRIX_HEIGHT)
                     sm.activate(0, True)
                     sm.set_frame(0, enabled=False)
                     sm.update_text(0, test_device_ip, color="FFFFFF", bgcolor="010101", align="C")
                     sm.mark_all_dirty()
-                    logger.info(f"[TEST] Displaying IP: '{test_device_ip}' (seg: 0,{MATRIX_HEIGHT//2},{MATRIX_WIDTH},{MATRIX_HEIGHT//2})")
+                    logger.info(f"[TEST] Displaying IP: '{test_device_ip}'")
                 else:
                     logger.info(f"[TEST] Blank cycle (state {test_cycle_state})")
                 # States 1 and 3 are blank (no segments, just bars)
