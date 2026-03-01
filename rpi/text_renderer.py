@@ -157,22 +157,42 @@ class TextRenderer:
         if not any_dirty:
             return
         
-        # Get current orientation and canvas dimensions
+        # Get current orientation and rotation
         orientation = udp_handler.get_orientation()
+        from udp_handler import get_rotation
         
-        if orientation == "portrait":
+        # Use override rotation if set, otherwise use configured rotation
+        if self._rotation_override is not None:
+            rotation = self._rotation_override
+        else:
+            rotation = get_rotation()
+        
+        # Determine canvas dimensions based on rotation
+        # 90° and 270° need swapped dimensions (like portrait mode)
+        if rotation in (90, 270):
             canvas_width = MATRIX_HEIGHT  # 32
             canvas_height = MATRIX_WIDTH  # 64
+            effective_orientation = "rotated_portrait"
         else:
             canvas_width = MATRIX_WIDTH   # 64
             canvas_height = MATRIX_HEIGHT # 32
+            effective_orientation = "rotated_landscape"
         
-        # Recreate image if orientation changed
-        if orientation != self._current_orientation:
+        # Handle legacy portrait mode (adds to rotation)
+        if orientation == "portrait":
+            # Portrait mode is essentially 90° rotation
+            canvas_width = MATRIX_HEIGHT  # 32
+            canvas_height = MATRIX_WIDTH  # 64
+            effective_orientation = "portrait"
+        
+        # Recreate image if dimensions changed
+        current_dims = (canvas_width, canvas_height)
+        if not hasattr(self, '_current_dims') or self._current_dims != current_dims:
             self._image = Image.new("RGB", (canvas_width, canvas_height), (0, 0, 0))
             self._draw = ImageDraw.Draw(self._image)
-            self._current_orientation = orientation
-            logger.info(f"[RENDER] Canvas resized to {canvas_width}×{canvas_height} for {orientation} mode")
+            self._current_dims = current_dims
+            self._current_orientation = effective_orientation
+            logger.info(f"[RENDER] Canvas resized to {canvas_width}×{canvas_height} for rotation={rotation}°")
         
         # Step 2: Clear canvas to black
         self._image.paste(0, [0, 0, canvas_width, canvas_height])
@@ -191,25 +211,27 @@ class TextRenderer:
         # Step 4: Render group indicator on top
         self._render_group_indicator(canvas_width, canvas_height)
         
-        # Step 5: Apply rotation if needed and push to matrix
-        from udp_handler import get_rotation
+        # Step 5: Apply rotation and push to matrix
+        # Canvas dimensions are already correct based on rotation
+        # Now apply the actual image rotation
         
-        # Use override rotation if set, otherwise use configured rotation
-        if self._rotation_override is not None:
-            rotation = self._rotation_override
-        else:
-            rotation = get_rotation()
-        
-        # Portrait orientation (90° rotation)
         if orientation == "portrait":
+            # Legacy portrait mode: rotate the landscape canvas -90°
             rotated_img = self._image.rotate(-90, expand=True)
+        elif rotation == 0:
+            # No rotation needed
+            rotated_img = self._image
+        elif rotation == 90:
+            # 90° clockwise: canvas is already 32×64, rotate image -90°
+            rotated_img = self._image.rotate(-90, expand=True)
+        elif rotation == 180:
+            # 180°: canvas is 64×32, rotate image 180°
+            rotated_img = self._image.rotate(180, expand=False)
+        elif rotation == 270:
+            # 270° clockwise (= 90° counter-clockwise): canvas is 32×64, rotate image 90°
+            rotated_img = self._image.rotate(90, expand=True)
         else:
             rotated_img = self._image
-        
-        # Additional rotation (0, 90, 180, 270)
-        if rotation != 0:
-            # Rotate clockwise (negative for PIL rotate which is counter-clockwise)
-            rotated_img = rotated_img.rotate(-rotation, expand=False)
         
         self._canvas.SetImage(rotated_img)
         
