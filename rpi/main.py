@@ -553,8 +553,9 @@ def main():
                     logger.error(f"[TEST] Render exception: {exc}")
             
             # STEP 3: Send combined image to matrix
-            if matrix:
-                matrix.SetImage(test_img)
+            if matrix and canvas:
+                canvas.SetImage(test_img)
+                canvas = matrix.SwapOnVSync(canvas)
             
             time.sleep(0.016)  # ~60fps for smooth bars
             continue
