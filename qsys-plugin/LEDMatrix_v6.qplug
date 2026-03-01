@@ -1,9 +1,9 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 6.2.0 - Added reboot button for remote panel restart
+-- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
 -- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
 -- FIRMWARE PROTOCOL (JSON over UDP):
---   {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
+--   {" {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
 --    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
 --   {"cmd":"clear","seg":0,"group":1}  |  {"cmd":"clear_all","group":1}
 --   {"cmd":"brightness","value":200,"group":1}
@@ -41,9 +41,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.2.0",
-    Id = "dhpke.olimex.led.matrix.6.2.0",
-    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot",
+    Version = "6.2.1",
+    Id = "dhpke.olimex.led.matrix.6.2.1",
+    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot (FIXED)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -159,7 +159,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.2.0",
+        Type="Text", Text="LED Matrix Controller  v6.2.1 (Reboot Fixed)",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -183,7 +183,7 @@ function GetControlLayout(props)
     GBox(0, y, W, 72, "Group Routing")
     Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+5, W-12)
     
-    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap (reduced 10%)
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap
     local btnW = 56
     local btnGap = 6
     local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
@@ -197,7 +197,6 @@ function GetControlLayout(props)
             Position={bx, y+22}, Size={btnW, 36}
         }
     end
-    -- Active group display (hidden text control for status)
     layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+62}, Size={0, 0} }
 
     -- ── Display Layout ──────────────────────────────────────────────
@@ -217,7 +216,7 @@ function GetControlLayout(props)
         })
     end
 
-    -- Thumbnails for presets (abbreviated version)
+    -- Thumbnails for presets
     local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
     for i = 0, 6 do
         local tx = TX + i*(TW+GAP)
@@ -240,51 +239,44 @@ function GetControlLayout(props)
             Position={tx, ty+TH+2}, Size={TW, 10}})
     end
 
-    -- Thumbnail visual fills (segment colors)
-    local cA = {70, 160,  70}   -- green   seg 0
-    local cB = {70,  80, 160}   -- blue    seg 1
-    local cC = {160, 70,  70}   -- red     seg 2
-    local cD = {160,160,  40}   -- yellow  seg 3
+    -- Thumbnail fills
+    local cA = {70, 160,  70}
+    local cB = {70,  80, 160}
+    local cC = {160, 70,  70}
+    local cD = {160,160,  40}
 
-    local HW = 31   -- half width
-    local HH = 13   -- half height
-    local T1 = 20   -- first third width
-    local T2 = 20   -- second third width
-    local T3 = 22   -- third third width
+    local HW = 31
+    local HH = 13
+    local T1 = 20
+    local T2 = 20
+    local T3 = 22
 
-    -- Preset 1 — Fullscreen
     do local tx=TX+0*(TW+GAP); local ty=y+14
         TRect(cA, tx, ty, TW, TH)
     end
-    -- Preset 2 — Top/Bottom
     do local tx=TX+1*(TW+GAP); local ty=y+14
         TRect(cA, tx,    ty,    TW, HH)
         TRect(cB, tx,    ty+HH, TW, HH)
     end
-    -- Preset 3 — Left/Right
     do local tx=TX+2*(TW+GAP); local ty=y+14
         TRect(cA, tx,    ty, HW, TH)
         TRect(cB, tx+HW, ty, HW, TH)
     end
-    -- Preset 4 — Triple Left
     do local tx=TX+3*(TW+GAP); local ty=y+14
         TRect(cA, tx,    ty,    HW, TH)
         TRect(cB, tx+HW, ty,    HW, HH)
         TRect(cC, tx+HW, ty+HH, HW, HH)
     end
-    -- Preset 5 — Triple Right
     do local tx=TX+4*(TW+GAP); local ty=y+14
         TRect(cA, tx,    ty,    HW, HH)
         TRect(cB, tx,    ty+HH, HW, HH)
         TRect(cC, tx+HW, ty,    HW, TH)
     end
-    -- Preset 6 — Thirds
     do local tx=TX+5*(TW+GAP); local ty=y+14
         TRect(cA, tx,       ty, T1, TH)
         TRect(cB, tx+T1,    ty, T2, TH)
         TRect(cC, tx+T1+T2, ty, T3, TH)
     end
-    -- Preset 7 — Quad
     do local tx=TX+6*(TW+GAP); local ty=y+14
         TRect(cA, tx,    ty,    HW, HH)
         TRect(cB, tx+HW, ty,    HW, HH)
@@ -292,7 +284,6 @@ function GetControlLayout(props)
         TRect(cD, tx+HW, ty+HH, HW, HH)
     end
     
-    -- Preset 11-14 — Fullscreen per segment
     do local tx=TX+0*(TW+GAP); local ty=y+56
         TRect(cA, tx, ty, TW, TH)
     end
@@ -321,7 +312,7 @@ function GetControlLayout(props)
 
     -- ── Segment rows ────────────────────────────────────────────────
     y = y + 166
-    local SEG_H = 145  -- Reduced: removed intensity fader, added frame controls
+    local SEG_H = 145
 
     local comboCols = {
         {"Text Color", "text_color", "TxtColor", 110},
@@ -366,7 +357,6 @@ function GetControlLayout(props)
             cx = cx + col[4] + 6
         end
 
-        -- Row 3: Frame controls
         local r3 = sy + 107
         layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
             ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
@@ -388,7 +378,6 @@ function GetControlLayout(props)
     layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
         Position={6, y+30}, Size={100, 36} }
     
-    -- Rotation control
     Lbl("Rotation (°)", 112, y+16, 100)
     layout["rotation"] = { PrettyName="Global~Rotation", Style="ComboBox",
         Position={112, y+30}, Size={100, 36} }
@@ -416,8 +405,8 @@ if Controls then
 
     local activeLayoutSegments = {}
     local debounceTimers = {}
-    local activeGroup = 0  -- 0 = All (broadcast), 1-8 = specific group
-    local updatingGroups = false  -- Flag to prevent group button event loops
+    local activeGroup = 0
+    local updatingGroups = false
 
     local ColorNames = {
         ["White"]   = "FFFFFF", ["Red"]     = "FF0000", ["Lime"]    = "00FF00",
@@ -453,14 +442,6 @@ if Controls then
         "13 - Fullscreen Seg 3", "14 - Fullscreen Seg 4",
     }
 
-    local function Debounce(key, delay, fn)
-        if debounceTimers[key] then debounceTimers[key]:Stop() end
-        if not debounceTimers[key] then debounceTimers[key] = Timer.New() end
-        local t = debounceTimers[key]
-        t.EventHandler = function() t:Stop(); fn() end
-        t:Start(delay)
-    end
-
     local commandCounter = 0
     local lastError = nil
     local errorCount = 0
@@ -468,7 +449,6 @@ if Controls then
     local function ReopenSocket()
         print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
         if socket then 
-            print("[SOCKET] Closing existing socket...")
             pcall(function() socket:Close() end) 
         end
         local ok, err = pcall(function()
@@ -521,20 +501,15 @@ if Controls then
             errorCount = errorCount + 1
             lastError = "No socket"
             
-            -- Auto-reconnect attempt
             if errorCount < 3 then
-                print(string.format("[CMD #%d] Attempting auto-reconnect (attempt %d/3)...", cmdId, errorCount + 1))
+                print(string.format("[CMD #%d] Attempting auto-reconnect...", cmdId))
                 ReopenSocket()
             end
             return false
         end
         
-        print(string.format("[CMD #%d] Socket state: %s", cmdId, socket and "OK" or "NULL"))
-        
         local ok, err = pcall(function() 
-            print(string.format("[CMD #%d] Calling socket:Send()...", cmdId))
             socket:Send(ip_addr, udp_port, json .. "\n") 
-            print(string.format("[CMD #%d] socket:Send() completed", cmdId))
         end)
         
         if ok then
@@ -551,9 +526,7 @@ if Controls then
             Controls.connection_status.Value = 2
             print(string.format("✗ [CMD #%d ERROR #%d] %s", cmdId, errorCount, tostring(err)))
             
-            -- Auto-reconnect on error
             if errorCount >= 2 then
-                print(string.format("[CMD #%d] Multiple errors detected, forcing socket reconnect...", cmdId))
                 ReopenSocket()
             end
             return false
@@ -570,7 +543,6 @@ if Controls then
         local align   = AlignMap[Controls[s.."align"].String]        or "C"
         local effect  = Controls[s.."effect"].String                 or "none"
         
-        -- Add group routing
         return text, buildJson({
             cmd="text", seg=seg, group=activeGroup, text=text, color=color, bgcolor=bgcolor,
             font=font, size=size, align=align, effect=effect, intensity=255
@@ -579,11 +551,8 @@ if Controls then
 
     local function Initialize()
         print("=======================================================")
-        print("=== LED Matrix v6.2.0 (Groups+Rotation+Reboot)     ===")
-        print("=== Initializing...                                ===")
+        print("=== LED Matrix v6.2.1 (Reboot Fixed)               ===")
         print("=======================================================")
-        print(string.format("[INIT] Target IP: %s", ip_addr))
-        print(string.format("[INIT] Target Port: %s", tostring(udp_port)))
         
         if Controls.ip_address.String == "" then
             Controls.ip_address.String = ip_addr
@@ -592,7 +561,6 @@ if Controls then
             Controls.udp_port.String = tostring(udp_port)
         end
         
-        print("[INIT] Setting up control choices...")
         Controls.rotation.Choices = {"0", "90", "180", "270"}
         Controls.layout_preset.Choices = LayoutChoices
         
@@ -607,7 +575,6 @@ if Controls then
         end
         Controls.layout_preset.String = LayoutChoices[1]
 
-        -- Initialize group buttons (default to "All")
         Controls.group0_select.Boolean = true
         for grp = 1, 8 do
             Controls[string.format("group%d_select", grp)].Boolean = false
@@ -662,30 +629,17 @@ if Controls then
             Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
         end
 
-        print("[INIT] Opening UDP socket...")
         ReopenSocket()
-        print("===========================================")
-        print("=== Plugin Ready - Debug Mode Active    ===")
-        print(string.format("=== Commands sent: %d | Errors: %d       ===", commandCounter, errorCount))
-        print("===========================================")
+        print("=== Plugin Ready ===")
     end
 
     -- Group selection handlers
     for grp = 0, 8 do
         Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
-            print(string.format("[GROUP] Button %d event: Boolean=%s, updatingGroups=%s", 
-                grp, tostring(ctl.Boolean), tostring(updatingGroups)))
-            if updatingGroups then 
-                print(string.format("[GROUP] Ignoring event (updatingGroups=true)"))
-                return 
-            end
+            if updatingGroups then return end
             if ctl.Boolean then
-                print(string.format("[GROUP] Activating group %d", grp))
-                -- Delay execution slightly to ensure it happens after button release
                 Timer.CallAfter(function()
                     updatingGroups = true
-                    print(string.format("[GROUP] Deactivating other groups..."))
-                    -- Turn off all other group buttons
                     for g = 0, 8 do
                         if g ~= grp then
                             Controls[string.format("group%d_select", g)].Boolean = false
@@ -695,13 +649,9 @@ if Controls then
                     activeGroup = grp
                     local groupName = grp == 0 and "All" or tostring(grp)
                     Controls.active_group.String = groupName
-                    print(string.format("[GROUP] Active group set to: %s", groupName))
-                    -- Send group assignment command to Pi(s)
                     SendCommand(buildJson({cmd="group", value=grp}))
                 end, 0.05)
             else
-                print(string.format("[GROUP] Preventing deselect of group %d", grp))
-                -- Don't allow deselecting - always have one selected
                 ctl.Boolean = true
             end
         end
@@ -710,11 +660,9 @@ if Controls then
     local function ApplyLayoutByKey(key)
         local p = LayoutPresets[key]
         if not p then
-            print("✗ Unknown layout key: " .. tostring(key))
             Controls.last_command.String = "ERROR: unknown preset"
             return false
         end
-        print("Applying layout: " .. p.name .. " to group " .. (activeGroup == 0 and "All" or activeGroup))
 
         SendCommand(buildJson({cmd="layout", preset=p.preset, group=activeGroup}))
 
@@ -731,7 +679,6 @@ if Controls then
             for _, seg in ipairs(p.activeSegments) do
                 local _, cmd = BuildTextCommand(seg)
                 SendCommand(cmd)
-                -- Resend frame commands with correct width for new layout
                 local s = "seg" .. (seg+1) .. "_"
                 if Controls[s.."frame"].Boolean then
                     local color = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
@@ -752,7 +699,6 @@ if Controls then
     end
 
     Controls.reconnect.EventHandler = function()
-        print("=== Manual Reconnect ===")
         ReopenSocket()
         Controls.last_command.String = "Reconnected"
     end
@@ -829,9 +775,7 @@ if Controls then
         end
         
         Controls[s.."frame_link"].EventHandler = function()
-            -- Copy text color to frame color
             Controls[s.."frame_color"].String = Controls[s.."text_color"].String
-            -- If frame is enabled, send update immediately
             if Controls[s.."frame"].Boolean then
                 local color = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
                 SendCommand(buildJson({
@@ -852,48 +796,46 @@ if Controls then
 
     Controls.brightness.EventHandler = function(ctl)
         local value = tonumber(ctl.String) or 128
-        value = math.max(0, math.min(255, math.floor(value)))  -- Clamp to 0-255
+        value = math.max(0, math.min(255, math.floor(value)))
         ctl.String = tostring(value)
-        -- Apply immediately (no debounce)
         SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
     end
 
-    -- Rotation handler
     Controls.apply_rotation.EventHandler = function()
         local rotation = tonumber(Controls.rotation.String) or 0
         if SendCommand(buildJson({cmd="rotation", value=rotation, group=activeGroup})) then
-            print("✓ Rotation set to: " .. rotation .. "° for group " .. (activeGroup == 0 and "All" or activeGroup))
-            print("⚠ Use Reboot Panel button to apply rotation")
+            print("✓ Rotation set to: " .. rotation .. "°")
             Controls.last_command.String = "Rotation saved - click Reboot Panel to apply"
         end
     end
 
-    -- Reboot panel handler
+    -- ✅ FIXED: Reboot using HttpClient instead of os.execute
     Controls.reboot_panel.EventHandler = function()
-        print("[REBOOT] Sending reboot command to panel...")
-        -- Use curl to trigger web UI reboot endpoint
-        local rebootCmd = string.format('curl -s -X POST http://%s:8080/reboot', ip_addr)
-        print("[REBOOT] Command: " .. rebootCmd)
+        print("[REBOOT] Sending HTTP POST to /api/reboot")
         Controls.last_command.String = "Rebooting panel..."
-        -- Note: Panel will be offline for ~30 seconds
-        Timer.CallAfter(function()
-            Controls.last_command.String = "Panel rebooting (offline ~30s)"
-        end, 1)
-        -- Execute via shell (Q-SYS allows os.execute in plugins)
-        local ok, result = pcall(function() 
-            return os.execute(rebootCmd)
-        end)
-        if ok then
-            print("✓ [REBOOT] Reboot command sent successfully")
-        else
-            print("✗ [REBOOT] Failed to send reboot command: " .. tostring(result))
-            Controls.last_command.String = "Reboot failed - use Web UI"
+        
+        -- Create HttpClient and send POST request
+        local http = HttpClient.New()
+        http.Url = string.format("http://%s:8080/api/reboot", ip_addr)
+        http.Method = "POST"
+        http.Timeout = 5
+        
+        http.EventHandler = function(tbl, code, data, err)
+            if code == 200 or code == 0 then
+                -- Code 0 can happen when connection closes during reboot
+                print("✓ [REBOOT] Command sent successfully")
+                Controls.last_command.String = "Panel rebooting (offline ~30s)"
+            else
+                print(string.format("✗ [REBOOT] HTTP error: code=%s, err=%s", tostring(code), tostring(err)))
+                Controls.last_command.String = "Reboot failed - use Web UI"
+            end
         end
+        
+        http:Send()
     end
 
     Controls.ip_address.EventHandler = function(ctl)
         ip_addr = ctl.String
-        print("[CONFIG] IP changed to: " .. ip_addr)
         ReopenSocket()
     end
 
@@ -901,40 +843,25 @@ if Controls then
         local v = ValidatePort(ctl.String)
         if v then
             udp_port = v
-            print("[CONFIG] Port changed to: " .. udp_port)
             ReopenSocket()
-        else
-            print("[CONFIG ERROR] Invalid port: " .. tostring(ctl.String))
         end
     end
 
-    -- Health check timer - reconnect if too many errors
     local healthCheckTimer = Timer.New()
     healthCheckTimer.EventHandler = function()
         if errorCount >= 5 then
-            print(string.format("[HEALTH CHECK] Error count high (%d), forcing reconnect...", errorCount))
             ReopenSocket()
         end
-        if commandCounter > 0 and commandCounter % 50 == 0 then
-            print(string.format("[STATS] Commands: %d | Errors: %d | Last Error: %s", 
-                commandCounter, errorCount, lastError or "none"))
-        end
     end
-    healthCheckTimer:Start(10)  -- Check every 10 seconds
+    healthCheckTimer:Start(10)
 
     function Cleanup()
-        print("[CLEANUP] Stopping plugin...")
         if healthCheckTimer then 
             pcall(function() healthCheckTimer:Stop() end)
         end
-        for _, t in pairs(debounceTimers) do
-            if t then pcall(function() t:Stop() end) end
-        end
         if socket then 
-            print("[CLEANUP] Closing socket...")
             pcall(function() socket:Close() end) 
         end
-        print("[CLEANUP] Complete")
     end
 
     Initialize()
