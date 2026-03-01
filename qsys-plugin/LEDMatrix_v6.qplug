@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
 -- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
 -- Version 6.6.1 - Added Data parameter to HttpClient.Upload (required even for empty POST)
 -- Version 6.6.0 - Fixed to use correct Q-SYS HttpClient API (Upload/Download, not New)
@@ -52,9 +53,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.6.2",
-    Id = "dhpke.olimex.led.matrix.6.6.2",
-    Description = "RPi 64x32 LED Matrix - Color names updated + segment defaults",
+    Version = "6.6.3",
+    Id = "dhpke.olimex.led.matrix.6.6.3",
+    Description = "RPi 64x32 LED Matrix - Segment defaults updated",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -605,7 +606,7 @@ if Controls then
         local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}
         local effectChoices = {"none","scroll","blink","fade"}
-        local defaultColors = {"Red","Green","Red","Yellow"}  -- Seg1=Red, Seg2=Green, Seg3=Red, Seg4=Yellow
+        local defaultColors = {"Red","Green","Blue","White"}  -- Seg1=Red, Seg2=Green, Seg3=Blue, Seg4=White
 
         for seg = 0, 3 do
             local s = "seg" .. (seg+1) .. "_"
