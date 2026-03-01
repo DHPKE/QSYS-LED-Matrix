@@ -8,6 +8,7 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <atomic>
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <fstream>
@@ -28,6 +29,9 @@ using namespace rgb_matrix;
 RGBMatrix* g_matrix = nullptr;
 UDPHandler* g_udp_handler = nullptr;
 static volatile bool interrupt_received = false;
+
+// Atomic brightness change flag (to avoid blocking UDP thread)
+static std::atomic<int> g_pending_brightness{-1};
 
 static void InterruptHandler(int signo) {
     interrupt_received = true;
@@ -220,12 +224,11 @@ int main(int argc, char* argv[]) {
              << g_matrix->height() << ")" << std::endl;
     
     // ── 4. Brightness callback ───────────────────────────────────────────────
+    // Don't call SetBrightness() here - it blocks! Just queue the change.
     auto on_brightness_change = [](int value_255) {
-        if (g_matrix) {
-            int pct = std::max(0, std::min(100, (value_255 * 100) / 255));
-            g_matrix->SetBrightness(pct);
-            std::cout << "[MAIN] Brightness → " << pct << "%" << std::endl;
-        }
+        int pct = std::max(0, std::min(100, (value_255 * 100) / 255));
+        g_pending_brightness.store(pct);
+        std::cout << "[MAIN] Brightness change queued: " << pct << "%" << std::endl;
     };
     
     // ── 5. Orientation callback ──────────────────────────────────────────────
@@ -290,6 +293,13 @@ int main(int argc, char* argv[]) {
     
     while (!interrupt_received) {
         auto now = std::chrono::steady_clock::now();
+        
+        // Apply pending brightness change (non-blocking from main thread)
+        int pending_brightness = g_pending_brightness.exchange(-1);
+        if (pending_brightness >= 0) {
+            g_matrix->SetBrightness(pending_brightness);
+            std::cout << "[MAIN] Brightness applied: " << pending_brightness << "%" << std::endl;
+        }
         
         // Check for test mode
         static bool test_mode_active = false;
