@@ -109,13 +109,20 @@ def _get_first_up_ip() -> str:
         for line in out.splitlines():
             line_stripped = line.strip()
             
-            # Line like: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ..."
+            # Line like: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ... state UP ..."
             if not line.startswith(" ") and ":" in line:
                 parts = line.split(":")
                 if len(parts) >= 2:
                     current_iface = parts[1].strip()
-                    # Check if interface is UP (not just configured, but actually up)
-                    is_up = "UP" in line and "LOWER_UP" in line and "NO-CARRIER" not in line
+                    # Check if interface is actually UP:
+                    # Must have LOWER_UP (link is up) OR state UP
+                    # Must NOT have NO-CARRIER or state DOWN
+                    has_lower_up = "LOWER_UP" in line
+                    has_state_up = "state UP" in line
+                    has_no_carrier = "NO-CARRIER" in line
+                    has_state_down = "state DOWN" in line
+                    
+                    is_up = (has_lower_up or has_state_up) and not has_no_carrier and not has_state_down
             
             # Line like: "    inet 10.1.1.25/24 ..."
             elif line_stripped.startswith("inet ") and current_iface:
