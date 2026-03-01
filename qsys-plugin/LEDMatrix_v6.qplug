@@ -41,9 +41,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
-    Version = "6.2.2",
-    Id = "dhpke.olimex.led.matrix.6.2.2",
-    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot (faster)",
+    Version = "6.2.3",
+    Id = "dhpke.olimex.led.matrix.6.2.3",
+    Description = "RPi 64x32 LED Matrix with 8-group support + full rotation + remote reboot (API fix)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -159,7 +159,7 @@ function GetControlLayout(props)
         Position={0,0}, Size={W,36}
     })
     table.insert(graphics, {
-        Type="Text", Text="LED Matrix Controller  v6.2.2",
+        Type="Text", Text="LED Matrix Controller  v6.2.3",
         Font="Roboto", FontSize=14, FontStyle="Bold",
         HTextAlign="Center", Color={255,255,255},
         Position={0,9}, Size={W,20}
@@ -815,7 +815,7 @@ if Controls then
         Controls.last_command.String = "Rebooting panel..."
         
         -- Create HttpClient and send POST request
-        local http = HttpClient.New()
+        local http = HttpClient.new()  -- lowercase 'new' for Q-SYS
         http.Url = string.format("http://%s:8080/api/reboot", ip_addr)
         http.Method = "POST"
         http.Timeout = 2  -- Reduced timeout (reboot happens after 1s anyway)
