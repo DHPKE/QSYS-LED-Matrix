@@ -120,6 +120,58 @@ module.exports = function(RED) {
                     cmd: "orientation",
                     value: msg.orientation
                 };
+            } else if (msg.rotation !== undefined) {
+                // ROTATION command (0, 90, 180, 270 degrees)
+                cmdObj = {
+                    cmd: "rotation",
+                    value: msg.rotation,
+                    group: msg.group || 0
+                };
+            } else if (msg.testmode !== undefined) {
+                // TEST MODE command (via HTTP POST to web API)
+                const http = require('http');
+                const postData = JSON.stringify({ enabled: !!msg.testmode });
+                const options = {
+                    hostname: node.ip,
+                    port: 8080,
+                    path: '/api/testmode',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(postData)
+                    }
+                };
+
+                const req = http.request(options, (res) => {
+                    if (res.statusCode === 200) {
+                        node.status({fill:"green", shape:"dot", text:`test mode ${msg.testmode ? 'ON' : 'OFF'}`});
+                    } else {
+                        node.status({fill:"red", shape:"ring", text:`test mode failed: ${res.statusCode}`});
+                    }
+                });
+
+                req.on('error', (err) => {
+                    node.error(`Test mode request failed: ${err.message}`);
+                    node.status({fill:"red", shape:"ring", text:"test mode error"});
+                });
+
+                req.write(postData);
+                req.end();
+
+                msg.ledmatrix = { command: { cmd: "testmode", enabled: !!msg.testmode } };
+                node.send(msg);
+                return;
+            } else if (msg.frame !== undefined) {
+                // FRAME command (enable/disable segment border)
+                const segValue = getValue(msg.segment !== undefined ? msg.segment : msg.seg, node.defaults.segment, 0);
+                cmdObj = {
+                    cmd: "frame",
+                    seg: segValue,
+                    enabled: !!msg.frame,
+                    color: msg.framecolor ? msg.framecolor.replace('#', '') : "FFFFFF",
+                    width: msg.framewidth || 1,
+                    group: msg.group || 0
+                };
             } else if (msg.group !== undefined) {
                 // GROUP command
                 cmdObj = {
