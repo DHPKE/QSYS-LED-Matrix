@@ -199,7 +199,8 @@ void UDPHandler::dispatch(const std::string& raw_json) {
                 if (brightness_callback_) {
                     brightness_callback_(val);
                 }
-                sm_->markAllDirty();
+                // Don't markAllDirty() - brightness change doesn't need full redraw
+                // and SetBrightness() blocks the UDP thread
                 saveConfig();
             }
             
