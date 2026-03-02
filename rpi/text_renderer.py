@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import (MATRIX_WIDTH, MATRIX_HEIGHT,
                     FONT_PATHS, FONT_FALLBACK,
+                    FONT_STROKE_WIDTH, FONT_STROKE_WIDTH_DEFAULT,
                     GROUP_COLORS, GROUP_INDICATOR_SIZE)
 from segment_manager import SegmentManager, TextAlign, TextEffect
 import udp_handler
@@ -37,6 +38,11 @@ _color_cache: dict[str, tuple[int, int, int]] = {}
 
 # Cache for text measurements: (text, size) -> (width, height)
 _text_measurement_cache: dict[tuple, tuple[int, int]] = {}
+
+
+def _get_stroke_width(font_name: str) -> int:
+    """Get stroke width for a given font name."""
+    return FONT_STROKE_WIDTH.get(font_name.lower(), FONT_STROKE_WIDTH_DEFAULT)
 
 
 def _load_font(font_name: str, size: int) -> ImageFont.ImageFont:
@@ -346,7 +352,12 @@ class TextRenderer:
         # (Drawing colored text then converting to grayscale causes some colors to disappear)
         tmp_mask = Image.new('L', (snap['width'], snap['height']), 0)
         tmp_mask_draw = ImageDraw.Draw(tmp_mask)
-        tmp_mask_draw.text((tx, ty), text, font=font, fill=255)
+        # Add stroke for bolder rendering (configurable per font)
+        stroke_w = _get_stroke_width(snap.get('font', 'arial'))
+        if stroke_w > 0:
+            tmp_mask_draw.text((tx, ty), text, font=font, fill=255, stroke_width=stroke_w, stroke_fill=255)
+        else:
+            tmp_mask_draw.text((tx, ty), text, font=font, fill=255)
         
         # Binary threshold: > 128 becomes white (pixels > 50% gray)
         tmp_binary = tmp_mask.point(lambda p: 255 if p > 128 else 0, mode='L')
@@ -445,12 +456,18 @@ class TextRenderer:
 
         # SHARP NO-ALIAS RENDERING: Binary threshold for crisp edges
         # Render on grayscale then convert to pure black/white
+        stroke_w = _get_stroke_width(seg.font)
+        
         if seg.effect == TextEffect.SCROLL:
             # For scrolling text, render on larger canvas
             tmp_gray = Image.new("L", (MATRIX_WIDTH + tw, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
-            tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
-                          text, font=font, fill=255)
+            if stroke_w > 0:
+                tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
+                              text, font=font, fill=255, stroke_width=stroke_w, stroke_fill=255)
+            else:
+                tmp_draw.text((draw_x - seg.x, (seg.height - th) // 2 - descent),
+                              text, font=font, fill=255)
             
             # Binary threshold: > 128 becomes white (pixels > 50% gray)
             tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')
@@ -471,7 +488,10 @@ class TextRenderer:
             # For static text
             tmp_gray = Image.new("L", (seg.width, seg.height), 0)
             tmp_draw = ImageDraw.Draw(tmp_gray)
-            tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
+            if stroke_w > 0:
+                tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255, stroke_width=stroke_w, stroke_fill=255)
+            else:
+                tmp_draw.text((draw_x - seg.x, draw_y - seg.y), text, font=font, fill=255)
             
             # Binary threshold: > 128 becomes white (pixels > 50% gray)
             tmp_binary = tmp_gray.point(lambda p: 255 if p > 128 else 0, mode='L')

@@ -178,15 +178,26 @@ MAX_TEXT_LENGTH    = 128
 DEFAULT_SCROLL_SPEED = 50   # pixels per second
 
 # Font mapping (Q-SYS plugin font names -> font file paths)
+# Two fonts available: "arial" (sans-serif) and "digital" (Mono Regular - clean monospace)
+# Backward compatibility aliases: digital12 -> digital, verdana -> arial
 FONT_PATHS = {
-    "arial":     "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf",
-    "verdana":   "/usr/share/fonts/truetype/msttcorefonts/Verdana_Bold.ttf",
-    "digital12": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",  # Digital fallback
-    "mono9":     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",       # Mono fallback
+    "arial":     "/usr/share/fonts/truetype/nimbus/NimbusSanL-Bold.otf",
+    "digital":   "/usr/share/fonts/truetype/sevensegment/MonoRegular.ttf",
+    "digital12": "/usr/share/fonts/truetype/sevensegment/MonoRegular.ttf",  # Alias for digital
+    "verdana":   "/usr/share/fonts/truetype/nimbus/NimbusSanL-Bold.otf",  # Alias for arial
 }
 
 # Fallback font if requested font not found
-FONT_FALLBACK = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT_FALLBACK = "/usr/share/fonts/truetype/nimbus/NimbusSanL-Bold.otf"
+
+# Font stroke width for bold rendering (0 = no stroke, 1-2 = bolder)
+FONT_STROKE_WIDTH = {
+    "arial":     0,  # No stroke - Nimbus Sans L Bold is already bold enough
+    "digital":   0,  # No stroke for seven-segment (crisp rendering)
+    "digital12": 0,
+    "verdana":   0,
+}
+FONT_STROKE_WIDTH_DEFAULT = 0  # Default: no stroke
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Persistence
