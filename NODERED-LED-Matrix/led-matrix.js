@@ -23,7 +23,10 @@ module.exports = function(RED) {
             align: config.align || null,
             intensity: config.intensity !== "" ? parseInt(config.intensity) : null,
             layout: config.layout !== "" ? parseInt(config.layout) : null,
-            brightness: config.brightness !== "" ? parseInt(config.brightness) : null
+            brightness: config.brightness !== "" ? parseInt(config.brightness) : null,
+            frame: config.frame === "true" ? true : (config.frame === "false" ? false : null),
+            framecolor: config.framecolor || null,
+            framewidth: config.framewidth !== "" ? parseInt(config.framewidth) : null
         };
 
         // UDP client
@@ -161,17 +164,21 @@ module.exports = function(RED) {
                 msg.ledmatrix = { command: { cmd: "testmode", enabled: !!msg.testmode } };
                 node.send(msg);
                 return;
-            } else if (msg.frame !== undefined) {
-                // FRAME command (enable/disable segment border)
-                const segValue = getValue(msg.segment !== undefined ? msg.segment : msg.seg, node.defaults.segment, 0);
-                cmdObj = {
-                    cmd: "frame",
-                    seg: segValue,
-                    enabled: !!msg.frame,
-                    color: msg.framecolor ? msg.framecolor.replace('#', '') : "FFFFFF",
-                    width: msg.framewidth || 1,
-                    group: msg.group || 0
-                };
+            } else if (msg.frame !== undefined || node.defaults.frame !== null) {
+                // FRAME command (enable/disable segment border) - use defaults if message doesn't provide
+                const frameValue = msg.frame !== undefined ? msg.frame : node.defaults.frame;
+                
+                if (frameValue !== null && frameValue !== undefined) {
+                    const segValue = getValue(msg.segment !== undefined ? msg.segment : msg.seg, node.defaults.segment, 0);
+                    cmdObj = {
+                        cmd: "frame",
+                        seg: segValue,
+                        enabled: !!frameValue,
+                        color: getValue(msg.framecolor, node.defaults.framecolor, "FFFFFF").replace('#', ''),
+                        width: getValue(msg.framewidth, node.defaults.framewidth, 1),
+                        group: msg.group || 0
+                    };
+                }
             } else if (msg.group !== undefined) {
                 // GROUP command
                 cmdObj = {

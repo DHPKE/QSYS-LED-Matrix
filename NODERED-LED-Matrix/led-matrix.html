@@ -13,7 +13,10 @@
             align: { value: "" },
             intensity: { value: "" },
             layout: { value: "" },
-            brightness: { value: "" }
+            brightness: { value: "" },
+            frame: { value: "" },
+            framecolor: { value: "" },
+            framewidth: { value: "" }
         },
         inputs: 1,
         outputs: 1,
@@ -34,6 +37,9 @@
             if (node.bgcolor) {
                 $('#text-bgcolor-picker').val('#' + node.bgcolor.replace('#', ''));
             }
+            if (node.framecolor) {
+                $('#frame-color-picker').val('#' + node.framecolor.replace('#', ''));
+            }
             
             // Color picker -> text input (user picks color)
             $('#text-color-picker').on('input', function() {
@@ -42,6 +48,10 @@
             
             $('#text-bgcolor-picker').on('input', function() {
                 $('#node-input-bgcolor').val($(this).val().substring(1).toUpperCase());
+            });
+            
+            $('#frame-color-picker').on('input', function() {
+                $('#node-input-framecolor').val($(this).val().substring(1).toUpperCase());
             });
             
             // Text input -> color picker (user types hex)
@@ -56,6 +66,13 @@
                 const val = $(this).val().replace('#', '');
                 if (val.length === 6 && /^[0-9A-Fa-f]{6}$/.test(val)) {
                     $('#text-bgcolor-picker').val('#' + val.toUpperCase());
+                }
+            });
+            
+            $('#node-input-framecolor').on('input', function() {
+                const val = $(this).val().replace('#', '');
+                if (val.length === 6 && /^[0-9A-Fa-f]{6}$/.test(val)) {
+                    $('#frame-color-picker').val('#' + val.toUpperCase());
                 }
             });
         }
@@ -152,6 +169,29 @@
     <div class="form-row">
         <label for="node-input-brightness"><i class="fa fa-sun-o"></i> Brightness</label>
         <input type="number" id="node-input-brightness" min="0" max="255" placeholder="From message (0-255)">
+    </div>
+    
+    <hr>
+    <h4>Frame / Border (optional)</h4>
+    
+    <div class="form-row">
+        <label for="node-input-frame"><i class="fa fa-square-o"></i> Frame Enabled</label>
+        <select id="node-input-frame">
+            <option value="">From message</option>
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-framecolor"><i class="fa fa-tint"></i> Frame Color</label>
+        <input type="text" id="node-input-framecolor" placeholder="From message or FFFFFF" style="width: 150px;">
+        <input type="color" id="frame-color-picker" value="#FFFFFF" style="width: 60px; margin-left: 10px;">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-framewidth"><i class="fa fa-arrows-h"></i> Frame Width</label>
+        <input type="number" id="node-input-framewidth" min="1" max="5" placeholder="From message or 1">
     </div>
     
     <div class="form-tips">
