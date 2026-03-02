@@ -981,13 +981,14 @@ if Controls then
         end
         
         local enabled = Controls.curtain_enable.Boolean
-        local color = Controls.curtain_color.String or "FFFFFF"
+        local colorName = Controls.curtain_color.String or "White"
+        local color = ColorNames[colorName] or colorName  -- Map name to hex, or use as-is if already hex
         
         -- Remove # if present
         color = color:gsub("#", "")
         
-        print(string.format("[CURTAIN] Applying config: enabled=%s, color=%s, group=%d", 
-            tostring(enabled), color, activeGroup))
+        print(string.format("[CURTAIN] Applying config: enabled=%s, color=%s (%s), group=%d", 
+            tostring(enabled), colorName, color, activeGroup))
         Controls.last_command.String = "Configuring curtain..."
         
         local payload = {
