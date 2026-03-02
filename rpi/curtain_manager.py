@@ -79,6 +79,7 @@ class CurtainManager:
     def set_visibility(self, group: int, visible: bool) -> None:
         """
         Toggle curtain visibility for a group (boolean trigger).
+        Only sets visibility if curtain is enabled for this group.
         
         Args:
             group: Group ID (1-8)
@@ -90,14 +91,16 @@ class CurtainManager:
         
         with self._lock:
             if group not in self._curtains:
-                # Auto-create with default color if not configured
-                self._curtains[group] = {
-                    "enabled": True,
-                    "visible": visible,
-                    "color": CURTAIN_DEFAULT_COLOR
-                }
-            else:
-                self._curtains[group]["visible"] = visible
+                # Don't auto-create if not configured - curtain must be explicitly enabled first
+                logger.info(f"[Curtain] Group {group} not configured, ignoring visibility request")
+                return
+            
+            # Only set visibility if enabled
+            if not self._curtains[group].get("enabled", False):
+                logger.info(f"[Curtain] Group {group} not enabled, ignoring visibility request")
+                return
+            
+            self._curtains[group]["visible"] = visible
         
         logger.info(f"[Curtain] Group {group} visibility: {visible}")
         self._save_state()

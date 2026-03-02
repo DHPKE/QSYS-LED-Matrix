@@ -351,6 +351,18 @@ class UDPHandler:
             value = int(doc.get("value", 0))
             logger.info(f"[UDP] Group command -> value={value}")
             set_group_id(value)
+            
+            # Auto-activate curtain if configured for this group
+            if hasattr(self, '_curtain_callback') and self._curtain_callback and value > 0:
+                # When switching to a group, show curtain if enabled for that group
+                logger.info(f"[UDP] Auto-activating curtain for group {value}")
+                self._curtain_callback(value, True)
+            elif hasattr(self, '_curtain_callback') and self._curtain_callback and value == 0:
+                # When switching to no group (broadcast), hide all curtains
+                logger.info(f"[UDP] Auto-deactivating curtain (no group)")
+                for grp in range(1, 9):
+                    self._curtain_callback(grp, False)
+            
             # Force immediate render to show group indicator change
             self._sm.mark_all_dirty()
 
