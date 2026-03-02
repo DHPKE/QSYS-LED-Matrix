@@ -16,7 +16,10 @@
             brightness: { value: "" },
             frame: { value: "" },
             framecolor: { value: "" },
-            framewidth: { value: "" }
+            framewidth: { value: "" },
+            curtain: { value: "" },
+            curtainColor: { value: "" },
+            curtainEnable: { value: "" }
         },
         inputs: 1,
         outputs: 1,
@@ -40,6 +43,9 @@
             if (node.framecolor) {
                 $('#frame-color-picker').val('#' + node.framecolor.replace('#', ''));
             }
+            if (node.curtainColor) {
+                $('#curtain-color-picker').val('#' + node.curtainColor.replace('#', ''));
+            }
             
             // Color picker -> text input (user picks color)
             $('#text-color-picker').on('input', function() {
@@ -52,6 +58,10 @@
             
             $('#frame-color-picker').on('input', function() {
                 $('#node-input-framecolor').val($(this).val().substring(1).toUpperCase());
+            });
+            
+            $('#curtain-color-picker').on('input', function() {
+                $('#node-input-curtainColor').val($(this).val().substring(1).toUpperCase());
             });
             
             // Text input -> color picker (user types hex)
@@ -73,6 +83,13 @@
                 const val = $(this).val().replace('#', '');
                 if (val.length === 6 && /^[0-9A-Fa-f]{6}$/.test(val)) {
                     $('#frame-color-picker').val('#' + val.toUpperCase());
+                }
+            });
+            
+            $('#node-input-curtainColor').on('input', function() {
+                const val = $(this).val().replace('#', '');
+                if (val.length === 6 && /^[0-9A-Fa-f]{6}$/.test(val)) {
+                    $('#curtain-color-picker').val('#' + val.toUpperCase());
                 }
             });
         }
@@ -194,6 +211,33 @@
         <input type="number" id="node-input-framewidth" min="1" max="5" placeholder="From message or 1">
     </div>
     
+    <hr>
+    <h4>Curtain Mode (v7.0)</h4>
+    
+    <div class="form-row">
+        <label for="node-input-curtainEnable"><i class="fa fa-columns"></i> Curtain Enable</label>
+        <select id="node-input-curtainEnable" style="width: 200px;">
+            <option value="">From message</option>
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-curtainColor"><i class="fa fa-tint"></i> Curtain Color</label>
+        <input type="text" id="node-input-curtainColor" placeholder="From message or FFFFFF" style="width: 150px;">
+        <input type="color" id="curtain-color-picker" value="#FFFFFF" style="width: 60px; margin-left: 10px;">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-curtain"><i class="fa fa-eye"></i> Curtain Show/Hide</label>
+        <select id="node-input-curtain" style="width: 200px;">
+            <option value="">From message</option>
+            <option value="true">Show</option>
+            <option value="false">Hide</option>
+        </select>
+    </div>
+    
     <div class="form-tips">
         <strong>Tip:</strong> Leave fields empty to use values from incoming messages. 
         Set values here to use as defaults when message doesn't provide them.
@@ -267,6 +311,26 @@ msg.framewidth = 2;         // Optional width (default: 1)</pre>
     <p>Disable frame:</p>
     <pre>msg.frame = false;
 msg.segment = 0;</pre>
+
+    <h3>Curtain Mode (v7.0)</h3>
+    <p>Curtain Mode creates two 3-pixel wide vertical bars on the left (0-2) and right (61-63) edges. 
+       Each group (1-8) has independent curtain configuration.</p>
+    
+    <p>Configure curtain for a group:</p>
+    <pre>msg.curtainEnable = true;     // Enable curtain for group
+msg.curtainColor = "FF0000";  // Red curtain bars
+msg.group = 1;                // Group 1</pre>
+    
+    <p>Toggle curtain visibility:</p>
+    <pre>msg.curtain = true;   // Show curtain
+msg.group = 1;        // For group 1</pre>
+    
+    <p>Hide curtain:</p>
+    <pre>msg.curtain = false;
+msg.group = 1;</pre>
+    
+    <p><strong>Note:</strong> Segments continue using their configured positions when curtain is active. 
+       To avoid overlap, configure segments with x=3, w=58 in your layout.</p>
 
     <h3>Group</h3>
     <p>Define segment groups:</p>

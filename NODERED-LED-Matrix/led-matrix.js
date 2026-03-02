@@ -26,7 +26,10 @@ module.exports = function(RED) {
             brightness: config.brightness !== "" ? parseInt(config.brightness) : null,
             frame: config.frame === "true" ? true : (config.frame === "false" ? false : null),
             framecolor: config.framecolor || null,
-            framewidth: config.framewidth !== "" ? parseInt(config.framewidth) : null
+            framewidth: config.framewidth !== "" ? parseInt(config.framewidth) : null,
+            curtain: config.curtain === "true" ? true : (config.curtain === "false" ? false : null),
+            curtainColor: config.curtainColor || null,
+            curtainEnable: config.curtainEnable === "true" ? true : (config.curtainEnable === "false" ? false : null)
         };
 
         // UDP client
@@ -177,6 +180,29 @@ module.exports = function(RED) {
                         color: getValue(msg.framecolor, node.defaults.framecolor, "FFFFFF").replace('#', ''),
                         width: getValue(msg.framewidth, node.defaults.framewidth, 1),
                         group: msg.group || 0
+                    };
+                }
+            } else if (msg.curtainEnable !== undefined || node.defaults.curtainEnable !== null) {
+                // CURTAIN CONFIG command - configure curtain for a group
+                const enableValue = msg.curtainEnable !== undefined ? msg.curtainEnable : node.defaults.curtainEnable;
+                
+                if (enableValue !== null && enableValue !== undefined) {
+                    cmdObj = {
+                        cmd: "curtain",
+                        group: msg.group || 1,
+                        enabled: !!enableValue,
+                        color: getValue(msg.curtainColor, node.defaults.curtainColor, "FFFFFF").replace('#', '')
+                    };
+                }
+            } else if (msg.curtain !== undefined || node.defaults.curtain !== null) {
+                // CURTAIN SHOW/HIDE command - toggle visibility
+                const curtainValue = msg.curtain !== undefined ? msg.curtain : node.defaults.curtain;
+                
+                if (curtainValue !== null && curtainValue !== undefined) {
+                    cmdObj = {
+                        cmd: "curtain",
+                        group: msg.group || 1,
+                        state: !!curtainValue
                     };
                 }
             } else if (msg.group !== undefined) {
