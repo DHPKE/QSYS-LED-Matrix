@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.1 - Automatic curtain activation on group assignment
 -- Version 7.0.0 - Added Curtain Mode support (3px vertical bars on edges)
 -- Version 6.7.0 - Added display enable/disable control, improved test mode restoration
 -- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
@@ -49,9 +50,14 @@
 --   Creates two 3-pixel wide vertical bars on the left (0-2) and right (61-63) edges.
 --   Each group (1-8) has independent curtain configuration.
 --   Use "Curtain Config" to enable and set color for a group.
---   Use "Curtain Show/Hide" toggle to control visibility.
---   Commands: {"cmd":"curtain","group":1,"state":true}
---            {"cmd":"curtain","group":1,"enabled":true,"color":"FF0000"}
+--   Curtain automatically shows/hides when you assign the panel to that group.
+--   
+--   Workflow:
+--     1. Configure curtain: {"cmd":"curtain","group":4,"enabled":true,"color":"FF0000"}
+--     2. Assign to group: {"cmd":"group","value":4}  <- Curtain auto-shows
+--     3. Switch group: {"cmd":"group","value":1}     <- Curtain auto-hides
+--   
+--   Manual override: Use "Curtain Show/Hide" toggle to force visibility
 --
 -- LAYOUT PRESETS:
 --   1  = Fullscreen
@@ -65,9 +71,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.0.0",
-    Id = "dhpke.olimex.led.matrix.7.0.0",
-    Description = "RPi 64x32 LED Matrix - Added Curtain Mode (3px edge bars)",
+    Version = "7.0.1",
+    Id = "dhpke.olimex.led.matrix.7.0.1",
+    Description = "RPi 64x32 LED Matrix - Curtain Mode with automatic group activation",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -431,7 +437,7 @@ function GetControlLayout(props)
         Position={516, y+30}, Size={78, 36} }
     
     -- Curtain Mode (v7.0)
-    Lbl("Curtain Mode", 6, y+74, 120)
+    Lbl("Curtain Mode (auto-activates on group assign)", 6, y+74, 350)
     layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
         ButtonStyle="Toggle", Legend="Enable", Color={100,100,200},
         Position={6, y+88}, Size={80, 36} }
@@ -446,7 +452,7 @@ function GetControlLayout(props)
         Position={208, y+88}, Size={120, 36} }
     
     layout["curtain_show"] = { PrettyName="Curtain~Show", Style="Button",
-        ButtonStyle="Toggle", Legend="Show/Hide", Color=C_BTN_G,
+        ButtonStyle="Toggle", Legend="Override", Color=C_BTN_G,
         Position={334, y+88}, Size={90, 36} }
     
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
