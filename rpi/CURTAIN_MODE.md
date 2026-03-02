@@ -85,6 +85,44 @@ Curtain configuration is saved to `/var/lib/led-matrix/config.json` and persists
 
 ## Behavior
 
+### Automatic Activation (v7.0.1)
+
+**Curtains automatically show/hide based on group assignment:**
+
+1. **Configure curtain for a group** (one-time setup):
+   ```json
+   {"cmd":"curtain", "group":4, "enabled":true, "color":"FF0000"}
+   ```
+
+2. **Assign panel to that group** - curtain automatically shows:
+   ```json
+   {"cmd":"group", "value":4}
+   ```
+
+3. **Switch to different group** - curtain automatically hides:
+   ```json
+   {"cmd":"group", "value":1}
+   ```
+
+4. **Switch to no group (broadcast)** - all curtains hide:
+   ```json
+   {"cmd":"group", "value":0}
+   ```
+
+**Key points:**
+- Curtain must be **enabled** for a group first (step 1)
+- Once enabled, it automatically shows/hides when you switch groups
+- No need to manually send `state:true/false` commands
+- Group 0 (broadcast) disables all curtains
+
+### Manual Override
+
+You can still manually toggle curtain visibility:
+```json
+{"cmd":"curtain", "group":4, "state":true}   // Force show
+{"cmd":"curtain", "group":4, "state":false}  // Force hide
+```
+
 ### When Curtain is Active
 
 1. **Configuration**: Set `enabled=true` and specify a color for a group
@@ -109,18 +147,29 @@ Curtain configuration is saved to `/var/lib/led-matrix/config.json` and persists
 
 ## Example Workflow
 
-### Step 1: Configure Curtain for Group 1
+### Step 1: Configure Curtain for Group 4
 
 ```json
 {
   "cmd": "curtain",
-  "group": 1,
+  "group": 4,
   "enabled": true,
   "color": "00FF00"
 }
 ```
 
-### Step 2: Assign Panel to Group 1
+### Step 2: Assign Panel to Group 4 (Curtain Auto-Shows)
+
+```json
+{
+  "cmd": "group",
+  "value": 4
+}
+```
+
+**Result:** Curtain immediately appears with green bars on left and right edges.
+
+### Step 3: Switch to Group 1 (Curtain Auto-Hides)
 
 ```json
 {
@@ -129,25 +178,18 @@ Curtain configuration is saved to `/var/lib/led-matrix/config.json` and persists
 }
 ```
 
-### Step 3: Show Curtain
+**Result:** Curtain disappears (only group 4 has curtain configured).
+
+### Step 4: Switch Back to Group 4 (Curtain Auto-Shows Again)
 
 ```json
 {
-  "cmd": "curtain",
-  "group": 1,
-  "state": true
+  "cmd": "group",
+  "value": 4
 }
 ```
 
-### Step 4: Hide Curtain
-
-```json
-{
-  "cmd": "curtain",
-  "group": 1,
-  "state": false
-}
-```
+**Result:** Curtain reappears automatically.
 
 ## Node-RED Example
 
