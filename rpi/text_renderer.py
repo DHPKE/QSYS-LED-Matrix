@@ -128,21 +128,23 @@ class TextRenderer:
     Draws all active segments onto a shared RGBMatrix canvas.
 
     Usage:
-        renderer = TextRenderer(matrix, canvas, segment_manager)
+        renderer = TextRenderer(matrix, canvas, segment_manager, curtain_manager)
         # In render loop:
         renderer.render_all()
         matrix.SwapOnVSync(canvas)
     """
 
-    def __init__(self, matrix, canvas, segment_manager: SegmentManager):
+    def __init__(self, matrix, canvas, segment_manager: SegmentManager, curtain_manager=None):
         """
         :param matrix:  rgbmatrix.RGBMatrix instance
         :param canvas:  FrameCanvas returned by matrix.CreateFrameCanvas()
         :param segment_manager: shared SegmentManager
+        :param curtain_manager: optional CurtainManager for rendering curtain bars
         """
         self._matrix  = matrix
         self._canvas  = canvas
         self._sm      = segment_manager
+        self._cm      = curtain_manager  # CurtainManager (v7.0+)
         # Off-screen PIL image for compositing - size depends on orientation
         # Always matches the physical matrix dimensions (64×32)
         self._image   = Image.new("RGB", (MATRIX_WIDTH, MATRIX_HEIGHT), (0, 0, 0))
@@ -231,10 +233,15 @@ class TextRenderer:
             self._render_segment_from_snapshot(snap)
             rendered_count += 1
         
-        # Step 4: Render group indicator on top
+        # Step 4: Render curtain bars (v7.0+)
+        if self._cm:
+            current_group_id = udp_handler.get_group_id()
+            self._cm.render(self._image, current_group_id)
+        
+        # Step 5: Render group indicator on top
         self._render_group_indicator(canvas_width, canvas_height)
         
-        # Step 5: Apply rotation and push to matrix
+        # Step 6: Apply rotation and push to matrix
         # Canvas dimensions are already correct based on rotation
         # Now apply the actual image rotation
         

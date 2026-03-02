@@ -1,6 +1,8 @@
 """
 config.py — Central configuration for RPi Zero 2 W + PoE Hat LED Matrix controller.
 
+Version: 7.0.0 (Curtain Mode)
+
 Hardware:
   - Raspberry Pi Zero 2 W (RP3A0, quad-core Cortex-A53 @ 1GHz, 512MB RAM)
   - PoE HAT (802.3af) providing power + wired Ethernet via USB or HAT
@@ -132,6 +134,30 @@ GROUP_COLORS = {
 GROUP_INDICATOR_SIZE = 2   # Size of the group indicator square (2×2 pixels)
 GROUP_INDICATOR_X = 0      # X position (bottom-left corner)
 GROUP_INDICATOR_Y = -1     # Y position (-1 = auto-calculate bottom position)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Curtain Mode (v7.0+)
+# ──────────────────────────────────────────────────────────────────────────────
+# Curtain mode creates two 3-pixel wide vertical bars on the left and right edges
+# of the display. These bars can be assigned to a group (1-8) and toggled on/off
+# via boolean input (true/false, 1/0).
+#
+# When curtain mode is active for a group:
+# - Left bar: pixels 0-2 (3 pixels wide, full height)
+# - Right bar: pixels 61-63 (3 pixels wide, full height)
+# - Middle area: pixels 3-60 (58 pixels wide) - segments stay as configured
+# - The curtain bars are always on top of segments (highest z-index)
+# - Segments 1-4 are NOT remapped - they continue using their configured positions
+#
+# Usage: Send UDP command {"cmd":"curtain", "enabled":true, "color":"FF0000", "group":1}
+# Group boolean trigger: {"cmd":"curtain", "group":1, "state":true}
+
+CURTAIN_WIDTH = 3          # Width of each curtain bar in pixels
+CURTAIN_DEFAULT_COLOR = (255, 255, 255)  # Default color (white) RGB tuple
+
+# Curtain state per group (1-8) - persisted to storage
+# Format: {group_id: {"enabled": bool, "color": (R,G,B)}}
+CURTAIN_STATE = {}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Segments
