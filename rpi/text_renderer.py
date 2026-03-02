@@ -351,6 +351,9 @@ class TextRenderer:
             tx = snap['width'] - tw - 1
         else:  # CENTER
             tx = (snap['width'] - tw) // 2
+            # Fix for Mono Regular font - it renders 1px too far left
+            if snap.get('font', 'arial').lower() in ('digital', 'digital12'):
+                tx += 1
         
         # Adjust vertical position to account for bbox offset
         ty = (snap['height'] - th) // 2 - bbox[1]
@@ -458,6 +461,9 @@ class TextRenderer:
                 draw_x = seg.x + seg.width - tw - 1
             else:  # CENTER
                 draw_x = seg.x + (seg.width - tw) // 2
+                # Fix for Mono Regular font - it renders 1px too far left
+                if seg.font.lower() in ('digital', 'digital12'):
+                    draw_x += 1
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 
