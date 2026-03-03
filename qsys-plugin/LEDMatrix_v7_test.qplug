@@ -1,10 +1,4 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 7.1.0 - Added tabbed UI (Connection, Segments, Layout, Global, Curtain)
--- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
--- Version 7.0.4 - Curtain group field, enable button works immediately, removed apply button
--- Version 7.0.3 - Fixed dynamic curtain group tracking (minimal changes to v7.0.1)
--- Version 7.0.1 - Automatic curtain activation on group assignment
--- Version 7.0.0 - Added Curtain Mode support (3px vertical bars on edges)
 -- Version 6.7.0 - Added display enable/disable control, improved test mode restoration
 -- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
 -- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
@@ -29,8 +23,6 @@
 --   {"cmd":"rotation","value":0,"group":1}  -- 0, 90, 180, or 270 degrees
 --   {"cmd":"layout","preset":N,"group":1}
 --   {"cmd":"group","value":3}   -- Assign panel to group 3
---   {"cmd":"curtain","group":1,"state":true}  -- Toggle curtain visibility
---   {"cmd":"curtain","group":1,"enabled":true,"color":"FF0000"}  -- Configure curtain
 --
 -- ROTATION (v6.0+):
 --   Supports 0°, 90°, 180°, and 270° rotation of the entire display.
@@ -50,19 +42,6 @@
 --     Group 3 = Orange   Group 7 = Cyan
 --     Group 4 = Red      Group 8 = Green
 --
--- CURTAIN MODE (v7.0):
---   Creates two 3-pixel wide vertical bars on the left (0-2) and right (61-63) edges.
---   Each group (1-8) has independent curtain configuration.
---   Use "Curtain Config" to enable and set color for a group.
---   Curtain automatically shows/hides when you assign the panel to that group.
---   
---   Workflow:
---     1. Configure curtain: {"cmd":"curtain","group":4,"enabled":true,"color":"FF0000"}
---     2. Assign to group: {"cmd":"group","value":4}  <- Curtain auto-shows
---     3. Switch group: {"cmd":"group","value":1}     <- Curtain auto-hides
---   
---   Manual override: Use "Curtain Show/Hide" toggle to force visibility
---
 -- LAYOUT PRESETS:
 --   1  = Fullscreen
 --   2  = Top / Bottom halves
@@ -74,17 +53,13 @@
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.1.0",
-    Id = "dhpke.olimex.led.matrix.7.1.0",
-    Description = "RPi 64x32 LED Matrix - Tabbed UI with 5 pages",
+    Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
+    Version = "6.7.0",
+    Id = "dhpke.olimex.led.matrix.6.7.0",
+    Description = "RPi 64x32 LED Matrix - Display enable/disable + test mode fixes",
     ShowDebug = true,
     Author = "DHPKE"
 }
-
-function GetPages()
-    return {"Connection", "Segments", "Layout", "Global", "Curtain"}
-end
 
 function GetProperties()
     return {
@@ -142,13 +117,6 @@ function GetControls(props)
     table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="display_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
-    
-    -- Curtain Mode (v7.0)
-    table.insert(controls, { Name="curtain_group", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="curtain_color", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="curtain_apply", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
-    table.insert(controls, { Name="curtain_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
-    
     table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="test_mode", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -159,9 +127,6 @@ end
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
-    
-    -- Read current page from props
-    local currentPage = props["page_index"].Value
 
     local W  = 600
     local CH = 24
@@ -202,280 +167,254 @@ function GetControlLayout(props)
         })
     end
 
-    -- ══════════════════════════════════════════════════════════════════
-    -- PAGE 0: CONNECTION
-    -- ══════════════════════════════════════════════════════════════════
-    if currentPage == 0 then
-        local y = 10
-        GBox(0, y, W, 80, "Connection")
-        Lbl("IP Address",    6,   y+10, 124)
-        Lbl("Port",        138,   y+10,  62)
-        Lbl("Status",      278,   y+10,  62)
-        Lbl("Last Command",348,   y+10, W-354)
-        layout["ip_address"]        = { PrettyName="Conn~IP",       Style="Text",      Position={6,   y+26}, Size={124,   CH} }
-        layout["udp_port"]          = { PrettyName="Conn~Port",     Style="Text",      Position={138, y+26}, Size={62,    CH} }
-        layout["reconnect"]         = { PrettyName="Conn~Reconnect", Style="Button",   ButtonStyle="Trigger", Legend="Reconnect", Color=C_BTN_B, Position={208, y+26}, Size={62, BH} }
-        layout["connection_status"] = { PrettyName="Conn~Status",   Style="Indicator", Position={278, y+26}, Size={62,    CH} }
-        layout["last_command"]      = { PrettyName="Conn~LastCmd",  Style="Text",      Position={348, y+26}, Size={W-354, CH} }
+    -- ── Title bar ──────────────────────────────────────────────────
+    table.insert(graphics, {
+        Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5,
+        Position={0,0}, Size={W,36}
+    })
+    table.insert(graphics, {
+        Type="Text", Text="LED Matrix Controller  v6.3.0",
+        Font="Roboto", FontSize=14, FontStyle="Bold",
+        HTextAlign="Center", Color={255,255,255},
+        Position={0,9}, Size={W,20}
+    })
+
+    -- ── Connection ─────────────────────────────────────────────────
+    local y = 42
+    GBox(0, y, W, 54, "Connection")
+    Lbl("IP Address",    6,   y+5, 124)
+    Lbl("Port",        138,   y+5,  62)
+    Lbl("Status",      278,   y+5,  62)
+    Lbl("Last Command",348,   y+5, W-354)
+    layout["ip_address"]        = { PrettyName="Conn~IP",       Style="Text",      Position={6,   y+18}, Size={124,   CH} }
+    layout["udp_port"]          = { PrettyName="Conn~Port",     Style="Text",      Position={138, y+18}, Size={62,    CH} }
+    layout["reconnect"]         = { PrettyName="Conn~Reconnect", Style="Button",   ButtonStyle="Trigger", Legend="Reconnect", Color=C_BTN_B, Position={208, y+18}, Size={62, BH} }
+    layout["connection_status"] = { PrettyName="Conn~Status",   Style="Indicator", Position={278, y+18}, Size={62,    CH} }
+    layout["last_command"]      = { PrettyName="Conn~LastCmd",  Style="Text",      Position={348, y+18}, Size={W-354, CH} }
+
+    -- ── Group Selection ─────────────────────────────────────────────
+    y = y + 60
+    GBox(0, y, W, 72, "Group Routing")
+    Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+5, W-12)
     
-    -- ══════════════════════════════════════════════════════════════════
-    -- PAGE 1: SEGMENTS
-    -- ══════════════════════════════════════════════════════════════════
-    elseif currentPage == 1 then
-        local y = 10
-        local SEG_H = 145
-
-        local comboCols = {
-            {"Text Color", "text_color", "TxtColor", 110},
-            {"BG Color",   "bg_color",   "BgColor",  110},
-            {"Font",       "font",       "Font",      82},
-            {"Size",       "size",       "Size",      66},
-            {"Align",      "align",      "Align",     76},
-            {"Effect",     "effect",     "Effect",   114},
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap
+    local btnW = 56
+    local btnGap = 6
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
+    for grp = 0, 8 do
+        local bx = 6 + grp * (btnW + btnGap)
+        layout[string.format("group%d_select", grp)] = {
+            PrettyName="Group~"..groupLabels[grp+1],
+            Style="Button", ButtonStyle="Toggle",
+            Legend=groupLabels[grp+1],
+            Color=C_GRP_COLORS[grp],
+            Position={bx, y+22}, Size={btnW, 36}
         }
-
-        for seg = 0, 3 do
-            local n   = seg + 1
-            local sn  = "seg"..n.."_"
-            local grp = "Seg"..n
-            local sy  = y + seg * (SEG_H + 4)
-
-            GBox(0, sy, W, SEG_H, grp)
-
-            local r1 = sy + 20
-            layout[sn.."active"] = { PrettyName=grp.."~Active", Style="Led",
-                Position={6, r1+5}, Size={14, 14} }
-            Lbl("Text", 26, r1-12, W-330)
-            layout[sn.."text"]   = { PrettyName=grp.."~Text",   Style="Text",
-                Position={26, r1}, Size={W-332, CH} }
-            layout[sn.."send"]   = { PrettyName=grp.."~Send",   Style="Button",
-                ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
-                Position={W-300, r1}, Size={94, BH} }
-            layout[sn.."invert"] = { PrettyName=grp.."~Invert", Style="Button",
-                ButtonStyle="Trigger", Legend="Invert",  Color=C_BTN_B,
-                Position={W-200, r1}, Size={94, BH} }
-            layout[sn.."clear"]  = { PrettyName=grp.."~Clear",  Style="Button",
-                ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R,
-                Position={W-100, r1}, Size={94, BH} }
-
-            local r2 = sy + 70
-            local cx = 6
-            for _, col in ipairs(comboCols) do
-                Lbl(col[1], cx, r2-20, col[4])
-                layout[sn..col[2]] = { PrettyName=grp.."~"..col[3], Style="ComboBox",
-                    IsReadOnly=false,
-                    Position={cx, r2}, Size={col[4], CH} }
-                cx = cx + col[4] + 6
-            end
-
-            local r3 = sy + 107
-            layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
-                ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
-                Position={6, r3}, Size={80, BH} }
-            Lbl("Color", 92, r3-15, 50)
-            layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
-                IsReadOnly=false,
-                Position={92, r3}, Size={110, CH} }
-            layout[sn.."frame_link"] = { PrettyName=grp.."~LinkColor", Style="Button",
-                ButtonStyle="Toggle", Legend="→", Color={80,120,180}, OffColor={60,60,60}, UnlinkOffColor=true,
-                Position={208, r3}, Size={32, BH}, FontSize=18 }
-        end
-
-    -- ══════════════════════════════════════════════════════════════════
-    -- PAGE 2: LAYOUT
-    -- ══════════════════════════════════════════════════════════════════
-    elseif currentPage == 2 then
-        local y = 10
-        
-        -- Group Selection
-        GBox(0, y, W, 72, "Group Routing")
-        Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+5, W-12)
-        
-        -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap
-        local btnW = 56
-        local btnGap = 6
-        local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
-        for grp = 0, 8 do
-            local bx = 6 + grp * (btnW + btnGap)
-            layout[string.format("group%d_select", grp)] = {
-                PrettyName="Group~"..groupLabels[grp+1],
-                Style="Button", ButtonStyle="Toggle",
-                Legend=groupLabels[grp+1],
-                Color=C_GRP_COLORS[grp],
-                Position={bx, y+22}, Size={btnW, 36}
-            }
-        end
-        layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+62}, Size={0, 0} }
-        
-        -- Display Layout
-        y = y + 78
-        GBox(0, y, W, 148, "Display Layout")
-        
-        local TW  = 62
-        local TH  = 26
-        local GAP = 6
-        local TX  = 6
-
-        local function TRect(col, x, gy, w, h)
-            table.insert(graphics, {
-                Type="GroupBox", Text="", Fill=col,
-                StrokeWidth=0, CornerRadius=0,
-                Position={x, gy}, Size={w, h}
-            })
-        end
-
-        -- Thumbnails for presets
-        local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
-        for i = 0, 6 do
-            local tx = TX + i*(TW+GAP)
-            local ty = y + 14
-            table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
-                StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
-            table.insert(graphics, {Type="Text", Text=thumbLabels[i+1],
-                Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
-                Position={tx, ty+TH+2}, Size={TW, 10}})
-        end
-        
-        local thumbLabels2 = {"11 Seg1","12 Seg2","13 Seg3","14 Seg4"}
-        for i = 0, 3 do
-            local tx = TX + i*(TW+GAP)
-            local ty = y + 56
-            table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
-                StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
-            table.insert(graphics, {Type="Text", Text=thumbLabels2[i+1],
-                Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
-                Position={tx, ty+TH+2}, Size={TW, 10}})
-        end
-
-        -- Thumbnail fills
-        local cA = {70, 160,  70}
-        local cB = {70,  80, 160}
-        local cC = {160, 70,  70}
-        local cD = {160,160,  40}
-
-        local HW = 31
-        local HH = 13
-        local T1 = 20
-        local T2 = 20
-        local T3 = 22
-
-        do local tx=TX+0*(TW+GAP); local ty=y+14
-            TRect(cA, tx, ty, TW, TH)
-        end
-        do local tx=TX+1*(TW+GAP); local ty=y+14
-            TRect(cA, tx,    ty,    TW, HH)
-            TRect(cB, tx,    ty+HH, TW, HH)
-        end
-        do local tx=TX+2*(TW+GAP); local ty=y+14
-            TRect(cA, tx,    ty, HW, TH)
-            TRect(cB, tx+HW, ty, HW, TH)
-        end
-        do local tx=TX+3*(TW+GAP); local ty=y+14
-            TRect(cA, tx,    ty,    HW, TH)
-            TRect(cB, tx+HW, ty,    HW, HH)
-            TRect(cC, tx+HW, ty+HH, HW, HH)
-        end
-        do local tx=TX+4*(TW+GAP); local ty=y+14
-            TRect(cA, tx,    ty,    HW, HH)
-            TRect(cB, tx,    ty+HH, HW, HH)
-            TRect(cC, tx+HW, ty,    HW, TH)
-        end
-        do local tx=TX+5*(TW+GAP); local ty=y+14
-            TRect(cA, tx,       ty, T1, TH)
-            TRect(cB, tx+T1,    ty, T2, TH)
-            TRect(cC, tx+T1+T2, ty, T3, TH)
-        end
-        do local tx=TX+6*(TW+GAP); local ty=y+14
-            TRect(cA, tx,    ty,    HW, HH)
-            TRect(cB, tx+HW, ty,    HW, HH)
-            TRect(cC, tx,    ty+HH, HW, HH)
-            TRect(cD, tx+HW, ty+HH, HW, HH)
-        end
-        
-        do local tx=TX+0*(TW+GAP); local ty=y+56
-            TRect(cA, tx, ty, TW, TH)
-        end
-        do local tx=TX+1*(TW+GAP); local ty=y+56
-            TRect(cB, tx, ty, TW, TH)
-        end
-        do local tx=TX+2*(TW+GAP); local ty=y+56
-            TRect(cC, tx, ty, TW, TH)
-        end
-        do local tx=TX+3*(TW+GAP); local ty=y+56
-            TRect(cD, tx, ty, TW, TH)
-        end
-        
-        Lbl("Layout Preset", TX, y+96, 210)
-        layout["layout_preset"] = {
-            PrettyName="Layout~Preset",
-            Style="ComboBox", IsReadOnly=false,
-            Position={TX, y+110}, Size={220, CH}
-        }
-        layout["apply_layout"] = {
-            PrettyName="Layout~Apply",
-            Style="Button", ButtonStyle="Trigger",
-            Legend="Apply Layout", Color=C_BTN_O,
-            Position={234, y+110}, Size={160, CH}
-        }
-
-    -- ══════════════════════════════════════════════════════════════════
-    -- PAGE 3: GLOBAL
-    -- ══════════════════════════════════════════════════════════════════
-    elseif currentPage == 3 then
-        local y = 10
-        GBox(0, y, W, 200, "Global Controls")
-        
-        Lbl("Brightness (0-255)", 6, y+16, 120)
-        layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
-            Position={6, y+30}, Size={100, 36} }
-        
-        Lbl("Rotation (°)", 112, y+16, 100)
-        layout["rotation"] = { PrettyName="Global~Rotation", Style="ComboBox",
-            Position={112, y+30}, Size={100, 36} }
-        layout["apply_rotation"] = { PrettyName="Global~ApplyRot", Style="Button",
-            ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
-            Position={218, y+30}, Size={120, 36} }
-        
-        layout["display_enable"] = { PrettyName="Global~Display", Style="Button",
-            ButtonStyle="Toggle", Legend="Display", Color=C_BTN_G,
-            Position={344, y+30}, Size={80, 36} }
-        
-        layout["test_mode"] = { PrettyName="Global~TestMode", Style="Button",
-            ButtonStyle="Toggle", Legend="Test Mode", Color={255, 193, 7},
-            Position={430, y+30}, Size={80, 36} }
-        
-        layout["reboot_panel"] = { PrettyName="Global~Reboot", Style="Button",
-            ButtonStyle="Trigger", Legend="Reboot", Color={200, 80, 80},
-            Position={516, y+30}, Size={78, 36} }
-        
-        layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
-            ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
-            Position={6, y+80}, Size={100, 36} }
-
-    -- ══════════════════════════════════════════════════════════════════
-    -- PAGE 4: CURTAIN
-    -- ══════════════════════════════════════════════════════════════════
-    elseif currentPage == 4 then
-        local y = 10
-        GBox(0, y, W, 120, "Curtain Mode")
-        
-        Lbl("Group (1-8)", 6, y+16, 80)
-        layout["curtain_group"] = { PrettyName="Curtain~Group", Style="Text",
-            Position={6, y+30}, Size={80, 36} }
-        
-        Lbl("Color", 92, y+16, 120)
-        layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox",
-            IsReadOnly=false,
-            Position={92, y+30}, Size={120, 36} }
-        
-        layout["curtain_apply"] = { PrettyName="Curtain~Apply", Style="Button",
-            ButtonStyle="Trigger", Legend="Apply Config", Color=C_BTN_O,
-            Position={218, y+30}, Size={100, 36} }
-        
-        layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
-            ButtonStyle="Toggle", Legend="Show/Hide", Color=C_BTN_G,
-            Position={324, y+30}, Size={100, 36} }
     end
+    layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+62}, Size={0, 0} }
+
+    -- ── Display Layout ──────────────────────────────────────────────
+    y = y + 78
+    GBox(0, y, W, 148, "Display Layout")
+    
+    local TW  = 62
+    local TH  = 26
+    local GAP = 6
+    local TX  = 6
+
+    local function TRect(col, x, gy, w, h)
+        table.insert(graphics, {
+            Type="GroupBox", Text="", Fill=col,
+            StrokeWidth=0, CornerRadius=0,
+            Position={x, gy}, Size={w, h}
+        })
+    end
+
+    -- Thumbnails for presets
+    local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
+    for i = 0, 6 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 14
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        table.insert(graphics, {Type="Text", Text=thumbLabels[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+    
+    local thumbLabels2 = {"11 Seg1","12 Seg2","13 Seg3","14 Seg4"}
+    for i = 0, 3 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 56
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        table.insert(graphics, {Type="Text", Text=thumbLabels2[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+
+    -- Thumbnail fills
+    local cA = {70, 160,  70}
+    local cB = {70,  80, 160}
+    local cC = {160, 70,  70}
+    local cD = {160,160,  40}
+
+    local HW = 31
+    local HH = 13
+    local T1 = 20
+    local T2 = 20
+    local T3 = 22
+
+    do local tx=TX+0*(TW+GAP); local ty=y+14
+        TRect(cA, tx, ty, TW, TH)
+    end
+    do local tx=TX+1*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    TW, HH)
+        TRect(cB, tx,    ty+HH, TW, HH)
+    end
+    do local tx=TX+2*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty, HW, TH)
+        TRect(cB, tx+HW, ty, HW, TH)
+    end
+    do local tx=TX+3*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, TH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx+HW, ty+HH, HW, HH)
+    end
+    do local tx=TX+4*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx,    ty+HH, HW, HH)
+        TRect(cC, tx+HW, ty,    HW, TH)
+    end
+    do local tx=TX+5*(TW+GAP); local ty=y+14
+        TRect(cA, tx,       ty, T1, TH)
+        TRect(cB, tx+T1,    ty, T2, TH)
+        TRect(cC, tx+T1+T2, ty, T3, TH)
+    end
+    do local tx=TX+6*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx,    ty+HH, HW, HH)
+        TRect(cD, tx+HW, ty+HH, HW, HH)
+    end
+    
+    do local tx=TX+0*(TW+GAP); local ty=y+56
+        TRect(cA, tx, ty, TW, TH)
+    end
+    do local tx=TX+1*(TW+GAP); local ty=y+56
+        TRect(cB, tx, ty, TW, TH)
+    end
+    do local tx=TX+2*(TW+GAP); local ty=y+56
+        TRect(cC, tx, ty, TW, TH)
+    end
+    do local tx=TX+3*(TW+GAP); local ty=y+56
+        TRect(cD, tx, ty, TW, TH)
+    end
+    
+    Lbl("Layout Preset", TX, y+96, 210)
+    layout["layout_preset"] = {
+        PrettyName="Layout~Preset",
+        Style="ComboBox", IsReadOnly=false,
+        Position={TX, y+110}, Size={220, CH}
+    }
+    layout["apply_layout"] = {
+        PrettyName="Layout~Apply",
+        Style="Button", ButtonStyle="Trigger",
+        Legend="Apply Layout", Color=C_BTN_O,
+        Position={234, y+110}, Size={160, CH}
+    }
+
+    -- ── Segment rows ────────────────────────────────────────────────
+    y = y + 166
+    local SEG_H = 145
+
+    local comboCols = {
+        {"Text Color", "text_color", "TxtColor", 110},
+        {"BG Color",   "bg_color",   "BgColor",  110},
+        {"Font",       "font",       "Font",      82},
+        {"Size",       "size",       "Size",      66},
+        {"Align",      "align",      "Align",     76},
+        {"Effect",     "effect",     "Effect",   114},
+    }
+
+    for seg = 0, 3 do
+        local n   = seg + 1
+        local sn  = "seg"..n.."_"
+        local grp = "Seg"..n
+        local sy  = y + seg * (SEG_H + 4)
+
+        GBox(0, sy, W, SEG_H, grp)
+
+        local r1 = sy + 20
+        layout[sn.."active"] = { PrettyName=grp.."~Active", Style="Led",
+            Position={6, r1+5}, Size={14, 14} }
+        Lbl("Text", 26, r1-12, W-330)
+        layout[sn.."text"]   = { PrettyName=grp.."~Text",   Style="Text",
+            Position={26, r1}, Size={W-332, CH} }
+        layout[sn.."send"]   = { PrettyName=grp.."~Send",   Style="Button",
+            ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
+            Position={W-300, r1}, Size={94, BH} }
+        layout[sn.."invert"] = { PrettyName=grp.."~Invert", Style="Button",
+            ButtonStyle="Trigger", Legend="Invert",  Color=C_BTN_B,
+            Position={W-200, r1}, Size={94, BH} }
+        layout[sn.."clear"]  = { PrettyName=grp.."~Clear",  Style="Button",
+            ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R,
+            Position={W-100, r1}, Size={94, BH} }
+
+        local r2 = sy + 70
+        local cx = 6
+        for _, col in ipairs(comboCols) do
+            Lbl(col[1], cx, r2-20, col[4])
+            layout[sn..col[2]] = { PrettyName=grp.."~"..col[3], Style="ComboBox",
+                IsReadOnly=false,
+                Position={cx, r2}, Size={col[4], CH} }
+            cx = cx + col[4] + 6
+        end
+
+        local r3 = sy + 107
+        layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
+            ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
+            Position={6, r3}, Size={80, BH} }
+        Lbl("Color", 92, r3-15, 50)
+        layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
+            IsReadOnly=false,
+            Position={92, r3}, Size={110, CH} }
+        layout[sn.."frame_link"] = { PrettyName=grp.."~LinkColor", Style="Button",
+            ButtonStyle="Toggle", Legend="→", Color={80,120,180}, OffColor={60,60,60}, UnlinkOffColor=true,
+            Position={208, r3}, Size={32, BH}, FontSize=18 }
+    end
+
+    -- ── Global Controls ─────────────────────────────────────────────
+    y = y + 4 * (SEG_H + 4) + 4
+    GBox(0, y, W, 102, "Global Controls")
+    
+    Lbl("Brightness (0-255)", 6, y+16, 120)
+    layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
+        Position={6, y+30}, Size={100, 36} }
+    
+    Lbl("Rotation (°)", 112, y+16, 100)
+    layout["rotation"] = { PrettyName="Global~Rotation", Style="ComboBox",
+        Position={112, y+30}, Size={100, 36} }
+    layout["apply_rotation"] = { PrettyName="Global~ApplyRot", Style="Button",
+        ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
+        Position={218, y+30}, Size={120, 36} }
+    
+    layout["display_enable"] = { PrettyName="Global~Display", Style="Button",
+        ButtonStyle="Toggle", Legend="Display", Color=C_BTN_G,
+        Position={344, y+30}, Size={80, 36} }
+    
+    layout["test_mode"] = { PrettyName="Global~TestMode", Style="Button",
+        ButtonStyle="Toggle", Legend="Test Mode", Color={255, 193, 7},
+        Position={430, y+30}, Size={80, 36} }
+    
+    layout["reboot_panel"] = { PrettyName="Global~Reboot", Style="Button",
+        ButtonStyle="Trigger", Legend="Reboot", Color={200, 80, 80},
+        Position={516, y+30}, Size={78, 36} }
+    
+    layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
+        ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
+        Position={112, y+72}, Size={100, 36} }
 
     return layout, graphics
 end
@@ -530,9 +469,6 @@ if Controls then
     local commandCounter = 0
     local lastError = nil
     local errorCount = 0
-    
-    -- Curtain state tracking (v7.0.3)
-    local curtainEnabledGroups = {}  -- Track which groups have curtain enabled
     
     local function ReopenSocket()
         print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
@@ -679,20 +615,6 @@ if Controls then
         local effectChoices = {"none","scroll","blink","fade"}
         local defaultColors = {"Red","Green","Blue","White"}  -- Seg1=Red, Seg2=Green, Seg3=Blue, Seg4=White
 
-        -- Curtain initialization
-        if Controls.curtain_group and Controls.curtain_group.String == "" then
-            Controls.curtain_group.String = "1"
-        end
-        if Controls.curtain_color then
-            Controls.curtain_color.Choices = colorChoices
-            if Controls.curtain_color.String == "" then
-                Controls.curtain_color.String = "White"
-            end
-        end
-        if Controls.curtain_enable and Controls.curtain_enable.Boolean == nil then
-            Controls.curtain_enable.Boolean = false
-        end
-
         for seg = 0, 3 do
             local s = "seg" .. (seg+1) .. "_"
             if Controls[s.."text_color"] then Controls[s.."text_color"].Choices = colorChoices end
@@ -758,11 +680,6 @@ if Controls then
                     local groupName = grp == 0 and "All" or tostring(grp)
                     Controls.active_group.String = groupName
                     SendCommand(buildJson({cmd="group", value=grp}))
-                    
-                    -- Dynamic curtain check (v7.0.3)
-                    if grp > 0 and curtainEnabledGroups[grp] then
-                        print(string.format("[CURTAIN] Group %d has curtain enabled (auto-showing via Pi)", grp))
-                    end
                 end, 0.05)
             else
                 ctl.Boolean = true
@@ -1003,86 +920,6 @@ if Controls then
             print(string.format("⚠ [DISPLAY] Send failed: %s", result))
             Controls.last_command.String = "Display toggle failed"
         end
-    end
-
-    -- Curtain Mode Event Handlers (v7.0.5)
-    -- Apply button: Configure curtain for a group (color + enable)
-    Controls.curtain_apply.EventHandler = function()
-        print("[CURTAIN] Apply button clicked")
-        
-        if not socket then
-            print("[CURTAIN] ERROR: Socket not ready yet")
-            Controls.last_command.String = "Error: Socket not ready"
-            return
-        end
-        
-        local curtainGroup = tonumber(Controls.curtain_group.String) or 1
-        local colorName = Controls.curtain_color.String or "White"
-        local color = ColorNames[colorName] or colorName
-        color = color:gsub("#", "")
-        
-        -- Validate group
-        if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
-            Controls.last_command.String = "Error: Group must be 1-8"
-            return
-        end
-        
-        print(string.format("[CURTAIN] Configuring: group=%d, color=%s", curtainGroup, color))
-        
-        -- Track that this group has curtain configured
-        curtainEnabledGroups[curtainGroup] = true
-        
-        -- Send config command (always enabled=true when applying)
-        local payload = {
-            cmd = "curtain",
-            group = curtainGroup,
-            enabled = true,
-            color = color
-        }
-        
-        local json = buildJson(payload)
-        print(string.format("[CURTAIN] Sending: %s", json))
-        SendCommand(json)
-        
-        Controls.last_command.String = string.format("Curtain configured for group %d", curtainGroup)
-    end
-    
-    -- Enable button: Show/Hide curtain for the configured group
-    Controls.curtain_enable.EventHandler = function(ctl)
-        print(string.format("[CURTAIN] Enable toggle: %s", tostring(ctl.Boolean)))
-        
-        if not socket then
-            print("[CURTAIN] ERROR: Socket not ready yet")
-            Controls.last_command.String = "Error: Socket not ready"
-            return
-        end
-        
-        local visible = ctl.Boolean
-        local curtainGroup = tonumber(Controls.curtain_group.String) or 1
-        
-        -- Validate group
-        if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
-            Controls.last_command.String = "Error: Group must be 1-8"
-            return
-        end
-        
-        print(string.format("[CURTAIN] Setting visibility: group=%d, visible=%s", curtainGroup, tostring(visible)))
-        
-        -- Send visibility command
-        local payload = {
-            cmd = "curtain",
-            group = curtainGroup,
-            state = visible
-        }
-        
-        local json = buildJson(payload)
-        print(string.format("[CURTAIN] Sending: %s", json))
-        SendCommand(json)
-        
-        Controls.last_command.String = string.format("Curtain %s (Group %d)", 
-            visible and "shown" or "hidden", curtainGroup)
     end
 
     -- Test Mode Toggle Handler using Q-SYS HttpClient.Upload()
