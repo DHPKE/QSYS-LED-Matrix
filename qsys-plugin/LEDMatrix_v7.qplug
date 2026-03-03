@@ -1,5 +1,4 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
 -- Version 7.0.4 - Curtain group field, enable button works immediately, removed apply button
 -- Version 7.0.3 - Fixed dynamic curtain group tracking (minimal changes to v7.0.1)
 -- Version 7.0.1 - Automatic curtain activation on group assignment
@@ -74,9 +73,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.0.5",
-    Id = "dhpke.olimex.led.matrix.7.0.5",
-    Description = "RPi 64x32 LED Matrix - Curtain with proper show/hide",
+    Version = "7.0.4",
+    Id = "dhpke.olimex.led.matrix.7.0.4",
+    Description = "RPi 64x32 LED Matrix - Curtain Mode with group field",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -140,9 +139,9 @@ function GetControls(props)
     
     -- Curtain Mode (v7.0)
     table.insert(controls, { Name="curtain_group", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="curtain_color", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="curtain_apply", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="curtain_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_color", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_show", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     
     table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="test_mode", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
@@ -446,16 +445,16 @@ function GetControlLayout(props)
     layout["curtain_group"] = { PrettyName="Curtain~Group", Style="Text",
         Position={6, y+102}, Size={60, 36} }
     
-    Lbl("Color", 72, y+88, 50)
+    layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
+        ButtonStyle="Toggle", Legend="Enable", Color={100,100,200},
+        Position={72, y+102}, Size={80, 36} }
+    
+    Lbl("Color", 158, y+88, 50)
     layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox",
         IsReadOnly=false,
-        Position={72, y+102}, Size={110, 36} }
+        Position={158, y+102}, Size={110, 36} }
     
-    layout["curtain_apply"] = { PrettyName="Curtain~Apply", Style="Button",
-        ButtonStyle="Trigger", Legend="Apply", Color=C_BTN_O,
-        Position={188, y+102}, Size={80, 36} }
-    
-    layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
+    layout["curtain_show"] = { PrettyName="Curtain~Show", Style="Button",
         ButtonStyle="Toggle", Legend="Show", Color=C_BTN_G,
         Position={274, y+102}, Size={80, 36} }
     
@@ -677,6 +676,9 @@ if Controls then
         end
         if Controls.curtain_enable and Controls.curtain_enable.Boolean == nil then
             Controls.curtain_enable.Boolean = false
+        end
+        if Controls.curtain_show and Controls.curtain_show.Boolean == nil then
+            Controls.curtain_show.Boolean = false
         end
 
         for seg = 0, 3 do
@@ -991,17 +993,14 @@ if Controls then
         end
     end
 
-    -- Curtain Mode Event Handlers (v7.0.5)
-    -- Apply button: Configure curtain for a group (color + enable)
-    Controls.curtain_apply.EventHandler = function()
-        print("[CURTAIN] Apply button clicked")
-        
+    -- Curtain Mode Event Handlers (v7.0)
+    Controls.curtain_enable.EventHandler = function(ctl)
         if not socket then
-            print("[CURTAIN] ERROR: Socket not ready yet")
-            Controls.last_command.String = "Error: Socket not ready"
+            print("[CURTAIN] Socket not ready yet")
             return
         end
         
+        local enabled = ctl.Boolean
         local curtainGroup = tonumber(Controls.curtain_group.String) or 1
         local colorName = Controls.curtain_color.String or "White"
         local color = ColorNames[colorName] or colorName
@@ -1009,66 +1008,58 @@ if Controls then
         
         -- Validate group
         if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
+            print(string.format("[CURTAIN] Invalid group %d, must be 1-8", curtainGroup))
             Controls.last_command.String = "Error: Group must be 1-8"
+            ctl.Boolean = not enabled  -- Revert toggle
             return
         end
         
-        print(string.format("[CURTAIN] Configuring: group=%d, color=%s", curtainGroup, color))
+        print(string.format("[CURTAIN] Config: enabled=%s, color=%s, group=%d", 
+            tostring(enabled), colorName, curtainGroup))
+        Controls.last_command.String = "Configuring curtain..."
         
-        -- Track that this group has curtain configured
-        curtainEnabledGroups[curtainGroup] = true
+        -- Track curtain state in plugin
+        if enabled then
+            curtainEnabledGroups[curtainGroup] = true
+            print(string.format("[CURTAIN] Enabled for group %d", curtainGroup))
+        else
+            curtainEnabledGroups[curtainGroup] = nil
+            print(string.format("[CURTAIN] Disabled for group %d", curtainGroup))
+        end
         
-        -- Send config command (always enabled=true when applying)
         local payload = {
             cmd = "curtain",
             group = curtainGroup,
-            enabled = true,
+            enabled = enabled,
             color = color
         }
         
-        local json = buildJson(payload)
-        print(string.format("[CURTAIN] Sending: %s", json))
-        SendCommand(json)
-        
-        Controls.last_command.String = string.format("Curtain configured for group %d", curtainGroup)
+        SendCommand(buildJson(payload))
+        Controls.last_command.String = string.format("Curtain %s for group %d", 
+            enabled and "enabled" or "disabled", curtainGroup)
     end
     
-    -- Enable button: Show/Hide curtain for the configured group
-    Controls.curtain_enable.EventHandler = function(ctl)
-        print(string.format("[CURTAIN] Enable toggle: %s", tostring(ctl.Boolean)))
-        
+    Controls.curtain_show.EventHandler = function(ctl)
         if not socket then
-            print("[CURTAIN] ERROR: Socket not ready yet")
-            Controls.last_command.String = "Error: Socket not ready"
+            print("[CURTAIN] Socket not ready yet")
             return
         end
         
-        local visible = ctl.Boolean
+        local state = ctl.Boolean
         local curtainGroup = tonumber(Controls.curtain_group.String) or 1
         
-        -- Validate group
-        if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
-            Controls.last_command.String = "Error: Group must be 1-8"
-            return
-        end
+        print(string.format("[CURTAIN] Toggle visibility: %s, group=%d", 
+            state and "SHOW" or "HIDE", curtainGroup))
         
-        print(string.format("[CURTAIN] Setting visibility: group=%d, visible=%s", curtainGroup, tostring(visible)))
-        
-        -- Send visibility command
         local payload = {
             cmd = "curtain",
             group = curtainGroup,
-            state = visible
+            state = state
         }
         
-        local json = buildJson(payload)
-        print(string.format("[CURTAIN] Sending: %s", json))
-        SendCommand(json)
-        
+        SendCommand(buildJson(payload))
         Controls.last_command.String = string.format("Curtain %s (Group %d)", 
-            visible and "shown" or "hidden", curtainGroup)
+            state and "shown" or "hidden", curtainGroup)
     end
 
     -- Test Mode Toggle Handler using Q-SYS HttpClient.Upload()
