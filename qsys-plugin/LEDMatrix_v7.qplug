@@ -456,7 +456,7 @@ function GetControlLayout(props)
         Position={188, y+102}, Size={80, 36} }
     
     layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
-        ButtonStyle="Toggle", Legend="Show", Color=C_BTN_G,
+        ButtonStyle="Toggle", Legend="Enable", Color=C_BTN_G,
         Position={274, y+102}, Size={80, 36} }
     
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
