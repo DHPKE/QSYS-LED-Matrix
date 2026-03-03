@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.12 - Apply button flushes ALL curtain groups (1-8), then sets only specified group
 -- Version 7.0.11 - Clear curtains from all groups on group switch, apply only to current
 -- Version 7.0.10 - Fixed num_segments scope with fallback default
 -- Version 7.0.9 - Dynamic segment count via property window (1-4 segments)
@@ -1057,7 +1058,7 @@ if Controls then
 
     -- Curtain Mode Event Handlers (v7.0.5)
     -- Apply button: Configure curtain for a group (color + enable)
-    -- ✅ FIXED v7.0.6: Apply button configures color but does NOT show curtain
+    -- ✅ FIXED v7.0.12: Apply flushes ALL groups, then sets only the specified group
     Controls.curtain_apply.EventHandler = function()
         print("[CURTAIN] Apply button clicked")
         
@@ -1079,28 +1080,49 @@ if Controls then
             return
         end
         
-        print(string.format("[CURTAIN] Configuring: group=%d, color=%s, enabled=false", curtainGroup, color))
+        print(string.format("[CURTAIN] Step 1: Flushing all curtain groups (1-8)"))
         
-        -- Track that this group has curtain configured
-        curtainEnabledGroups[curtainGroup] = true
-        curtainVisibleGroups[curtainGroup] = false  -- ✅ Start hidden
+        -- ✅ v7.0.12: Step 1 - Flush ALL curtain groups (1-8)
+        for g = 1, 8 do
+            curtainEnabledGroups[g] = nil  -- Clear config tracking
+            curtainVisibleGroups[g] = nil  -- Clear visibility tracking
+            
+            local payload = {
+                cmd = "curtain",
+                group = g,
+                enabled = false,
+                color = "000000"  -- Black = cleared
+            }
+            SendCommand(buildJson(payload))
+            print(string.format("[CURTAIN] Flushed group %d", g))
+        end
         
-        -- ✅ FIX: Send config with enabled=false (invisible by default)
-        local payload = {
-            cmd = "curtain",
-            group = curtainGroup,
-            enabled = false,  -- ✅ Changed from true to false
-            color = color
-        }
-        
-        local json = buildJson(payload)
-        print(string.format("[CURTAIN] Sending: %s", json))
-        SendCommand(json)
-        
-        -- ✅ FIX: Set toggle to OFF after applying
-        Controls.curtain_enable.Boolean = false
-        
-        Controls.last_command.String = string.format("Curtain configured for group %d (hidden)", curtainGroup)
+        -- Brief delay to ensure flush completes
+        Timer.CallAfter(function()
+            print(string.format("[CURTAIN] Step 2: Configuring group %d (color=%s, enabled=false)", curtainGroup, color))
+            
+            -- ✅ Step 2 - Configure ONLY the specified group
+            curtainEnabledGroups[curtainGroup] = true
+            curtainVisibleGroups[curtainGroup] = false  -- Start hidden
+            
+            -- Send config with enabled=false (invisible by default)
+            local payload = {
+                cmd = "curtain",
+                group = curtainGroup,
+                enabled = false,
+                color = color
+            }
+            
+            local json = buildJson(payload)
+            print(string.format("[CURTAIN] Sending: %s", json))
+            SendCommand(json)
+            
+            -- Update UI
+            Controls.curtain_enable.Boolean = false
+            Controls.last_command.String = string.format("Curtain configured (Group %d, hidden)", curtainGroup)
+            
+            print(string.format("✓ [CURTAIN] Group %d configured with color %s (hidden)", curtainGroup, color))
+        end, 0.2)  -- 200ms delay
     end
     
     -- ✅ FIXED v7.0.6: Enable toggle controls visibility using enabled parameter
