@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.9 - Dynamic segment count via property window (1-4 segments)
 -- Version 7.0.7 - Fixed Pi auto-show on group switch + per-group curtain state tracking
 -- Version 7.0.6 - Fixed curtain visibility control (only show when enabled=true)
 -- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
@@ -84,13 +85,24 @@ PluginInfo = {
 
 function GetProperties()
     return {
-        { Name = "IP Address", Type = "string",  Value = "192.168.1.100" },
-        { Name = "UDP Port",   Type = "integer", Min = 1, Max = 65535, Value = 21324 }
+        { Name = "IP Address",       Type = "string",  Value = "192.168.1.100" },
+        { Name = "UDP Port",         Type = "integer", Min = 1, Max = 65535, Value = 21324 },
+        { Name = "Number of Segments", Type = "integer", Min = 1, Max = 4, Value = 4 }
     }
 end
 
 function GetControls(props)
     local controls = {}
+    
+    -- Get number of segments from properties (default to 4 if not set)
+    local num_segments = 4
+    if props and props["Number of Segments"] then
+        if type(props["Number of Segments"]) == "table" then
+            num_segments = props["Number of Segments"].Value or 4
+        else
+            num_segments = props["Number of Segments"] or 4
+        end
+    end
 
     -- Connection
     table.insert(controls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
@@ -110,8 +122,8 @@ function GetControls(props)
     table.insert(controls, { Name="layout_preset", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_layout",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
-    -- Segment controls (seg1 .. seg4)
-    for seg = 0, 3 do
+    -- Segment controls (dynamic based on property)
+    for seg = 0, num_segments - 1 do
         local n = seg + 1
         table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=false, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_text_color", n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
@@ -155,6 +167,16 @@ end
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
+
+    -- Get number of segments from properties (default to 4 if not set)
+    local num_segments = 4
+    if props and props["Number of Segments"] then
+        if type(props["Number of Segments"]) == "table" then
+            num_segments = props["Number of Segments"].Value or 4
+        else
+            num_segments = props["Number of Segments"] or 4
+        end
+    end
 
     local W  = 600
     local CH = 24
@@ -366,7 +388,7 @@ function GetControlLayout(props)
         {"Effect",     "effect",     "Effect",   114},
     }
 
-    for seg = 0, 3 do
+    for seg = 0, num_segments - 1 do
         local n   = seg + 1
         local sn  = "seg"..n.."_"
         local grp = "Seg"..n
@@ -681,7 +703,7 @@ if Controls then
             Controls.curtain_enable.Boolean = false
         end
 
-        for seg = 0, 3 do
+        for seg = 0, num_segments - 1 do
             local s = "seg" .. (seg+1) .. "_"
             if Controls[s.."text_color"] then Controls[s.."text_color"].Choices = colorChoices end
             if Controls[s.."bg_color"] then Controls[s.."bg_color"].Choices   = bgChoices end
@@ -715,7 +737,7 @@ if Controls then
         end
 
         activeLayoutSegments = activeLayoutSegments or {[0]=true}
-        for seg = 0, 3 do
+        for seg = 0, num_segments - 1 do
             Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
         end
 
@@ -793,7 +815,7 @@ if Controls then
             activeLayoutSegments[seg] = true
         end
 
-        for seg = 0, 3 do
+        for seg = 0, num_segments - 1 do
             Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
         end
 
@@ -835,7 +857,7 @@ if Controls then
         if key then ApplyLayoutByKey(key) end
     end
 
-    for seg = 0, 3 do
+    for seg = 0, num_segments - 1 do
         local s = "seg" .. (seg+1) .. "_"
 
         Controls[s.."send"].EventHandler = function()
@@ -925,7 +947,7 @@ if Controls then
 
     Controls.clear_all.EventHandler = function()
         if SendCommand(buildJson({cmd="clear_all", group=activeGroup})) then
-            for seg = 0, 3 do
+            for seg = 0, num_segments - 1 do
                 Controls["seg"..(seg+1).."_active"].Boolean = false
             end
             activeLayoutSegments = {}
