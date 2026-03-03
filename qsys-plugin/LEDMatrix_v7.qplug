@@ -496,7 +496,7 @@ if Controls then
     local socket   = nil
     local ip_addr  = Properties["IP Address"].Value
     local udp_port = Properties["UDP Port"].Value
-    local num_segments = Properties["Number of Segments"].Value  -- Get from properties
+    local num_segments = (Properties["Number of Segments"] and Properties["Number of Segments"].Value) or 4  -- Default to 4 if not set
 
     local activeLayoutSegments = {}
     local debounceTimers = {}
