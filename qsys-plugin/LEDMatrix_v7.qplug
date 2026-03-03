@@ -1,6 +1,7 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.3 - Fixed dynamic curtain group tracking
+-- Version 7.0.2 - Treat curtains as segments with automatic remapping
 -- Version 7.0.1 - Automatic curtain activation on group assignment
--- Version 7.0.0 - Added Curtain Mode support (3px vertical bars on edges)
 -- Version 6.7.0 - Added display enable/disable control, improved test mode restoration
 -- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
 -- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
@@ -71,9 +72,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.0.1",
-    Id = "dhpke.olimex.led.matrix.7.0.1",
-    Description = "RPi 64x32 LED Matrix - Curtain Mode with automatic group activation",
+    Version = "7.0.3",
+    Id = "dhpke.olimex.led.matrix.7.0.3",
+    Description = "RPi 64x32 LED Matrix - Curtain Mode with dynamic group tracking",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -147,9 +148,14 @@ function GetControls(props)
     return controls
 end
 
+function GetPages(props)
+    return { "Connection", "Segments", "Global", "Curtain" }
+end
+
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
+    local currentPage = props["page_index"]
 
     local W  = 600
     local CH = 24
@@ -507,6 +513,9 @@ if Controls then
     local lastError = nil
     local errorCount = 0
     
+    -- Curtain state tracking
+    local curtainEnabledGroups = {}  -- Table storing which groups have curtain enabled
+    
     local function ReopenSocket()
         print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
         if socket then 
@@ -660,7 +669,7 @@ if Controls then
             end
         end
         if Controls.curtain_groups and Controls.curtain_groups.String == "" then
-            Controls.curtain_groups.String = "1,4,6"
+            Controls.curtain_groups.String = ""  -- Empty by default - user must configure
         end
 
         for seg = 0, 3 do
@@ -727,7 +736,20 @@ if Controls then
                     activeGroup = grp
                     local groupName = grp == 0 and "All" or tostring(grp)
                     Controls.active_group.String = groupName
+                    
+                    -- Send group command to Pi
                     SendCommand(buildJson({cmd="group", value=grp}))
+                    
+                    -- Check if curtain should auto-activate for this group
+                    if grp > 0 and curtainEnabledGroups[grp] then
+                        print(string.format("[CURTAIN] Auto-activating for group %d", grp))
+                        -- Curtain will auto-show via Pi firmware (udp_handler.py handles this)
+                    elseif grp == 0 then
+                        print("[CURTAIN] Broadcast mode - curtains hidden")
+                        -- Pi firmware will hide all curtains for group 0
+                    else
+                        print(string.format("[CURTAIN] Group %d has no curtain configured", grp))
+                    end
                 end, 0.05)
             else
                 ctl.Boolean = true
@@ -977,7 +999,7 @@ if Controls then
             return
         end
         
-        local groupsStr = Controls.curtain_groups.String or "1,4,6"
+        local groupsStr = Controls.curtain_groups.String or ""
         local colorName = Controls.curtain_color.String or "White"
         local color = ColorNames[colorName] or colorName  -- Map name to hex
         color = color:gsub("#", "")
@@ -997,13 +1019,18 @@ if Controls then
             return
         end
         
+        -- Clear previous curtain groups
+        curtainEnabledGroups = {}
+        
         print(string.format("[CURTAIN] Applying config: groups=%s, color=%s (%s)", 
             groupsStr, colorName, color))
         Controls.last_command.String = "Configuring curtain..."
         
-        -- Send config for each group
+        -- Send config for each group AND track in plugin state
         local sent = 0
         for _, grp in ipairs(groups) do
+            curtainEnabledGroups[grp] = true  -- Track in plugin state
+            
             local payload = {
                 cmd = "curtain",
                 group = grp,
@@ -1015,6 +1042,7 @@ if Controls then
             end
         end
         
+        print(string.format("[CURTAIN] Enabled groups: %s", table.concat(groups, ",")))
         Controls.last_command.String = string.format("Curtain config sent to %d group(s)", sent)
     end
 
