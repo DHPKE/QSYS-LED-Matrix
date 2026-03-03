@@ -82,7 +82,7 @@ PluginInfo = {
     Author = "DHPKE"
 }
 
-function GetPages()
+function GetPages(props)
     return {"Connection", "Segments", "Layout", "Global", "Curtain"}
 end
 
@@ -160,8 +160,15 @@ function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
     
-    -- Read current page from props
-    local currentPage = props["page_index"].Value
+    -- Read current page from props (handle both string and table format)
+    local currentPage = 0
+    if props and props["page_index"] then
+        if type(props["page_index"]) == "table" then
+            currentPage = props["page_index"].Value or 0
+        else
+            currentPage = props["page_index"] or 0
+        end
+    end
 
     local W  = 600
     local CH = 24
