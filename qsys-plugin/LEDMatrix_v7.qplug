@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.7 - Fixed Pi auto-show on group switch + per-group curtain state tracking
 -- Version 7.0.6 - Fixed curtain visibility control (only show when enabled=true)
 -- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
 -- Version 7.0.4 - Curtain group field, enable button works immediately, removed apply button
@@ -74,9 +75,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.0.6",
-    Id = "dhpke.olimex.led.matrix.7.0.6",
-    Description = "RPi 64x32 LED Matrix - Fixed curtain visibility",
+    Version = "7.0.7",
+    Id = "dhpke.olimex.led.matrix.7.0.7",
+    Description = "RPi 64x32 LED Matrix - Per-group curtain state + auto-show fix",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -517,8 +518,9 @@ if Controls then
     local lastError = nil
     local errorCount = 0
     
-    -- Curtain state tracking (v7.0.3)
-    local curtainEnabledGroups = {}  -- Track which groups have curtain enabled
+    -- Curtain state tracking (v7.0.6)
+    local curtainEnabledGroups = {}  -- Track which groups have curtain configured
+    local curtainVisibleGroups = {}  -- Track which groups have curtain visible (enabled=true)
     
     local function ReopenSocket()
         print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
@@ -745,9 +747,30 @@ if Controls then
                     Controls.active_group.String = groupName
                     SendCommand(buildJson({cmd="group", value=grp}))
                     
-                    -- Dynamic curtain check (v7.0.3)
+                    -- ✅ v7.0.6 FIX: Pi firmware auto-shows curtain on group switch
+                    -- Force curtain to match stored visibility state for this group
                     if grp > 0 and curtainEnabledGroups[grp] then
-                        print(string.format("[CURTAIN] Group %d has curtain enabled (auto-showing via Pi)", grp))
+                        local curtainVisible = curtainVisibleGroups[grp] or false
+                        print(string.format("[CURTAIN] Group %d switch: forcing curtain enabled=%s", grp, tostring(curtainVisible)))
+                        
+                        -- Update UI toggle to match stored state
+                        Controls.curtain_group.String = tostring(grp)
+                        Controls.curtain_enable.Boolean = curtainVisible
+                        
+                        -- Send curtain state after brief delay to override Pi auto-show
+                        Timer.CallAfter(function()
+                            local colorName = Controls.curtain_color.String or "White"
+                            local color = ColorNames[colorName] or colorName
+                            color = color:gsub("#", "")
+                            
+                            local payload = {
+                                cmd = "curtain",
+                                group = grp,
+                                enabled = curtainVisible,
+                                color = color
+                            }
+                            SendCommand(buildJson(payload))
+                        end, 0.15)
                     end
                 end, 0.05)
             else
@@ -1019,6 +1042,7 @@ if Controls then
         
         -- Track that this group has curtain configured
         curtainEnabledGroups[curtainGroup] = true
+        curtainVisibleGroups[curtainGroup] = false  -- ✅ Start hidden
         
         -- ✅ FIX: Send config with enabled=false (invisible by default)
         local payload = {
@@ -1062,6 +1086,9 @@ if Controls then
         end
         
         print(string.format("[CURTAIN] Setting visibility: group=%d, enabled=%s", curtainGroup, tostring(visible)))
+        
+        -- ✅ v7.0.6: Store visibility state for this group
+        curtainVisibleGroups[curtainGroup] = visible
         
         -- ✅ FIX: Send enabled (not state) with current color
         local payload = {
