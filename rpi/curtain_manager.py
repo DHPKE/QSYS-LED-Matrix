@@ -122,7 +122,8 @@ class CurtainManager:
     def render(self, image: Image.Image, group: int, rotation: int = 0) -> None:
         """
         Render curtain bars on the given image if enabled for this group.
-        Adapts to rotation (canvas dimensions change at 90°/270°).
+        Curtain bars are always vertical (left and right edges of the DISPLAY),
+        regardless of rotation.
         
         Args:
             image: PIL Image to render on
@@ -135,41 +136,26 @@ class CurtainManager:
         color = self.get_color(group)
         draw = ImageDraw.Draw(image)
         
-        # Get actual canvas dimensions (may be swapped for 90°/270° rotation)
+        # Get actual canvas dimensions
         img_width, img_height = image.size
         
-        # For 90° and 270°, canvas is portrait (32×64)
-        # For 0° and 180°, canvas is landscape (64×32)
-        if rotation in (90, 270):
-            # Portrait mode: canvas is 32×64
-            # Curtain bars should be horizontal (top and bottom edges)
-            # Top bar: y=0 to y=2 (3 pixels tall, full width)
-            draw.rectangle(
-                [(0, 0), (img_width - 1, CURTAIN_WIDTH - 1)],
-                fill=color
-            )
-            # Bottom bar: y=(height-3) to y=(height-1)
-            bottom_y = img_height - CURTAIN_WIDTH
-            draw.rectangle(
-                [(0, bottom_y), (img_width - 1, img_height - 1)],
-                fill=color
-            )
-        else:
-            # Landscape mode: canvas is 64×32
-            # Curtain bars should be vertical (left and right edges)
-            # Left bar: x=0 to x=2 (3 pixels wide, full height)
-            draw.rectangle(
-                [(0, 0), (CURTAIN_WIDTH - 1, img_height - 1)],
-                fill=color
-            )
-            # Right bar: x=(width-3) to x=(width-1)
-            right_x = img_width - CURTAIN_WIDTH
-            draw.rectangle(
-                [(right_x, 0), (img_width - 1, img_height - 1)],
-                fill=color
-            )
+        # Curtain bars are ALWAYS on left and right edges of the canvas
+        # (which represents the physical display edges regardless of rotation)
         
-        logger.debug(f"[Curtain] Rendered curtains for group {group} at {rotation}° with color {color}")
+        # Left bar: x=0 to x=2 (3 pixels wide, full height)
+        draw.rectangle(
+            [(0, 0), (CURTAIN_WIDTH - 1, img_height - 1)],
+            fill=color
+        )
+        
+        # Right bar: x=(width-3) to x=(width-1) (3 pixels wide, full height)
+        right_x = img_width - CURTAIN_WIDTH
+        draw.rectangle(
+            [(right_x, 0), (img_width - 1, img_height - 1)],
+            fill=color
+        )
+        
+        logger.debug(f"[Curtain] Rendered curtains for group {group} at {rotation}° (canvas {img_width}×{img_height}) with color {color}")
     
     def _load_state(self) -> None:
         """Load curtain state from persistent storage."""

@@ -2,6 +2,12 @@
 # install.sh — Install the LED Matrix controller on a Raspberry Pi Zero 2 W
 #              running Raspberry Pi OS (Bookworm / Bullseye)
 #
+# Version 7.0.8+ includes:
+#   - Rotation-aware curtain rendering (bars stay left/right at all rotations)
+#   - Unified curtain protocol (enabled parameter controls config + visibility)
+#   - No auto-show on group switch (plugin controls visibility)
+#   - IP splash without frame border
+#
 # Run WITHOUT sudo:  bash install.sh
 # (Script will prompt for sudo when needed)
 #
