@@ -148,14 +148,9 @@ function GetControls(props)
     return controls
 end
 
-function GetPages(props)
-    return { "Connection", "Segments", "Global", "Curtain" }
-end
-
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
-    local currentPage = props["page_index"]
 
     local W  = 600
     local CH = 24
