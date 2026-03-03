@@ -161,9 +161,10 @@ class SegmentManager:
         Get atomic snapshot for rendering. Returns (snapshots, any_dirty).
         
         If curtain_active=True and CURTAIN_AUTO_REMAP=True, automatically adjusts
-        segment positions to avoid overlap with 3px curtain bars on each side:
-        - Shifts x positions right by CURTAIN_WIDTH (3 pixels)
-        - Reduces widths by 2*CURTAIN_WIDTH (6 pixels total)
+        segment positions to fit within the middle area (pixels 3-60, 58px wide):
+        - Shifts x positions: x_new = (x * 58/64) + 3
+        - Scales widths: w_new = w * 58/64
+        - Preserves relative positioning and proportions
         """
         with self._lock:
             # Quickly copy all active/dirty segment data
@@ -176,10 +177,12 @@ class SegmentManager:
                     
                     # Apply curtain remap if enabled and curtain is active
                     if curtain_active and CURTAIN_AUTO_REMAP:
-                        # Shift x position right by curtain width
-                        snapshot['x'] = snapshot['x'] + CURTAIN_WIDTH
-                        # Reduce width by 2x curtain width (left + right)
-                        snapshot['width'] = max(1, snapshot['width'] - (2 * CURTAIN_WIDTH))
+                        # Scale factor: middle area is 58px out of original 64px
+                        scale = 58.0 / 64.0
+                        # Shift original x position and scale it
+                        snapshot['x'] = int(snapshot['x'] * scale) + CURTAIN_WIDTH
+                        # Scale width to fit proportionally
+                        snapshot['width'] = max(1, int(snapshot['width'] * scale))
                     
                     snapshots.append(snapshot)
                     if seg.is_dirty:
