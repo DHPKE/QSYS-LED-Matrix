@@ -12,7 +12,8 @@ import time
 import copy
 from enum import Enum
 from config import (MAX_SEGMENTS, MAX_TEXT_LENGTH, MATRIX_WIDTH,
-                    MATRIX_HEIGHT, DEFAULT_SCROLL_SPEED, DEFAULT_SEGMENTS)
+                    MATRIX_HEIGHT, DEFAULT_SCROLL_SPEED, DEFAULT_SEGMENTS,
+                    CURTAIN_WIDTH, CURTAIN_AUTO_REMAP)
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +156,15 @@ class SegmentManager:
         with self._lock:
             return [copy.deepcopy(s.to_dict()) for s in self._segments]
 
-    def get_render_snapshot(self):
-        """Get atomic snapshot for rendering. Returns (snapshots, any_dirty, brightness, group_id)."""
+    def get_render_snapshot(self, curtain_active=False):
+        """
+        Get atomic snapshot for rendering. Returns (snapshots, any_dirty).
+        
+        If curtain_active=True and CURTAIN_AUTO_REMAP=True, automatically adjusts
+        segment positions to avoid overlap with 3px curtain bars on each side:
+        - Shifts x positions right by CURTAIN_WIDTH (3 pixels)
+        - Reduces widths by 2*CURTAIN_WIDTH (6 pixels total)
+        """
         with self._lock:
             # Quickly copy all active/dirty segment data
             snapshots = []
@@ -164,7 +172,16 @@ class SegmentManager:
             for seg in self._segments:
                 # Include all active segments or dirty segments
                 if seg.is_active or seg.is_dirty:
-                    snapshots.append(seg.create_render_snapshot())
+                    snapshot = seg.create_render_snapshot()
+                    
+                    # Apply curtain remap if enabled and curtain is active
+                    if curtain_active and CURTAIN_AUTO_REMAP:
+                        # Shift x position right by curtain width
+                        snapshot['x'] = snapshot['x'] + CURTAIN_WIDTH
+                        # Reduce width by 2x curtain width (left + right)
+                        snapshot['width'] = max(1, snapshot['width'] - (2 * CURTAIN_WIDTH))
+                    
+                    snapshots.append(snapshot)
                     if seg.is_dirty:
                         any_dirty = True
             return snapshots, any_dirty

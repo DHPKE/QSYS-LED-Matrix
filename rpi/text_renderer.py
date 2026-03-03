@@ -175,8 +175,15 @@ class TextRenderer:
         3. Clear dirty flags (with lock)
         """
         
+        # Check if curtain is active for current group
+        current_group_id = udp_handler.get_group_id()
+        curtain_active = False
+        if self._cm and current_group_id > 0:
+            curtain_active = self._cm.should_render(current_group_id)
+        
         # Step 1: Take atomic snapshot (minimal lock time)
-        segment_snapshots, any_dirty = self._sm.get_render_snapshot()
+        # Pass curtain_active to enable automatic segment remapping
+        segment_snapshots, any_dirty = self._sm.get_render_snapshot(curtain_active=curtain_active)
         
         # Skip rendering entirely if nothing changed
         if not any_dirty:

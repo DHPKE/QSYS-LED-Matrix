@@ -139,21 +139,27 @@ GROUP_INDICATOR_Y = -1     # Y position (-1 = auto-calculate bottom position)
 # Curtain Mode (v7.0+)
 # ──────────────────────────────────────────────────────────────────────────────
 # Curtain mode creates two 3-pixel wide vertical bars on the left and right edges
-# of the display. These bars can be assigned to a group (1-8) and toggled on/off
-# via boolean input (true/false, 1/0).
+# of the display. Think of curtains as TWO SEGMENTS (left bar + right bar).
 #
 # When curtain mode is active for a group:
-# - Left bar: pixels 0-2 (3 pixels wide, full height)
-# - Right bar: pixels 61-63 (3 pixels wide, full height)
-# - Middle area: pixels 3-60 (58 pixels wide) - segments stay as configured
-# - The curtain bars are always on top of segments (highest z-index)
-# - Segments 1-4 are NOT remapped - they continue using their configured positions
+# - Left curtain segment:  pixels 0-2   (3 pixels wide, full height, x=0, w=3)
+# - Right curtain segment: pixels 61-63 (3 pixels wide, full height, x=61, w=3)
+# - Middle area reserved:  pixels 3-60  (58 pixels wide, for regular segments)
 #
-# Usage: Send UDP command {"cmd":"curtain", "enabled":true, "color":"FF0000", "group":1}
-# Group boolean trigger: {"cmd":"curtain", "group":1, "state":true}
+# Segments 1-4 are AUTOMATICALLY REMAPPED when curtain is active:
+# - All segment x positions shifted right by 3 pixels
+# - All segment widths reduced by 6 pixels (3 left + 3 right)
+# - Example: Fullscreen segment (x=0, w=64) becomes (x=3, w=58)
+#
+# Usage: Configure curtain for specific groups (e.g., groups 1,4,6)
+# When panel switches to those groups, curtain automatically shows and
+# segments are remapped to avoid overlap.
 
 CURTAIN_WIDTH = 3          # Width of each curtain bar in pixels
 CURTAIN_DEFAULT_COLOR = (255, 255, 255)  # Default color (white) RGB tuple
+
+# Curtain remap mode: automatically adjust segment positions when curtain is active
+CURTAIN_AUTO_REMAP = True  # True = auto-shift segments, False = segments stay as-is
 
 # Curtain state per group (1-8) - persisted to storage
 # Format: {group_id: {"enabled": bool, "color": (R,G,B)}}
