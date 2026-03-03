@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.11 - Clear curtains from all groups on group switch, apply only to current
 -- Version 7.0.10 - Fixed num_segments scope with fallback default
 -- Version 7.0.9 - Dynamic segment count via property window (1-4 segments)
 -- Version 7.0.7 - Fixed Pi auto-show on group switch + per-group curtain state tracking
@@ -773,18 +774,32 @@ if Controls then
                     Controls.active_group.String = groupName
                     SendCommand(buildJson({cmd="group", value=grp}))
                     
-                    -- ✅ v7.0.6 FIX: Pi firmware auto-shows curtain on group switch
-                    -- Force curtain to match stored visibility state for this group
-                    if grp > 0 and curtainEnabledGroups[grp] then
-                        local curtainVisible = curtainVisibleGroups[grp] or false
-                        print(string.format("[CURTAIN] Group %d switch: forcing curtain enabled=%s", grp, tostring(curtainVisible)))
+                    -- ✅ v7.0.11: Clear curtains from ALL groups, then apply only to current group
+                    Timer.CallAfter(function()
+                        -- Step 1: Disable curtains on all groups (1-8)
+                        for g = 1, 8 do
+                            if g ~= grp and curtainEnabledGroups[g] then
+                                local payload = {
+                                    cmd = "curtain",
+                                    group = g,
+                                    enabled = false,
+                                    color = "FFFFFF"
+                                }
+                                SendCommand(buildJson(payload))
+                                print(string.format("[CURTAIN] Cleared group %d", g))
+                            end
+                        end
                         
-                        -- Update UI toggle to match stored state
-                        Controls.curtain_group.String = tostring(grp)
-                        Controls.curtain_enable.Boolean = curtainVisible
-                        
-                        -- Send curtain state after brief delay to override Pi auto-show
-                        Timer.CallAfter(function()
+                        -- Step 2: Apply curtain to current group if configured
+                        if grp > 0 and curtainEnabledGroups[grp] then
+                            local curtainVisible = curtainVisibleGroups[grp] or false
+                            print(string.format("[CURTAIN] Group %d switch: applying curtain enabled=%s", grp, tostring(curtainVisible)))
+                            
+                            -- Update UI
+                            Controls.curtain_group.String = tostring(grp)
+                            Controls.curtain_enable.Boolean = curtainVisible
+                            
+                            -- Send curtain state
                             local colorName = Controls.curtain_color.String or "White"
                             local color = ColorNames[colorName] or colorName
                             color = color:gsub("#", "")
@@ -796,8 +811,8 @@ if Controls then
                                 color = color
                             }
                             SendCommand(buildJson(payload))
-                        end, 0.15)
-                    end
+                        end
+                    end, 0.15)
                 end, 0.05)
             else
                 ctl.Boolean = true
