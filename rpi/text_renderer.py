@@ -243,7 +243,7 @@ class TextRenderer:
         # Step 4: Render curtain bars (v7.0+)
         if self._cm:
             current_group_id = udp_handler.get_group_id()
-            self._cm.render(self._image, current_group_id)
+            self._cm.render(self._image, current_group_id, rotation)
         
         # Step 5: Render group indicator on top
         self._render_group_indicator(canvas_width, canvas_height)

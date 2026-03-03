@@ -421,7 +421,7 @@ def main():
     udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for IP splash at 0°
     
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
-    sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
+    # Frame removed for cleaner splash screen (v7.0.7)
     sm.mark_all_dirty()  # Mark for rendering
     
     # Force immediate render of IP splash at 0° rotation

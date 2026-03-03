@@ -352,16 +352,9 @@ class UDPHandler:
             logger.info(f"[UDP] Group command -> value={value}")
             set_group_id(value)
             
-            # Auto-activate curtain if configured for this group
-            if hasattr(self, '_curtain_callback') and self._curtain_callback and value > 0:
-                # When switching to a group, show curtain if enabled for that group
-                logger.info(f"[UDP] Auto-activating curtain for group {value}")
-                self._curtain_callback(value, True)
-            elif hasattr(self, '_curtain_callback') and self._curtain_callback and value == 0:
-                # When switching to no group (broadcast), hide all curtains
-                logger.info(f"[UDP] Auto-deactivating curtain (no group)")
-                for grp in range(1, 9):
-                    self._curtain_callback(grp, False)
+            # v7.0.7: Removed auto-activation — curtain visibility is now controlled
+            # explicitly by the plugin's curtain_enable toggle
+            # (Plugin sends curtain commands after group switch if needed)
             
             # Force immediate render to show group indicator change
             self._sm.mark_all_dirty()
@@ -385,23 +378,32 @@ class UDPHandler:
 
         elif cmd == "curtain":
             # Curtain mode: 3-pixel wide bars on left and right edges
-            # {"cmd":"curtain", "enabled":true, "color":"FF0000", "group":1}
-            # {"cmd":"curtain", "group":1, "state":true} - boolean trigger
+            # v7.0.7+ unified protocol: {"cmd":"curtain", "group":1, "enabled":true, "color":"FF0000"}
+            # enabled=true → configure + show curtain
+            # enabled=false → hide curtain (keeps config)
+            # Legacy: {"cmd":"curtain", "group":1, "state":true} - boolean trigger (backward compat)
             group = int(doc.get("group", 1))
             
             if "state" in doc:
-                # Boolean trigger mode - just toggle visibility
+                # Legacy boolean trigger mode - just toggle visibility
                 state = bool(doc.get("state", False))
-                logger.info(f"[UDP] Curtain trigger -> group={group}, state={state}")
+                logger.info(f"[UDP] Curtain trigger (legacy) -> group={group}, state={state}")
                 if hasattr(self, '_curtain_callback') and self._curtain_callback:
                     self._curtain_callback(group, state)
             else:
-                # Configuration mode - set color and enable
+                # v7.0.7+ unified mode: enabled controls both config and visibility
                 enabled = bool(doc.get("enabled", False))
                 color = str(doc.get("color", "FFFFFF"))
-                logger.info(f"[UDP] Curtain config -> group={group}, enabled={enabled}, color={color}")
+                logger.info(f"[UDP] Curtain unified -> group={group}, enabled={enabled}, color={color}")
+                
+                # Always configure color (even when disabling)
                 if hasattr(self, '_curtain_config_callback') and self._curtain_config_callback:
-                    self._curtain_config_callback(group, enabled, color)
+                    # Configure with enabled=true (to store the color config)
+                    self._curtain_config_callback(group, True, color)
+                
+                # Then set visibility to match enabled state
+                if hasattr(self, '_curtain_callback') and self._curtain_callback:
+                    self._curtain_callback(group, enabled)
 
         elif cmd == "display":
             # Enable or disable display
