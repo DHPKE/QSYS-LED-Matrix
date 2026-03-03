@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.10 - Fixed num_segments scope with fallback default
 -- Version 7.0.9 - Dynamic segment count via property window (1-4 segments)
 -- Version 7.0.7 - Fixed Pi auto-show on group switch + per-group curtain state tracking
 -- Version 7.0.6 - Fixed curtain visibility control (only show when enabled=true)
@@ -497,6 +498,8 @@ if Controls then
     local ip_addr  = Properties["IP Address"].Value
     local udp_port = Properties["UDP Port"].Value
     local num_segments = (Properties["Number of Segments"] and Properties["Number of Segments"].Value) or 4  -- Default to 4 if not set
+    
+    print(string.format("[LED Matrix] Runtime initialized with %d segments", num_segments))
 
     local activeLayoutSegments = {}
     local debounceTimers = {}
