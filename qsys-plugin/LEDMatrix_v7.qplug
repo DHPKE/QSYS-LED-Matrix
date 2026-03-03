@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.6 - Fixed curtain visibility control (only show when enabled=true)
 -- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
 -- Version 7.0.4 - Curtain group field, enable button works immediately, removed apply button
 -- Version 7.0.3 - Fixed dynamic curtain group tracking (minimal changes to v7.0.1)
@@ -28,8 +29,7 @@
 --   {"cmd":"rotation","value":0,"group":1}  -- 0, 90, 180, or 270 degrees
 --   {"cmd":"layout","preset":N,"group":1}
 --   {"cmd":"group","value":3}   -- Assign panel to group 3
---   {"cmd":"curtain","group":1,"state":true}  -- Toggle curtain visibility
---   {"cmd":"curtain","group":1,"enabled":true,"color":"FF0000"}  -- Configure curtain
+--   {"cmd":"curtain","group":1,"enabled":true,"color":"FF0000"}  -- Show/hide curtain with color
 --
 -- ROTATION (v6.0+):
 --   Supports 0°, 90°, 180°, and 270° rotation of the entire display.
@@ -49,18 +49,18 @@
 --     Group 3 = Orange   Group 7 = Cyan
 --     Group 4 = Red      Group 8 = Green
 --
--- CURTAIN MODE (v7.0):
+-- CURTAIN MODE (v7.0, fixed in v7.0.6):
 --   Creates two 3-pixel wide vertical bars on the left (0-2) and right (61-63) edges.
 --   Each group (1-8) has independent curtain configuration.
---   Use "Curtain Config" to enable and set color for a group.
---   Curtain automatically shows/hides when you assign the panel to that group.
+--   Use "Curtain Config" to set color (curtain starts hidden).
+--   Use "Curtain Enable" toggle to show/hide.
 --   
 --   Workflow:
---     1. Configure curtain: {"cmd":"curtain","group":4,"enabled":true,"color":"FF0000"}
---     2. Assign to group: {"cmd":"group","value":4}  <- Curtain auto-shows
---     3. Switch group: {"cmd":"group","value":1}     <- Curtain auto-hides
+--     1. Apply button: {"cmd":"curtain","group":4,"enabled":false,"color":"FF0000"} (configure, hidden)
+--     2. Enable toggle: {"cmd":"curtain","group":4,"enabled":true,"color":"FF0000"}  (show)
+--     3. Disable toggle: {"cmd":"curtain","group":4,"enabled":false,"color":"FF0000"} (hide)
 --   
---   Manual override: Use "Curtain Show/Hide" toggle to force visibility
+--   Curtain bars only visible when enabled=true.
 --
 -- LAYOUT PRESETS:
 --   1  = Fullscreen
@@ -74,9 +74,9 @@
 
 PluginInfo = {
     Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.0.5",
-    Id = "dhpke.olimex.led.matrix.7.0.5",
-    Description = "RPi 64x32 LED Matrix - Curtain with proper show/hide",
+    Version = "7.0.6",
+    Id = "dhpke.olimex.led.matrix.7.0.6",
+    Description = "RPi 64x32 LED Matrix - Fixed curtain visibility",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -993,6 +993,7 @@ if Controls then
 
     -- Curtain Mode Event Handlers (v7.0.5)
     -- Apply button: Configure curtain for a group (color + enable)
+    -- ✅ FIXED v7.0.6: Apply button configures color but does NOT show curtain
     Controls.curtain_apply.EventHandler = function()
         print("[CURTAIN] Apply button clicked")
         
@@ -1014,16 +1015,16 @@ if Controls then
             return
         end
         
-        print(string.format("[CURTAIN] Configuring: group=%d, color=%s", curtainGroup, color))
+        print(string.format("[CURTAIN] Configuring: group=%d, color=%s, enabled=false", curtainGroup, color))
         
         -- Track that this group has curtain configured
         curtainEnabledGroups[curtainGroup] = true
         
-        -- Send config command (always enabled=true when applying)
+        -- ✅ FIX: Send config with enabled=false (invisible by default)
         local payload = {
             cmd = "curtain",
             group = curtainGroup,
-            enabled = true,
+            enabled = false,  -- ✅ Changed from true to false
             color = color
         }
         
@@ -1031,10 +1032,13 @@ if Controls then
         print(string.format("[CURTAIN] Sending: %s", json))
         SendCommand(json)
         
-        Controls.last_command.String = string.format("Curtain configured for group %d", curtainGroup)
+        -- ✅ FIX: Set toggle to OFF after applying
+        Controls.curtain_enable.Boolean = false
+        
+        Controls.last_command.String = string.format("Curtain configured for group %d (hidden)", curtainGroup)
     end
     
-    -- Enable button: Show/Hide curtain for the configured group
+    -- ✅ FIXED v7.0.6: Enable toggle controls visibility using enabled parameter
     Controls.curtain_enable.EventHandler = function(ctl)
         print(string.format("[CURTAIN] Enable toggle: %s", tostring(ctl.Boolean)))
         
@@ -1046,6 +1050,9 @@ if Controls then
         
         local visible = ctl.Boolean
         local curtainGroup = tonumber(Controls.curtain_group.String) or 1
+        local colorName = Controls.curtain_color.String or "White"
+        local color = ColorNames[colorName] or colorName
+        color = color:gsub("#", "")
         
         -- Validate group
         if curtainGroup < 1 or curtainGroup > 8 then
@@ -1054,13 +1061,14 @@ if Controls then
             return
         end
         
-        print(string.format("[CURTAIN] Setting visibility: group=%d, visible=%s", curtainGroup, tostring(visible)))
+        print(string.format("[CURTAIN] Setting visibility: group=%d, enabled=%s", curtainGroup, tostring(visible)))
         
-        -- Send visibility command
+        -- ✅ FIX: Send enabled (not state) with current color
         local payload = {
             cmd = "curtain",
             group = curtainGroup,
-            state = visible
+            enabled = visible,  -- ✅ Changed from state to enabled
+            color = color       -- ✅ Include color to maintain config
         }
         
         local json = buildJson(payload)
