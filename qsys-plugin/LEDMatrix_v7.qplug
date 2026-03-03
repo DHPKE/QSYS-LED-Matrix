@@ -993,10 +993,13 @@ if Controls then
         end
     end
 
-    -- Curtain Mode Event Handlers (v7.0)
+    -- Curtain Mode Event Handlers (v7.0.4)
     Controls.curtain_enable.EventHandler = function(ctl)
+        print(string.format("[CURTAIN] Enable button triggered: %s", tostring(ctl.Boolean)))
+        
         if not socket then
-            print("[CURTAIN] Socket not ready yet")
+            print("[CURTAIN] ERROR: Socket not ready yet")
+            Controls.last_command.String = "Error: Socket not ready"
             return
         end
         
@@ -1006,25 +1009,28 @@ if Controls then
         local color = ColorNames[colorName] or colorName
         color = color:gsub("#", "")
         
+        print(string.format("[CURTAIN] Read values: group=%s, color=%s, enabled=%s", 
+            tostring(curtainGroup), colorName, tostring(enabled)))
+        
         -- Validate group
         if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] Invalid group %d, must be 1-8", curtainGroup))
+            print(string.format("[CURTAIN] ERROR: Invalid group %d, must be 1-8", curtainGroup))
             Controls.last_command.String = "Error: Group must be 1-8"
             ctl.Boolean = not enabled  -- Revert toggle
             return
         end
         
-        print(string.format("[CURTAIN] Config: enabled=%s, color=%s, group=%d", 
-            tostring(enabled), colorName, curtainGroup))
+        print(string.format("[CURTAIN] Sending config: enabled=%s, color=%s, group=%d", 
+            tostring(enabled), color, curtainGroup))
         Controls.last_command.String = "Configuring curtain..."
         
         -- Track curtain state in plugin
         if enabled then
             curtainEnabledGroups[curtainGroup] = true
-            print(string.format("[CURTAIN] Enabled for group %d", curtainGroup))
+            print(string.format("[CURTAIN] Tracked: Enabled for group %d", curtainGroup))
         else
             curtainEnabledGroups[curtainGroup] = nil
-            print(string.format("[CURTAIN] Disabled for group %d", curtainGroup))
+            print(string.format("[CURTAIN] Tracked: Disabled for group %d", curtainGroup))
         end
         
         local payload = {
@@ -1034,7 +1040,12 @@ if Controls then
             color = color
         }
         
-        SendCommand(buildJson(payload))
+        local json = buildJson(payload)
+        print(string.format("[CURTAIN] JSON: %s", json))
+        
+        local result = SendCommand(json)
+        print(string.format("[CURTAIN] SendCommand result: %s", tostring(result)))
+        
         Controls.last_command.String = string.format("Curtain %s for group %d", 
             enabled and "enabled" or "disabled", curtainGroup)
     end
