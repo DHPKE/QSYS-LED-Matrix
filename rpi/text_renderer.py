@@ -438,9 +438,9 @@ class TextRenderer:
         if seg.effect == TextEffect.BLINK and not seg.blink_state:
             return
 
-        # Auto-fit font with 1px margin on all borders
-        avail_w = max(1, seg.width  - 2)  # 1px margin left and right
-        avail_h = max(1, seg.height - 2)  # 1px margin top and bottom
+        # Auto-fit font - no margin for maximum text size
+        avail_w = max(1, seg.width)
+        avail_h = max(1, seg.height)
         font, font_size = _fit_text(text, avail_w, avail_h, font_name=seg.font, debug_seg_id=seg.id)
 
         # Measure text
@@ -461,11 +461,11 @@ class TextRenderer:
             offset = seg.scroll_offset % total_scroll
             draw_x = seg.x + seg.width - offset
         else:
-            # Static alignment - minimal margins for maximum font size
+            # Static alignment - no margins for maximum font size
             if seg.align == TextAlign.LEFT:
-                draw_x = seg.x + 1
+                draw_x = seg.x
             elif seg.align == TextAlign.RIGHT:
-                draw_x = seg.x + seg.width - tw - 1
+                draw_x = seg.x + seg.width - tw
             else:  # CENTER
                 draw_x = seg.x + (seg.width - tw) // 2
                 # Fix for Mono Regular font - it renders 1px too far left
