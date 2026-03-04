@@ -295,8 +295,8 @@ LAYOUT_PRESETS = {
          (48,       19,        13,    10   ),                            # segment 2: small BR corner (13×10)
          (0,        0,         1,     1    )],                           # segment 3 hidden
     16: [(0,        0,         1,     1    ),                            # segment 0 hidden
-         (44,       3,         17,    13   ),                            # segment 1: medium top-right (17×13)
-         (48,       19,        13,    10   ),                            # segment 2: small BR corner (13×10)
+         (35,       3,         26,    16   ),                            # segment 1: larger top-right (26×16)
+         (48,       22,        13,    7    ),                            # segment 2: small BR corner (13×7)
          (0,        0,         1,     1    )],                           # segment 3 hidden
 }
 
@@ -349,8 +349,8 @@ LAYOUT_PRESETS_PORTRAIT = {
          (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6),                        # segment 2: quarter BR (10×26)
          (0,         0,         1,      1     )],                        # segment 3 hidden
     16: [(0,         0,         1,      1     ),                         # segment 0 hidden
-         (PW//2+3,   3,         PW//2-6,PH//3-6),                        # segment 1: half width, third height TR (10×15)
-         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6),                        # segment 2: quarter BR (10×26)
+         (3,         3,         PW-6,   PH//3-6),                        # segment 1: larger top area (26×15)
+         (PW//2+3,   PH//2+3,   PW//2-6,PH//4-6),                        # segment 2: smaller BR (10×10)
          (0,         0,         1,      1     )],                        # segment 3 hidden
 }
 
