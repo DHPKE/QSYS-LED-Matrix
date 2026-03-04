@@ -280,11 +280,11 @@ LAYOUT_PRESETS = {
     # Segments positioned with 1px gap from curtain (start at pixel 3, end at pixel 60)
     8: [(3,        3,         49,    26   ),                            # segment 0: large left (49×26, 1px gap from curtain) - Q-SYS "Segment 1"
         (0,        0,         1,     1    ),                            # segment 1 hidden
-        (51,       21,        9,     7    ),                            # segment 2: BR indicator (9×7, 1px gap) - Q-SYS "Segment 3"
+        (52,       22,        9,     7    ),                            # segment 2: BR indicator (9×7, down 1px, right 1px) - Q-SYS "Segment 3"
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
     9: [(0,        0,         1,     1    ),                            # segment 0 hidden
         (29,       2,         33,    20   ),                            # segment 1: top-right main (33×20, up 1px, right 1px) - Q-SYS "Segment 2"
-        (51,       21,        9,     7    ),                            # segment 2: BR indicator (9×7, 1px gap) - Q-SYS "Segment 3"
+        (52,       22,        9,     7    ),                            # segment 2: BR indicator (9×7, down 1px, right 1px) - Q-SYS "Segment 3"
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
     # Other segments set to 1x1 to hide them (segment index matches tuple position)
