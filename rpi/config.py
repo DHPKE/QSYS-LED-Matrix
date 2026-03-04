@@ -288,14 +288,16 @@ LAYOUT_PRESETS = {
          (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
          (0,        0,         W,     H    )],                           # segment 3 fullscreen
     # Voice-over layouts for video production
+    # All coordinates include 3px offset from display edges (for 2px curtain + 1px gap)
+    # Display: 64×32, Usable with curtain: (3,3) to (61,29) = 58×26
     15: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
-         (0,        0,         (5*W)//6, H  ),                           # segment 1: 5/6 width left (53×32)
+         (3,        3,         48,    26   ),                            # segment 1: 5/6 of usable width (48×26)
          (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
-         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter BR (32×16)
+         (35,       16,        26,    13   )],                           # segment 3: quarter usable area BR (26×13)
     16: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
          (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
-         (W//2,     0,         W//2,  H//3 ),                            # segment 2: 1/2 width, 1/3 height top-right (32×11)
-         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter BR (32×16)
+         (35,       3,         26,    8    ),                            # segment 2: half width, third height TR (26×8)
+         (35,       16,        26,    13   )],                           # segment 3: quarter usable area BR (26×13)
 }
 
 # Portrait layout presets (32×64 virtual canvas)
