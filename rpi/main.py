@@ -2,7 +2,7 @@
 """
 main.py — Entry point for the RPi Zero 2 W LED Matrix controller.
 
-Version: 7.0.25 (Removed Legacy 15/16)
+Version: 7.0.27 (VO Seg2 Positioned)
 
 Port of src/main.cpp (ESP32 Arduino firmware) to Python / Linux.
 
