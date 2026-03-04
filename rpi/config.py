@@ -290,14 +290,14 @@ LAYOUT_PRESETS = {
     # Voice-over layouts for video production
     # Red frame = curtain (2px), segments positioned 3px from edges
     # Display: 64×32, with 3px margins: usable area starts at (3,3)
-    15: [(0,        0,         1,     1    ),                            # segment 0 hidden
-         (3,        3,         42,    26   ),                            # segment 1: large left area (42×26)
-         (0,        0,         1,     1    ),                            # segment 2 hidden
-         (48,       19,        13,    10   )],                           # segment 3: small BR corner (13×10)
-    16: [(0,        0,         1,     1    ),                            # segment 0 hidden
+    15: [(3,        3,         42,    26   ),                            # segment 0: large left area (42×26)
          (0,        0,         1,     1    ),                            # segment 1 hidden
-         (44,       3,         17,    13   ),                            # segment 2: medium top-right (17×13)
-         (48,       19,        13,    10   )],                           # segment 3: small BR corner (13×10)
+         (48,       19,        13,    10   ),                            # segment 2: small BR corner (13×10)
+         (0,        0,         1,     1    )],                           # segment 3 hidden
+    16: [(0,        0,         1,     1    ),                            # segment 0 hidden
+         (44,       3,         17,    13   ),                            # segment 1: medium top-right (17×13)
+         (48,       19,        13,    10   ),                            # segment 2: small BR corner (13×10)
+         (0,        0,         1,     1    )],                           # segment 3 hidden
 }
 
 # Portrait layout presets (32×64 virtual canvas)
@@ -344,14 +344,14 @@ LAYOUT_PRESETS_PORTRAIT = {
          (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
          (0,         0,         PW,     PH    )],                        # segment 3 fullscreen
     # Voice-over layouts for video production (portrait mode)
-    15: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
-         (0,         0,         PW,     (5*PH)//6),                      # segment 1: 5/6 height top (32×53)
-         (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
-         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter BR (16×32)
-    16: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
-         (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
-         (0,         0,         PW//2,  PH//3 ),                         # segment 2: 1/2 width, 1/3 height top-left (16×21)
-         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter BR (16×32)
+    15: [(3,         3,         PW-6,   (5*PH)//6-6),                    # segment 0: 5/6 height top (26×47)
+         (0,         0,         1,      1     ),                         # segment 1 hidden
+         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6)],                       # segment 2: quarter BR (10×26)
+         (0,         0,         1,      1     ),                         # segment 3 hidden
+    16: [(0,         0,         1,      1     ),                         # segment 0 hidden
+         (PW//2+3,   3,         PW//2-6,PH//3-6),                        # segment 1: half width, third height TR (10×15)
+         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6)],                       # segment 2: quarter BR (10×26)
+         (0,         0,         1,      1     )],                        # segment 3 hidden
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
