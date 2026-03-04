@@ -239,13 +239,19 @@ SEGMENT_FILE = "/var/lib/led-matrix/segments.json"
 # Each entry is a list of (x, y, w, h) tuples, one per active segment.
 # Segments beyond the list length are deactivated (w=0).
 #
-#  Layout 1 — Fullscreen         [seg0: full 64×32]
-#  Layout 2 — Top/Bottom halves  [seg0: top, seg1: bottom]
-#  Layout 3 — Left/Right halves  [seg0: left, seg1: right]
-#  Layout 4 — Triple left        [seg0: left half, seg1: right-top, seg2: right-bottom]
-#  Layout 5 — Triple right       [seg0: left-top, seg1: left-bottom, seg2: right half]
-#  Layout 6 — Thirds vertical    [seg0 | seg1 | seg2]
-#  Layout 7 — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+#  Layout 1  — Fullscreen         [seg0: full 64×32]
+#  Layout 2  — Top/Bottom halves  [seg0: top, seg1: bottom]
+#  Layout 3  — Left/Right halves  [seg0: left, seg1: right]
+#  Layout 4  — Triple left        [seg0: left half, seg1: right-top, seg2: right-bottom]
+#  Layout 5  — Triple right       [seg0: left-top, seg1: left-bottom, seg2: right half]
+#  Layout 6  — Thirds vertical    [seg0 | seg1 | seg2]
+#  Layout 7  — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+#  Layout 11 — Segment 0 only     [seg0 fullscreen, others hidden]
+#  Layout 12 — Segment 1 only     [seg1 fullscreen, others hidden]
+#  Layout 13 — Segment 2 only     [seg2 fullscreen, others hidden]
+#  Layout 14 — Segment 3 only     [seg3 fullscreen, others hidden]
+#  Layout 15 — VO-left            [seg1: 5/6 width left (53×32), seg3: quarter BR (32×16)]
+#  Layout 16 — VO-right           [seg2: 1/3 width right (21×32), seg3: quarter BR (32×16)]
 # ──────────────────────────────────────────────────────────────────────────────
 W = MATRIX_WIDTH
 H = MATRIX_HEIGHT
@@ -281,6 +287,15 @@ LAYOUT_PRESETS = {
          (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
          (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
          (0,        0,         W,     H    )],                           # segment 3 fullscreen
+    # Voice-over layouts for video production
+    15: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         (5*W)//6, H  ),                           # segment 1: 5/6 width left (53×32)
+         (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
+         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter bottom-right (32×16)
+    16: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
+         (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
+         ((2*W)//3, 0,         W//3,  H    ),                            # segment 2: 1/3 width top-right (21×32)
+         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter bottom-right (32×16)
 }
 
 # Portrait layout presets (32×64 virtual canvas)
@@ -326,6 +341,15 @@ LAYOUT_PRESETS_PORTRAIT = {
          (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
          (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
          (0,         0,         PW,     PH    )],                        # segment 3 fullscreen
+    # Voice-over layouts for video production (portrait mode)
+    15: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         PW,     (5*PH)//6),                      # segment 1: 5/6 height top (32×53)
+         (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
+         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter bottom-right (16×32)
+    16: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
+         (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
+         (0,         (2*PH)//3, PW,     PH//3 ),                         # segment 2: 1/3 height bottom (32×21)
+         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter bottom-right (16×32)
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
