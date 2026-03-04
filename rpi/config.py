@@ -251,7 +251,7 @@ SEGMENT_FILE = "/var/lib/led-matrix/segments.json"
 #  Layout 13 — Segment 2 only     [seg2 fullscreen, others hidden]
 #  Layout 14 — Segment 3 only     [seg3 fullscreen, others hidden]
 #  Layout 15 — VO-left            [seg1: 5/6 width left (53×32), seg3: quarter BR (32×16)]
-#  Layout 16 — VO-right           [seg2: 1/3 width right (21×32), seg3: quarter BR (32×16)]
+#  Layout 16 — VO-right           [seg2: 1/2 width, 1/3 height top-right (32×11), seg3: quarter BR (32×16)]
 # ──────────────────────────────────────────────────────────────────────────────
 W = MATRIX_WIDTH
 H = MATRIX_HEIGHT
@@ -291,11 +291,11 @@ LAYOUT_PRESETS = {
     15: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
          (0,        0,         (5*W)//6, H  ),                           # segment 1: 5/6 width left (53×32)
          (0,        0,         1,     1    ),                            # segment 2 hidden (1x1)
-         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter bottom-right (32×16)
+         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter BR (32×16)
     16: [(0,        0,         1,     1    ),                            # segment 0 hidden (1x1)
          (0,        0,         1,     1    ),                            # segment 1 hidden (1x1)
-         ((2*W)//3, 0,         W//3,  H    ),                            # segment 2: 1/3 width top-right (21×32)
-         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter bottom-right (32×16)
+         (W//2,     0,         W//2,  H//3 ),                            # segment 2: 1/2 width, 1/3 height top-right (32×11)
+         (W//2,     H//2,      W//2,  H//2 )],                           # segment 3: quarter BR (32×16)
 }
 
 # Portrait layout presets (32×64 virtual canvas)
@@ -345,11 +345,11 @@ LAYOUT_PRESETS_PORTRAIT = {
     15: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
          (0,         0,         PW,     (5*PH)//6),                      # segment 1: 5/6 height top (32×53)
          (0,         0,         1,      1     ),                         # segment 2 hidden (1x1)
-         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter bottom-right (16×32)
+         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter BR (16×32)
     16: [(0,         0,         1,      1     ),                         # segment 0 hidden (1x1)
          (0,         0,         1,      1     ),                         # segment 1 hidden (1x1)
-         (0,         (2*PH)//3, PW,     PH//3 ),                         # segment 2: 1/3 height bottom (32×21)
-         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter bottom-right (16×32)
+         (0,         0,         PW//2,  PH//3 ),                         # segment 2: 1/2 width, 1/3 height top-left (16×21)
+         (PW//2,     PH//2,     PW//2,  PH//2 )],                        # segment 3: quarter BR (16×32)
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
