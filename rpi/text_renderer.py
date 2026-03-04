@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 # Expanded font size range for maximum granularity (tries every size from 32 down to 6)
 _FONT_SIZES = [32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 13, 12, 11, 10, 9, 8, 7, 6]
 
+# Size mode ranges
+_SIZE_RANGES = {
+    'auto': _FONT_SIZES,  # Full range, auto-scale
+    'small': [12, 11, 10, 9, 8, 7, 6],  # Small readable fonts
+    'medium': [20, 18, 16, 14, 13],  # Medium fonts
+    'large': [32, 30, 28, 26, 24, 22],  # Large fonts
+}
+
 # Cache loaded fonts keyed by (path, size) to avoid repeated disk I/O.
 _font_cache: dict[tuple, ImageFont.FreeTypeFont] = {}
 
@@ -93,12 +101,18 @@ def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     return rgb
 
 
-def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
+def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", size_mode: str = "auto", debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
     """Return (font, font_size) for the largest size that fits within max_w × max_h.
-    Uses cached measurements for performance."""
+    Uses cached measurements for performance.
+    
+    size_mode: 'auto' (full range), 'small' (6-12), 'medium' (13-20), 'large' (22-32)
+    """
+    
+    # Get size range for the mode
+    size_range = _SIZE_RANGES.get(size_mode, _FONT_SIZES)
     
     # Try to use cached measurement first
-    for size in _FONT_SIZES:
+    for size in size_range:
         cache_key = (text, font_name, size)
         
         if cache_key in _text_measurement_cache:
@@ -117,10 +131,11 @@ def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", debug
                 logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → size {size} ({tw}×{th} in {max_w}×{max_h})")
             return _load_font(font_name, size), size
     
-    # Fallback: smallest size
+    # Fallback: smallest size in range
+    min_size = size_range[-1]
     if debug_seg_id >= 0:
-        logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {_FONT_SIZES[-1]} (text too long)")
-    return _load_font(font_name, _FONT_SIZES[-1]), _FONT_SIZES[-1]
+        logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {min_size} (text too long)")
+    return _load_font(font_name, min_size), min_size
 
 
 class TextRenderer:
@@ -367,7 +382,7 @@ class TextRenderer:
         avail_w = max(1, snap['width'])
         avail_h = max(1, snap['height'])
 
-        font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), debug_seg_id=snap['id'])
+        font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), size_mode=snap.get('size', 'auto'), debug_seg_id=snap['id'])
         if not font:
             return
 
@@ -469,7 +484,7 @@ class TextRenderer:
         # Auto-fit font - no margin for maximum text size
         avail_w = max(1, seg.width)
         avail_h = max(1, seg.height)
-        font, font_size = _fit_text(text, avail_w, avail_h, font_name=seg.font, debug_seg_id=seg.id)
+        font, font_size = _fit_text(text, avail_w, avail_h, font_name=seg.font, size_mode=seg.size, debug_seg_id=seg.id)
 
         # Measure text
         try:

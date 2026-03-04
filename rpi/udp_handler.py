@@ -310,10 +310,11 @@ class UDPHandler:
             align   = str(doc.get("align",   "C"))
             effect  = str(doc.get("effect",  "none"))
             font    = str(doc.get("font",    "arial"))
+            size    = str(doc.get("size",    "auto")).lower()  # auto, small, medium, large
             intens  = int(doc.get("intensity", 255))
-            logger.info(f"[UDP] Text command -> seg={seg}, text='{text}', color={color}, bgcolor={bgcolor}, align={align}, effect={effect}, font={font}, intensity={intens}")
+            logger.info(f"[UDP] Text command -> seg={seg}, text='{text}', color={color}, bgcolor={bgcolor}, align={align}, effect={effect}, font={font}, size={size}, intensity={intens}")
             self._sm.update_text(seg, text, color=color, bgcolor=bgcolor,
-                                 align=align, effect=effect, font=font, intensity=intens)
+                                 align=align, effect=effect, font=font, size=size, intensity=intens)
 
         elif cmd == "layout":
             preset = int(doc.get("preset", 1))
