@@ -335,9 +335,9 @@ class TextRenderer:
         if snap['effect'] == TextEffect.BLINK and not snap['blink_state']:
             return
 
-        # Auto-fit font with 1px margin (layouts 15/16 have margins built into coordinates)
-        avail_w = max(1, snap['width']  - 2)  # 1px margin left and right
-        avail_h = max(1, snap['height'] - 2)  # 1px margin top and bottom
+        # Auto-fit font - no margin for maximum text size
+        avail_w = max(1, snap['width'])
+        avail_h = max(1, snap['height'])
 
         font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), debug_seg_id=snap['id'])
         if not font:
@@ -351,11 +351,11 @@ class TextRenderer:
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]
         
-        # Calculate position based on alignment
+        # Calculate position based on alignment (no margins)
         if snap['align'] == TextAlign.LEFT:
-            tx = 1
+            tx = 0
         elif snap['align'] == TextAlign.RIGHT:
-            tx = snap['width'] - tw - 1
+            tx = snap['width'] - tw
         else:  # CENTER
             tx = (snap['width'] - tw) // 2
             # Fix for Mono Regular font - it renders 1px too far left

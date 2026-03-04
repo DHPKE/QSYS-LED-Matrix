@@ -277,13 +277,13 @@ LAYOUT_PRESETS = {
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
     # Voice-over layouts (8 & 9) - Use these preset numbers directly
     # Curtain: 2px frame (0-1, 62-63 horizontal / 0-1, 30-31 vertical)
-    # NO GAP - segments touch curtain directly at pixel 2
-    8: [(2,        2,         48,    28   ),                            # segment 0: large left (48×28, touches curtain)
+    # Segments touch curtain at pixel 2, no gap (text renderer has no margin)
+    8: [(2,        2,         48,    28   ),                            # segment 0: large left (48×28)
         (0,        0,         1,     1    ),                            # segment 1 hidden
         (51,       21,        11,    9    ),                            # segment 2: small BR corner (11×9)
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
     9: [(0,        0,         1,     1    ),                            # segment 0 hidden
-        (32,       2,         30,    28   ),                            # segment 1: half display (30×28, touches curtain)
+        (32,       2,         30,    28   ),                            # segment 1: half display (30×28)
         (51,       21,        11,    9    ),                            # segment 2: small BR indicator (11×9)
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
