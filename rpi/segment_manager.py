@@ -48,7 +48,7 @@ class Segment:
     """Single display zone."""
     __slots__ = (
         "id", "x", "y", "width", "height",
-        "text", "color", "bgcolor", "font",
+        "text", "color", "bgcolor", "font", "size",
         "align", "effect", "effect_speed",
         "scroll_offset", "last_scroll_update",
         "blink_state", "last_blink_update",
