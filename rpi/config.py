@@ -346,11 +346,11 @@ LAYOUT_PRESETS_PORTRAIT = {
     # Voice-over layouts for video production (portrait mode)
     15: [(3,         3,         PW-6,   (5*PH)//6-6),                    # segment 0: 5/6 height top (26×47)
          (0,         0,         1,      1     ),                         # segment 1 hidden
-         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6)],                       # segment 2: quarter BR (10×26)
-         (0,         0,         1,      1     ),                         # segment 3 hidden
+         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6),                        # segment 2: quarter BR (10×26)
+         (0,         0,         1,      1     )],                        # segment 3 hidden
     16: [(0,         0,         1,      1     ),                         # segment 0 hidden
          (PW//2+3,   3,         PW//2-6,PH//3-6),                        # segment 1: half width, third height TR (10×15)
-         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6)],                       # segment 2: quarter BR (10×26)
+         (PW//2+3,   PH//2+3,   PW//2-6,PH//2-6),                        # segment 2: quarter BR (10×26)
          (0,         0,         1,      1     )],                        # segment 3 hidden
 }
 
