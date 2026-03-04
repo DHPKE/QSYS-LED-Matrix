@@ -283,7 +283,7 @@ LAYOUT_PRESETS = {
         (51,       21,        9,     7    ),                            # segment 2: BR indicator (9×7, 1px gap) - Q-SYS "Segment 3"
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
     9: [(0,        0,         1,     1    ),                            # segment 0 hidden
-        (30,       3,         30,    19   ),                            # segment 1: top-right main (30×19, 5px wider, 1px gap) - Q-SYS "Segment 2"
+        (28,       3,         33,    20   ),                            # segment 1: top-right main (33×20, 10% larger, 1px gap) - Q-SYS "Segment 2"
         (51,       21,        9,     7    ),                            # segment 2: BR indicator (9×7, 1px gap) - Q-SYS "Segment 3"
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
