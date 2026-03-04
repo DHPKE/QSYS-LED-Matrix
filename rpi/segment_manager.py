@@ -12,7 +12,8 @@ import time
 import copy
 from enum import Enum
 from config import (MAX_SEGMENTS, MAX_TEXT_LENGTH, MATRIX_WIDTH,
-                    MATRIX_HEIGHT, DEFAULT_SCROLL_SPEED, DEFAULT_SEGMENTS)
+                    MATRIX_HEIGHT, DEFAULT_SCROLL_SPEED, DEFAULT_SEGMENTS,
+                    CURTAIN_WIDTH, CURTAIN_AUTO_REMAP)
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +156,17 @@ class SegmentManager:
         with self._lock:
             return [copy.deepcopy(s.to_dict()) for s in self._segments]
 
-    def get_render_snapshot(self):
-        """Get atomic snapshot for rendering. Returns (snapshots, any_dirty, brightness, group_id)."""
+    def get_render_snapshot(self, curtain_active=False, rotation=0):
+        """
+        Get atomic snapshot for rendering. Returns (snapshots, any_dirty).
+        
+        If curtain_active=True and CURTAIN_AUTO_REMAP=True, automatically adjusts
+        segment positions to fit within the middle area (avoiding curtain bars):
+        - 0°/180° (landscape 64×32): middle area is pixels 3-60 (58px wide)
+        - 90°/270° (portrait 32×64): middle area is pixels 3-28 (26px wide)
+        - Shifts x positions and scales widths proportionally
+        - Preserves relative positioning
+        """
         with self._lock:
             # Quickly copy all active/dirty segment data
             snapshots = []
@@ -164,7 +174,28 @@ class SegmentManager:
             for seg in self._segments:
                 # Include all active segments or dirty segments
                 if seg.is_active or seg.is_dirty:
-                    snapshots.append(seg.create_render_snapshot())
+                    snapshot = seg.create_render_snapshot()
+                    
+                    # Apply curtain remap if enabled and curtain is active
+                    if curtain_active and CURTAIN_AUTO_REMAP:
+                        # Determine canvas dimensions based on rotation
+                        if rotation in (90, 270):
+                            # Portrait: 32×64, middle area is 32-6=26px wide
+                            original_width = 32
+                            middle_width = 26  # 32 - (2 * CURTAIN_WIDTH)
+                        else:
+                            # Landscape: 64×32, middle area is 64-6=58px wide
+                            original_width = 64
+                            middle_width = 58  # 64 - (2 * CURTAIN_WIDTH)
+                        
+                        # Scale factor: middle area width / original width
+                        scale = float(middle_width) / float(original_width)
+                        # Shift original x position and scale it
+                        snapshot['x'] = int(snapshot['x'] * scale) + CURTAIN_WIDTH
+                        # Scale width to fit proportionally
+                        snapshot['width'] = max(1, int(snapshot['width'] * scale))
+                    
+                    snapshots.append(snapshot)
                     if seg.is_dirty:
                         any_dirty = True
             return snapshots, any_dirty

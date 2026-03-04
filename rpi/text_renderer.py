@@ -128,21 +128,23 @@ class TextRenderer:
     Draws all active segments onto a shared RGBMatrix canvas.
 
     Usage:
-        renderer = TextRenderer(matrix, canvas, segment_manager)
+        renderer = TextRenderer(matrix, canvas, segment_manager, curtain_manager)
         # In render loop:
         renderer.render_all()
         matrix.SwapOnVSync(canvas)
     """
 
-    def __init__(self, matrix, canvas, segment_manager: SegmentManager):
+    def __init__(self, matrix, canvas, segment_manager: SegmentManager, curtain_manager=None):
         """
         :param matrix:  rgbmatrix.RGBMatrix instance
         :param canvas:  FrameCanvas returned by matrix.CreateFrameCanvas()
         :param segment_manager: shared SegmentManager
+        :param curtain_manager: optional CurtainManager for rendering curtain bars
         """
         self._matrix  = matrix
         self._canvas  = canvas
         self._sm      = segment_manager
+        self._cm      = curtain_manager  # CurtainManager (v7.0+)
         # Off-screen PIL image for compositing - size depends on orientation
         # Always matches the physical matrix dimensions (64×32)
         self._image   = Image.new("RGB", (MATRIX_WIDTH, MATRIX_HEIGHT), (0, 0, 0))
@@ -173,8 +175,15 @@ class TextRenderer:
         3. Clear dirty flags (with lock)
         """
         
+        # Check if curtain is active for current group
+        current_group_id = udp_handler.get_group_id()
+        curtain_active = False
+        if self._cm and current_group_id > 0:
+            curtain_active = self._cm.should_render(current_group_id)
+        
         # Step 1: Take atomic snapshot (minimal lock time)
-        segment_snapshots, any_dirty = self._sm.get_render_snapshot()
+        # Pass curtain_active to enable automatic segment remapping
+        segment_snapshots, any_dirty = self._sm.get_render_snapshot(curtain_active=curtain_active)
         
         # Skip rendering entirely if nothing changed
         if not any_dirty:
@@ -231,10 +240,15 @@ class TextRenderer:
             self._render_segment_from_snapshot(snap)
             rendered_count += 1
         
-        # Step 4: Render group indicator on top
+        # Step 4: Render curtain bars (v7.0+)
+        if self._cm:
+            current_group_id = udp_handler.get_group_id()
+            self._cm.render(self._image, current_group_id, rotation)
+        
+        # Step 5: Render group indicator on top
         self._render_group_indicator(canvas_width, canvas_height)
         
-        # Step 5: Apply rotation and push to matrix
+        # Step 6: Apply rotation and push to matrix
         # Canvas dimensions are already correct based on rotation
         # Now apply the actual image rotation
         
@@ -344,6 +358,9 @@ class TextRenderer:
             tx = snap['width'] - tw - 1
         else:  # CENTER
             tx = (snap['width'] - tw) // 2
+            # Fix for Mono Regular font - it renders 1px too far left
+            if snap.get('font', 'arial').lower() in ('digital', 'digital12'):
+                tx += 1
         
         # Adjust vertical position to account for bbox offset
         ty = (snap['height'] - th) // 2 - bbox[1]
@@ -451,6 +468,9 @@ class TextRenderer:
                 draw_x = seg.x + seg.width - tw - 1
             else:  # CENTER
                 draw_x = seg.x + (seg.width - tw) // 2
+                # Fix for Mono Regular font - it renders 1px too far left
+                if seg.font.lower() in ('digital', 'digital12'):
+                    draw_x += 1
 
         draw_y = seg.y + (seg.height - th) // 2 - descent
 

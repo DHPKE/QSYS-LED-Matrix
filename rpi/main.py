@@ -2,6 +2,8 @@
 """
 main.py — Entry point for the RPi Zero 2 W LED Matrix controller.
 
+Version: 7.0.0 (Curtain Mode)
+
 Port of src/main.cpp (ESP32 Arduino firmware) to Python / Linux.
 
 Architecture:
@@ -41,6 +43,7 @@ from config import (
     DHCP_TIMEOUT_S,
 )
 from segment_manager import SegmentManager
+from curtain_manager import CurtainManager
 from udp_handler import UDPHandler, _load_config
 from web_server import WebServer
 
@@ -269,6 +272,7 @@ def main():
 
     # ── 2. Shared state ──────────────────────────────────────────────────
     sm = SegmentManager()
+    cm = CurtainManager()  # Curtain mode manager (v7.0+)
 
     # ── 3. Try to initialise the real LED matrix ──────────────────────────
     matrix   = None
@@ -305,7 +309,7 @@ def main():
 
         matrix = RGBMatrix(options=options)
         canvas = matrix.CreateFrameCanvas()
-        renderer = TextRenderer(matrix, canvas, sm)
+        renderer = TextRenderer(matrix, canvas, sm, cm)  # Pass curtain manager
         logger.info("✓ LED matrix initialised")
 
     except ImportError:
@@ -369,10 +373,22 @@ def main():
     load_udp_config()
 
     # ── 6. Start UDP listener ────────────────────────────────────────────
+    def on_curtain_trigger(group: int, state: bool):
+        """Callback for curtain boolean trigger"""
+        cm.set_visibility(group, state)
+        sm.mark_all_dirty()  # Force re-render
+    
+    def on_curtain_config(group: int, enabled: bool, color: str):
+        """Callback for curtain configuration"""
+        cm.configure(group, enabled, color)
+        sm.mark_all_dirty()  # Force re-render
+    
     udp = UDPHandler(sm, 
                      brightness_callback=on_brightness_change,
                      orientation_callback=on_orientation_change,
-                     display_callback=on_display_change)
+                     display_callback=on_display_change,
+                     curtain_callback=on_curtain_trigger,
+                     curtain_config_callback=on_curtain_config)
     udp.start()
     
     # Apply the correct layout based on loaded orientation
@@ -405,7 +421,7 @@ def main():
     udp._apply_layout(1)  # Apply Layout 1 (fullscreen) for IP splash at 0°
     
     sm.update_text(0, current_ip_ref[0], color="FFFFFF", bgcolor="000000", align="C")
-    sm.set_frame(0, enabled=True, color="FFFFFF", width=1)  # Add frame to IP splash
+    # Frame removed for cleaner splash screen (v7.0.7)
     sm.mark_all_dirty()  # Mark for rendering
     
     # Force immediate render of IP splash at 0° rotation
