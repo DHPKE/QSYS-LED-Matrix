@@ -1,5 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 7.0.17 - Layout 8 & 9 now use firmware presets 8 & 9 (not 15 & 16)
+-- Version 7.0.26 - Fixed layout 8/9 selection (added layout 10 placeholder)
 -- Version 7.0.12 - Apply button flushes ALL curtain groups (1-8), then sets only specified group
 -- Version 7.0.11 - Clear curtains from all groups on group switch, apply only to current
 -- Version 7.0.10 - Fixed num_segments scope with fallback default
@@ -531,6 +531,7 @@ if Controls then
         [7]  = { name="7 - Quad View",             activeSegments={0,1,2,3}, preset=7  },
         [8]  = { name="8 - VO-left",               activeSegments={0,2},     preset=8 },
         [9]  = { name="9 - VO-right",              activeSegments={1,2},     preset=9 },
+        [10] = { name="10 - (reserved)",           activeSegments={0},       preset=1 },  -- placeholder to maintain numbering
         [11] = { name="11 - Fullscreen Seg 1",     activeSegments={0},       preset=11 },
         [12] = { name="12 - Fullscreen Seg 2",     activeSegments={1},       preset=12 },
         [13] = { name="13 - Fullscreen Seg 3",     activeSegments={2},       preset=13 },
@@ -543,7 +544,7 @@ if Controls then
     local LayoutChoices = {
         "1 - Fullscreen", "2 - Top / Bottom", "3 - Left / Right",
         "4 - Triple Left", "5 - Triple Right", "6 - Thirds", "7 - Quad View",
-        "8 - VO-left", "9 - VO-right",
+        "8 - VO-left", "9 - VO-right", "10 - (reserved)",
         "11 - Fullscreen Seg 1", "12 - Fullscreen Seg 2",
         "13 - Fullscreen Seg 3", "14 - Fullscreen Seg 4",
     }
