@@ -23,7 +23,6 @@
 -- Version 6.5.0 - Added HTTP health check for accurate connection status
 -- Version 6.4.0 - Added test mode toggle button
 -- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
--- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
 -- NOTE: Uses HttpClient.Upload() and HttpClient.Download() per Q-SYS API
 --       https://q-syshelp.qsc.com/DeveloperHelp/Content/Code_Examples/HTTPClient.htm
@@ -82,7 +81,7 @@
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display (v7 VO Layouts)",
+    Name = "PKE~LED Matrix Display VO",
     Version = "7.0.13",
     Id = "dhpke.olimex.led.matrix.7.0.13",
     Description = "RPi 64x32 LED Matrix - Added VO-left & VO-right layouts (8/9→15/16)",
