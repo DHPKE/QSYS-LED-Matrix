@@ -1,4 +1,5 @@
 -- Q-SYS LED Matrix Controller Plugin
+-- Version 7.0.13 - Added Layout 8 (VO-left→preset 15) and Layout 9 (VO-right→preset 16)
 -- Version 7.0.12 - Apply button flushes ALL curtain groups (1-8), then sets only specified group
 -- Version 7.0.11 - Clear curtains from all groups on group switch, apply only to current
 -- Version 7.0.10 - Fixed num_segments scope with fallback default
@@ -75,13 +76,15 @@
 --   5  = Triple Right
 --   6  = Thirds
 --   7  = Quad View
+--   8  = VO-left (voice-over: seg1 5/6 left, seg3 quarter BR)
+--   9  = VO-right (voice-over: seg2 1/3 right, seg3 quarter BR)
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display (v7 Curtain Mode)",
-    Version = "7.0.7",
-    Id = "dhpke.olimex.led.matrix.7.0.7",
-    Description = "RPi 64x32 LED Matrix - Per-group curtain state + auto-show fix",
+    Name = "PKE~LED Matrix Display (v7 VO Layouts)",
+    Version = "7.0.13",
+    Id = "dhpke.olimex.led.matrix.7.0.13",
+    Description = "RPi 64x32 LED Matrix - Added VO-left & VO-right layouts (8/9→15/16)",
     ShowDebug = true,
     Author = "DHPKE"
 }
@@ -526,6 +529,8 @@ if Controls then
         [5]  = { name="5 - Triple Right",          activeSegments={0,1,2},   preset=5  },
         [6]  = { name="6 - Thirds",                activeSegments={0,1,2},   preset=6  },
         [7]  = { name="7 - Quad View",             activeSegments={0,1,2,3}, preset=7  },
+        [8]  = { name="8 - VO-left",               activeSegments={1,3},     preset=15 },
+        [9]  = { name="9 - VO-right",              activeSegments={2,3},     preset=16 },
         [11] = { name="11 - Fullscreen Seg 1",     activeSegments={0},       preset=11 },
         [12] = { name="12 - Fullscreen Seg 2",     activeSegments={1},       preset=12 },
         [13] = { name="13 - Fullscreen Seg 3",     activeSegments={2},       preset=13 },
@@ -538,6 +543,7 @@ if Controls then
     local LayoutChoices = {
         "1 - Fullscreen", "2 - Top / Bottom", "3 - Left / Right",
         "4 - Triple Left", "5 - Triple Right", "6 - Thirds", "7 - Quad View",
+        "8 - VO-left", "9 - VO-right",
         "11 - Fullscreen Seg 1", "12 - Fullscreen Seg 2",
         "13 - Fullscreen Seg 3", "14 - Fullscreen Seg 4",
     }
