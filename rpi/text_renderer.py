@@ -286,7 +286,11 @@ class TextRenderer:
     # ─── Private ───────────────────────────────────────────────────────────
 
     def _render_group_indicator(self, canvas_width: int, canvas_height: int):
-        """Draw a small colored square in the bottom-left corner to indicate the group."""
+        """Draw a small colored square to indicate the group.
+        
+        For layouts 8 & 9 (VO layouts), fills segment 2 position (BR corner).
+        For other layouts, draws 2×2 square in bottom-left.
+        """
         group_id = udp_handler.get_group_id()
         
         # Update cache if group changed
@@ -302,7 +306,31 @@ class TextRenderer:
         if self._cached_group_color == (0, 0, 0):
             return
         
-        # Position: bottom-left corner (2×2 pixel square by default)
+        # Check if we're in VO layout mode (8 or 9)
+        from config import LAYOUT_PRESETS, LAYOUT_PRESETS_PORTRAIT
+        current_layout = udp_handler.get_current_layout()
+        use_segment_position = (current_layout in [8, 9])
+        
+        if use_segment_position:
+            # Get segment 2 position from current layout preset
+            rotation = udp_handler.get_rotation()
+            orientation = udp_handler.get_orientation()
+            use_portrait = (orientation == "portrait") or (rotation in (90, 270))
+            
+            if use_portrait:
+                zones = LAYOUT_PRESETS_PORTRAIT.get(current_layout)
+            else:
+                zones = LAYOUT_PRESETS.get(current_layout)
+            
+            if zones and len(zones) > 2:
+                # Use segment 2 (index 2) position and size
+                x1, y1, w, h = zones[2]
+                x2 = x1 + w - 1
+                y2 = y1 + h - 1
+                self._draw.rectangle([x1, y1, x2, y2], fill=self._cached_group_color)
+                return
+        
+        # Default: bottom-left corner (2×2 pixel square)
         indicator_size = GROUP_INDICATOR_SIZE
         x1 = 0
         y1 = canvas_height - indicator_size
