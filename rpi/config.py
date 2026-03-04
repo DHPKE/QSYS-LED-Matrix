@@ -277,8 +277,8 @@ LAYOUT_PRESETS = {
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
     # Voice-over layouts (8 & 9) - Use these preset numbers directly
     # Curtain: 2px frame (0-1, 62-63 horizontal / 0-1, 30-31 vertical)
-    # Segments touch curtain at pixel 2, no gap (text renderer has no margin)
-    8: [(2,        2,         48,    28   ),                            # segment 0: large left (48×28)
+    # Segments touch curtain at pixel 1, no gap (text renderer has no margin)
+    8: [(1,        1,         52,    30   ),                            # segment 0: large left (52×30)
         (0,        0,         1,     1    ),                            # segment 1 hidden
         (51,       21,        11,    9    ),                            # segment 2: small BR corner (11×9)
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
