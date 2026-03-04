@@ -277,14 +277,14 @@ LAYOUT_PRESETS = {
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
     # Voice-over layouts (8 & 9) - Use these preset numbers directly
     # Curtain: 2px frame (0-1, 62-63 horizontal / 0-1, 30-31 vertical) rendered ON TOP
-    # Segments start at 0 to go under curtain, segment 2 positioned inside visible area
-    8: [(0,        0,         52,    32   ),                            # segment 0: large left (52×32, full height under curtain)
+    # Segments positioned with 1px gap from curtain (start at pixel 3, end at pixel 60)
+    8: [(3,        3,         49,    26   ),                            # segment 0: large left (49×26, 1px gap from curtain) - Q-SYS "Segment 1"
         (0,        0,         1,     1    ),                            # segment 1 hidden
-        (51,       21,        11,    9    ),                            # segment 2: BR indicator (11×9, inside curtain)
+        (51,       21,        9,     7    ),                            # segment 2: BR indicator (9×7, 1px gap) - Q-SYS "Segment 3"
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
     9: [(0,        0,         1,     1    ),                            # segment 0 hidden
-        (35,       2,         27,    17   ),                            # segment 1: top-right main area (27×17) - Q-SYS "Segment 2"
-        (51,       21,        11,    9    ),                            # segment 2: BR indicator (11×9, bottom-right) - Q-SYS "Segment 3"
+        (30,       3,         30,    19   ),                            # segment 1: top-right main (30×19, 5px wider, 1px gap) - Q-SYS "Segment 2"
+        (51,       21,        9,     7    ),                            # segment 2: BR indicator (9×7, 1px gap) - Q-SYS "Segment 3"
         (0,        0,         1,     1    )],                           # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
     # Other segments set to 1x1 to hide them (segment index matches tuple position)
