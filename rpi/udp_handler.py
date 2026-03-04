@@ -44,6 +44,9 @@ _rotation_lock = threading.Lock()
 _group_id = GROUP_ID
 _group_id_lock = threading.Lock()
 
+# Global handler instance for cross-module access (set in main.py)
+_handler = None
+
 
 def get_brightness() -> int:
     with _brightness_lock:

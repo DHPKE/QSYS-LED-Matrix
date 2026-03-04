@@ -335,9 +335,34 @@ class TextRenderer:
         if snap['effect'] == TextEffect.BLINK and not snap['blink_state']:
             return
 
-        # Auto-fit font with 1px margin on all borders
-        avail_w = max(1, snap['width']  - 2)  # 1px margin left and right
-        avail_h = max(1, snap['height'] - 2)  # 1px margin top and bottom
+        # Get current layout preset
+        current_layout = udp_handler._handler.get_current_layout() if hasattr(udp_handler, '_handler') and udp_handler._handler else 1
+        
+        # For VO layouts (15/16), maximize text size with 1px gap from curtain frame
+        # Layout 15 = VO-left (seg 1,3), Layout 16 = VO-right (seg 2,3)
+        if current_layout in (15, 16):
+            # Check if curtain is active for current group
+            current_group_id = udp_handler.get_group_id()
+            curtain_active = False
+            if self._cm and current_group_id > 0:
+                curtain_active = self._cm.should_render(current_group_id)
+            
+            # If curtain is active, account for 2px frame + 1px gap = 3px margin
+            # If curtain is not active, use standard 1px margin
+            if curtain_active:
+                # Curtain frame: 2px on all edges
+                # Gap requirement: 1px between text and curtain
+                # Total reduction: 2px (curtain) + 1px (gap) = 3px per edge
+                margin = 3
+            else:
+                margin = 1
+        else:
+            # Standard layouts: 1px margin
+            margin = 1
+
+        # Auto-fit font with appropriate margin
+        avail_w = max(1, snap['width']  - (margin * 2))  # margin on left and right
+        avail_h = max(1, snap['height'] - (margin * 2))  # margin on top and bottom
 
         font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), debug_seg_id=snap['id'])
         if not font:
@@ -351,11 +376,11 @@ class TextRenderer:
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]
         
-        # Calculate position based on alignment
+        # Calculate position based on alignment (using dynamic margin)
         if snap['align'] == TextAlign.LEFT:
-            tx = 1
+            tx = margin
         elif snap['align'] == TextAlign.RIGHT:
-            tx = snap['width'] - tw - 1
+            tx = snap['width'] - tw - margin
         else:  # CENTER
             tx = (snap['width'] - tw) // 2
             # Fix for Mono Regular font - it renders 1px too far left
