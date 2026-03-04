@@ -275,6 +275,15 @@ LAYOUT_PRESETS = {
         (W//2,      0,         W//2,  H//2 ),                            # top-right
         (0,         H//2,      W//2,  H//2 ),                            # bottom-left
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
+    # Voice-over layouts (8 & 9) - Use these preset numbers directly
+    8: [(3,        3,         42,    26   ),                            # segment 0: large left area (42×26)
+        (0,        0,         1,     1    ),                            # segment 1 hidden
+        (48,       19,        13,    10   ),                            # segment 2: small BR corner (13×10)
+        (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
+    9: [(0,        0,         1,     1    ),                            # segment 0 hidden
+        (32,       3,         29,    18   ),                            # segment 1: large top-right (29×18)
+        (48,       24,        13,    5    ),                            # segment 2: small BR corner (13×5)
+        (0,        0,         1,     1    )],                           # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
     # Other segments set to 1x1 to hide them (segment index matches tuple position)
     11: [(0,        0,         W,     H    )],                           # segment 0 fullscreen only
@@ -331,6 +340,15 @@ LAYOUT_PRESETS_PORTRAIT = {
         (PW//2,      0,         PW//2,  PH//2 ),                         # top-right
         (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left
         (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right
+    # Voice-over layouts (8 & 9) - Portrait mode
+    8: [(3,          3,         PW-6,   (5*PH)//6-6),                    # segment 0: 5/6 height top (26×47)
+        (0,          0,         1,      1     ),                         # segment 1 hidden
+        (PW//2+3,    PH//2+3,   PW//2-6,PH//2-6),                        # segment 2: quarter BR (10×26)
+        (0,          0,         1,      1     )],                        # segment 3 hidden (VO-left)
+    9: [(0,          0,         1,      1     ),                         # segment 0 hidden
+        (3,          3,         PW-6,   PH//3-6),                        # segment 1: larger top area (26×15)
+        (PW//2+3,    PH//2+3,   PW//2-6,PH//4-6),                        # segment 2: smaller BR (10×10)
+        (0,          0,         1,      1     )],                        # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
     # Other segments set to 1x1 to hide them (segment index matches tuple position)
     11: [(0,         0,         PW,     PH    )],                        # segment 0 fullscreen only
