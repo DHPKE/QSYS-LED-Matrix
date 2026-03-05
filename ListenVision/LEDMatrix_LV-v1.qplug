@@ -59,9 +59,9 @@ function GetControls(props)
     table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
     table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
 
-    -- Group routing controls (0=all, 1-8=groups)
+    -- Group routing controls (0=all, 1-8=groups, 9=device)
     table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })
-    for grp = 0, 8 do
+    for grp = 0, 9 do
         table.insert(controls, { Name=string.format("group%d_select", grp), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
     end
 
@@ -178,19 +178,20 @@ function GetControlLayout(props)
     -- ── Group Selection ─────────────────────────────────────────────
     y = y + 60
     GBox(0, y, W, 72, "Target Selection")
-    Lbl("Select target: ALL (broadcast), specific group, or individual device", 6, y+5, W-12)
+    Lbl("Select target: ALL (broadcast), GROUP (1-8), or DEVICE (individual)", 6, y+5, W-12)
     
-    -- Group buttons: 9 buttons (All + 1-8)
-    local btnW = 56
-    local btnGap = 6
-    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
-    for grp = 0, 8 do
+    -- Group buttons: 10 buttons (All + Groups 1-8 + Device)
+    local btnW = 54
+    local btnGap = 5
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8", "Dev"}
+    for grp = 0, 9 do
         local bx = 6 + grp * (btnW + btnGap)
+        local btnColor = grp == 9 and {0, 191, 255} or C_GRP_COLORS[grp] or {128, 128, 128}
         layout[string.format("group%d_select", grp)] = {
             PrettyName="Target~"..groupLabels[grp+1],
             Style="Button", ButtonStyle="Toggle",
             Legend=groupLabels[grp+1],
-            Color=C_GRP_COLORS[grp],
+            Color=btnColor,
             Position={bx, y+22}, Size={btnW, 36}
         }
     end
@@ -323,13 +324,16 @@ if Controls then
 
     -- Build MQTT topic based on current target
     local function BuildTopic(command)
-        local target
         if activeGroup == 0 then
-            target = "all"
+            -- Broadcast to all displays
+            return string.format("led/display/all/cmd/%s", command)
+        elseif activeGroup == 9 then
+            -- Send to individual device
+            return string.format("led/display/%d/cmd/%s", device_id, command)
         else
-            target = string.format("group/%d", activeGroup)
+            -- Send to specific group (1-8)
+            return string.format("led/group/%d/cmd/%s", activeGroup, command)
         end
-        return string.format("led/display/%s/cmd/%s", target, command)
     end
 
     -- Send MQTT command
@@ -441,7 +445,7 @@ if Controls then
 
         -- Initialize group selection (default to "All")
         Controls.group0_select.Boolean = true
-        for grp = 1, 8 do
+        for grp = 1, 9 do
             Controls[string.format("group%d_select", grp)].Boolean = false
         end
         Controls.active_group.String = "All"
@@ -480,20 +484,27 @@ if Controls then
     end
 
     -- Group selection handlers
-    for grp = 0, 8 do
+    for grp = 0, 9 do
         Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
             if updatingGroups then return end
             if ctl.Boolean then
                 Timer.CallAfter(function()
                     updatingGroups = true
-                    for g = 0, 8 do
+                    for g = 0, 9 do
                         if g ~= grp then
                             Controls[string.format("group%d_select", g)].Boolean = false
                         end
                     end
                     updatingGroups = false
                     activeGroup = grp
-                    local groupName = grp == 0 and "All" or "Group " .. tostring(grp)
+                    local groupName
+                    if grp == 0 then
+                        groupName = "All"
+                    elseif grp == 9 then
+                        groupName = string.format("Device %d", device_id)
+                    else
+                        groupName = "Group " .. tostring(grp)
+                    end
                     Controls.active_group.String = groupName
                     print(string.format("[GROUP] Selected: %s", groupName))
                 end, 0.05)
