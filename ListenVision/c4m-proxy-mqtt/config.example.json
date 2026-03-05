@@ -1,0 +1,52 @@
+{
+  "mqtt": {
+    "broker": "mqtt://localhost:1883",
+    "username": "",
+    "password": "",
+    "clientId": "c4m-proxy",
+    "topicPrefix": "led"
+  },
+  "webPort": 8080,
+  "matrixWidth": 64,
+  "matrixHeight": 32,
+  "updateRate": 10,
+  "devices": [
+    { "id": 1, "ip": "10.1.1.101", "group": 0, "name": "Main-Entrance", "enabled": true },
+    { "id": 2, "ip": "10.1.1.102", "group": 0, "name": "Lobby-Left", "enabled": true },
+    { "id": 3, "ip": "10.1.1.103", "group": 1, "name": "Hall-A-01", "enabled": true },
+    { "id": 4, "ip": "10.1.1.104", "group": 1, "name": "Hall-A-02", "enabled": true },
+    { "id": 5, "ip": "10.1.1.105", "group": 1, "name": "Hall-A-03", "enabled": true },
+    { "id": 6, "ip": "10.1.1.106", "group": 2, "name": "Hall-B-01", "enabled": true },
+    { "id": 7, "ip": "10.1.1.107", "group": 2, "name": "Hall-B-02", "enabled": true },
+    { "id": 8, "ip": "10.1.1.108", "group": 2, "name": "Hall-B-03", "enabled": true }
+  ],
+  "groups": {
+    "0": {
+      "name": "All Displays",
+      "description": "Broadcast to all displays"
+    },
+    "1": {
+      "name": "Hall A",
+      "description": "Main auditorium area"
+    },
+    "2": {
+      "name": "Hall B",
+      "description": "Secondary auditorium"
+    },
+    "3": {
+      "name": "Lobby",
+      "description": "Entrance and lobby areas"
+    },
+    "4": {
+      "name": "Meeting Rooms",
+      "description": "Conference and meeting rooms"
+    }
+  },
+  "sdk": {
+    "ledType": 3,
+    "colorType": 4,
+    "grayLevel": 0,
+    "saveType": 3,
+    "fontPath": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+  }
+}
