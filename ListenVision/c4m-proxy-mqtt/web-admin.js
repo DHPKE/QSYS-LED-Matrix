@@ -496,9 +496,14 @@ class WebAdmin {
     
     <!-- Devices Section -->
     <div class="section">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="margin: 0;">🖥️ Devices (<span id="device-count">0</span>)</h2>
-        <button class="btn" onclick="showAddDevice()">+ Add Device</button>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="margin: 0; color: #00ffff;">Number of Devices:</label>
+          <input type="number" id="num-devices" min="1" max="100" placeholder="40" style="width: 80px; margin: 0;">
+          <button class="btn" onclick="setDeviceCount()">Generate</button>
+          <button class="btn" onclick="showAddDevice()">+ Add Single</button>
+        </div>
       </div>
       
       <table id="devices-table">
@@ -810,6 +815,60 @@ class WebAdmin {
         }
       } catch (e) {
         showToast('Failed to test device', true);
+      }
+    }
+    
+    // Set device count - generate empty device entries
+    async function setDeviceCount() {
+      const count = parseInt(document.getElementById('num-devices').value);
+      
+      if (!count || count < 1 || count > 100) {
+        showToast('Please enter a number between 1 and 100', true);
+        return;
+      }
+      
+      if (!confirm(\`This will create \${count} device entries. Existing devices will be preserved. Continue?\`)) {
+        return;
+      }
+      
+      try {
+        // Get existing device IDs
+        const existingIds = new Set(devices.map(d => d.id));
+        
+        // Generate new devices
+        const newDevices = [];
+        for (let i = 1; i <= count; i++) {
+          if (!existingIds.has(i)) {
+            newDevices.push({
+              id: i,
+              name: \`Device-\${String(i).padStart(2, '0')}\`,
+              ip: \`10.1.1.\${100 + i}\`,
+              group: 0,
+              enabled: true
+            });
+          }
+        }
+        
+        if (newDevices.length === 0) {
+          showToast('All device IDs 1-' + count + ' already exist', false);
+          return;
+        }
+        
+        // Add new devices
+        for (const device of newDevices) {
+          await fetch('/api/devices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(device)
+          });
+        }
+        
+        showToast(\`Generated \${newDevices.length} new devices (IDs 1-\${count})\`);
+        await loadDevices();
+        
+      } catch (e) {
+        console.error('Failed to generate devices:', e);
+        showToast('Failed to generate devices', true);
       }
     }
     
