@@ -35,6 +35,7 @@ const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
 const { RenderEngine, EFFECTS, ALIGN } = require('./render-engine');
+const WebAdmin = require('./web-admin');
 
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const DEFAULT_CONFIG = {
@@ -68,6 +69,7 @@ class C4MProxyMQTT {
     this.config = DEFAULT_CONFIG;
     this.mqttClient = null;
     this.httpServer = http.createServer(this.handleHTTP.bind(this));
+    this.webAdmin = new WebAdmin(this, CONFIG_FILE);
     
     // Device state tracking
     this.renderers = new Map();
@@ -595,29 +597,8 @@ class C4MProxyMQTT {
    * Handle HTTP requests
    */
   async handleHTTP(req, res) {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    
-    if (url.pathname === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(this.generateWebUI());
-    } else if (url.pathname === '/api/stats') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.getStats()));
-    } else if (url.pathname === '/api/devices') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      const devices = this.config.devices.map(d => ({
-        ...d,
-        health: this.deviceHealth.get(d.id) || {},
-        state: this.deviceStates.get(d.id) || {}
-      }));
-      res.end(JSON.stringify(devices));
-    } else if (url.pathname === '/api/config') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.config));
-    } else {
-      res.writeHead(404);
-      res.end('Not Found');
-    }
+    // Delegate to web admin
+    return this.webAdmin.handleRequest(req, res);
   }
 
   /**
