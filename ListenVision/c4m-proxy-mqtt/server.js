@@ -263,6 +263,7 @@ class C4MProxyMQTT {
   async processCommand(cmd, payload, devices) {
     switch (cmd) {
       case 'segment':
+      case 'text':  // Alias
         await this.handleSetSegment(payload, devices);
         break;
         
@@ -282,8 +283,36 @@ class C4MProxyMQTT {
         await this.handleClear(payload, devices);
         break;
         
+      case 'clear_all':
+        await this.handleClearAll(payload, devices);
+        break;
+        
       case 'test':
         await this.handleTest(payload, devices);
+        break;
+        
+      case 'frame':
+        await this.handleFrame(payload, devices);
+        break;
+        
+      case 'curtain':
+        await this.handleCurtain(payload, devices);
+        break;
+        
+      case 'group':
+        await this.handleGroup(payload, devices);
+        break;
+        
+      case 'display':
+        await this.handleDisplay(payload, devices);
+        break;
+        
+      case 'orientation':
+        await this.handleOrientation(payload, devices);
+        break;
+        
+      case 'config':
+        await this.handleConfig(payload, devices);
         break;
         
       default:
@@ -316,25 +345,36 @@ class C4MProxyMQTT {
   }
 
   /**
-   * Handle set segment command
+   * Handle set segment command (enhanced with all RPi properties)
    */
   async handleSetSegment(payload, devices) {
-    const { seg, enabled, text, color, effect, align } = payload;
+    const { 
+      seg, enabled, text, color, bgcolor, font, size, intensity,
+      effect, align 
+    } = payload;
     
     for (const device of devices) {
       const renderer = this.renderers.get(device.id);
       if (!renderer) continue;
       
-      renderer.setSegment(seg, {
+      const segProps = {
         enabled: enabled !== undefined ? enabled : true,
         text: text || '',
         color: color || '#FF0000',
-        effect: effect || EFFECTS.STATIC,
+        effect: effect !== undefined ? effect : EFFECTS.STATIC,
         align: align !== undefined ? align : ALIGN.LEFT
-      });
+      };
+      
+      // Add new properties if provided
+      if (bgcolor !== undefined) segProps.bgcolor = bgcolor;
+      if (font !== undefined) segProps.font = font;
+      if (size !== undefined) segProps.size = size;
+      if (intensity !== undefined) segProps.intensity = intensity;
+      
+      renderer.setSegment(seg, segProps);
       
       // Store state
-      this.storeDeviceState(device.id, { seg, enabled, text, color, effect, align });
+      this.storeDeviceState(device.id, { seg, ...segProps });
     }
     
     await this.renderAndSendToDevices(devices);
@@ -431,6 +471,151 @@ class C4MProxyMQTT {
     }
     
     await this.renderAndSendToDevices(devices);
+  }
+
+  /**
+   * Handle clear all command
+   */
+  async handleClearAll(payload, devices) {
+    for (const device of devices) {
+      const renderer = this.renderers.get(device.id);
+      if (!renderer) continue;
+      
+      for (let i = 0; i < 4; i++) {
+        renderer.setSegment(i, { enabled: false, text: '' });
+      }
+      
+      this.storeDeviceState(device.id, { cleared_all: true });
+    }
+    
+    await this.renderAndSendToDevices(devices);
+  }
+
+  /**
+   * Handle frame command - set segment borders
+   */
+  async handleFrame(payload, devices) {
+    const { seg, enabled, color, width } = payload;
+    
+    for (const device of devices) {
+      const renderer = this.renderers.get(device.id);
+      if (!renderer) continue;
+      
+      renderer.setFrame(seg, enabled, color || '#FFFFFF', width || 1);
+      this.storeDeviceState(device.id, { frame: { seg, enabled, color, width } });
+    }
+    
+    await this.renderAndSendToDevices(devices);
+  }
+
+  /**
+   * Handle curtain command - 3px edge bars per group
+   */
+  async handleCurtain(payload, devices) {
+    const { group, enabled, color, state } = payload;
+    
+    // Support both new unified mode (enabled) and legacy mode (state)
+    const isEnabled = enabled !== undefined ? enabled : (state !== undefined ? state : false);
+    const curtainColor = color || '#FFFFFF';
+    
+    for (const device of devices) {
+      const renderer = this.renderers.get(device.id);
+      if (!renderer) continue;
+      
+      // Configure curtain for the group
+      renderer.configureCurtain(group, isEnabled, curtainColor);
+      
+      // If this device is in the specified group, set it as active
+      if (device.group === group || group === 0) {
+        renderer.setGroup(group);
+      }
+      
+      this.storeDeviceState(device.id, { curtain: { group, enabled: isEnabled, color: curtainColor } });
+    }
+    
+    await this.renderAndSendToDevices(devices);
+  }
+
+  /**
+   * Handle group command - assign device to group
+   */
+  async handleGroup(payload, devices) {
+    const { value } = payload;
+    const groupId = parseInt(value);
+    
+    if (groupId < 0 || groupId > 8) {
+      console.warn(`⚠ Invalid group ID: ${groupId}`);
+      return;
+    }
+    
+    for (const device of devices) {
+      // Update device group in config
+      device.group = groupId;
+      
+      const renderer = this.renderers.get(device.id);
+      if (renderer) {
+        renderer.setGroup(groupId);
+      }
+      
+      this.storeDeviceState(device.id, { group: groupId });
+    }
+    
+    // Save updated config
+    await this.saveConfig();
+    
+    console.log(`✓ Assigned ${devices.length} device(s) to group ${groupId}`);
+  }
+
+  /**
+   * Handle display command - enable/disable display
+   */
+  async handleDisplay(payload, devices) {
+    const { enabled } = payload;
+    
+    for (const device of devices) {
+      const renderer = this.renderers.get(device.id);
+      if (!renderer) continue;
+      
+      renderer.setDisplayEnabled(enabled);
+      this.storeDeviceState(device.id, { display_enabled: enabled });
+    }
+    
+    await this.renderAndSendToDevices(devices);
+  }
+
+  /**
+   * Handle orientation command - landscape/portrait
+   */
+  async handleOrientation(payload, devices) {
+    const { value } = payload;
+    
+    for (const device of devices) {
+      const renderer = this.renderers.get(device.id);
+      if (!renderer) continue;
+      
+      renderer.setOrientation(value);
+      this.storeDeviceState(device.id, { orientation: value });
+    }
+    
+    // Orientation changes canvas size - re-render
+    await this.renderAndSendToDevices(devices);
+  }
+
+  /**
+   * Handle config command - manual segment positioning
+   */
+  async handleConfig(payload, devices) {
+    const { seg, x, y, w, h } = payload;
+    
+    for (const device of devices) {
+      const renderer = this.renderers.get(device.id);
+      if (!renderer) continue;
+      
+      renderer.configureSegment(seg, x, y, w, h);
+      this.storeDeviceState(device.id, { config: { seg, x, y, w, h } });
+    }
+    
+    console.log(`✓ Configured segment ${seg} position: ${x},${y} ${w}×${h}`);
   }
 
   /**
