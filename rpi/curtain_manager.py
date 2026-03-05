@@ -1,15 +1,15 @@
 """
 curtain_manager.py — Curtain Mode Manager (v7.0+)
 
-Manages curtain mode: 3-pixel wide vertical bars on left and right edges.
+Manages curtain mode: 2-pixel frame around the entire display.
 Curtains are group-based (1-8) and can be toggled on/off via boolean input.
 
 Curtain layout:
-  - Left bar: pixels 0-2 (3 pixels wide, full height)
-  - Right bar: pixels 61-63 (3 pixels wide, full height)
-  - Middle area: pixels 3-60 (58 pixels wide) - segments stay as configured
+  - 2-pixel frame rendered on all four edges (top, right, bottom, left)
+  - Inner display area: (2,2) to (61,29) on 64x32 panel
+  - Frame is rendered on top of all segments (highest z-index)
 
-Curtain bars are always rendered on top of segments (highest z-index).
+Curtain frame is always rendered on top of segments (highest z-index).
 """
 
 import logging
@@ -121,8 +121,8 @@ class CurtainManager:
     
     def render(self, image: Image.Image, group: int, rotation: int = 0) -> None:
         """
-        Render curtain bars on the given image if enabled for this group.
-        Curtain bars are always vertical (left and right edges of the DISPLAY),
+        Render 2-pixel frame around the entire display if enabled for this group.
+        Frame is always rendered on all four edges of the canvas,
         regardless of rotation.
         
         Args:
@@ -139,23 +139,35 @@ class CurtainManager:
         # Get actual canvas dimensions
         img_width, img_height = image.size
         
-        # Curtain bars are ALWAYS on left and right edges of the canvas
-        # (which represents the physical display edges regardless of rotation)
+        # Frame border width (2 pixels)
+        border = 2
         
-        # Left bar: x=0 to x=2 (3 pixels wide, full height)
+        # Draw 2-pixel frame around entire display
+        # Top edge (2 pixels high)
         draw.rectangle(
-            [(0, 0), (CURTAIN_WIDTH - 1, img_height - 1)],
+            [(0, 0), (img_width - 1, border - 1)],
             fill=color
         )
         
-        # Right bar: x=(width-3) to x=(width-1) (3 pixels wide, full height)
-        right_x = img_width - CURTAIN_WIDTH
+        # Bottom edge (2 pixels high)
         draw.rectangle(
-            [(right_x, 0), (img_width - 1, img_height - 1)],
+            [(0, img_height - border), (img_width - 1, img_height - 1)],
             fill=color
         )
         
-        logger.debug(f"[Curtain] Rendered curtains for group {group} at {rotation}° (canvas {img_width}×{img_height}) with color {color}")
+        # Left edge (2 pixels wide, full height)
+        draw.rectangle(
+            [(0, 0), (border - 1, img_height - 1)],
+            fill=color
+        )
+        
+        # Right edge (2 pixels wide, full height)
+        draw.rectangle(
+            [(img_width - border, 0), (img_width - 1, img_height - 1)],
+            fill=color
+        )
+        
+        logger.debug(f"[Curtain] Rendered 2px frame for group {group} at {rotation}° (canvas {img_width}×{img_height}) with color {color}")
     
     def _load_state(self) -> None:
         """Load curtain state from persistent storage."""

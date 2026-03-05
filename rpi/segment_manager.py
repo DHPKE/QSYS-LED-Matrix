@@ -48,7 +48,7 @@ class Segment:
     """Single display zone."""
     __slots__ = (
         "id", "x", "y", "width", "height",
-        "text", "color", "bgcolor", "font",
+        "text", "color", "bgcolor", "font", "size",
         "align", "effect", "effect_speed",
         "scroll_offset", "last_scroll_update",
         "blink_state", "last_blink_update",
@@ -66,6 +66,7 @@ class Segment:
         self.color  = "#FFFFFF"
         self.bgcolor = "#000000"
         self.font   = "arial"  # Default font
+        self.size   = "auto"   # Font size mode: auto, small, medium, large
         self.align  = TextAlign.CENTER
         self.effect = TextEffect.NONE
         self.effect_speed = DEFAULT_SCROLL_SPEED
@@ -90,6 +91,7 @@ class Segment:
             "color":   self.color,
             "bgcolor": self.bgcolor,
             "font":    self.font,
+            "size":    self.size,
             "align":   self.align.value,
             "effect":  self.effect.value,
             "active":  self.is_active,
@@ -109,6 +111,7 @@ class Segment:
             'color': self.color,
             'bgcolor': self.bgcolor,
             'font': self.font,
+            'size': self.size,
             'align': self.align,
             'effect': self.effect,
             'blink_state': self.blink_state,
@@ -210,7 +213,7 @@ class SegmentManager:
 
     def update_text(self, seg_id: int, text: str, color: str = None,
                     bgcolor: str = None, align: str = None,
-                    effect: str = None, font: str = None, intensity: int = 255):
+                    effect: str = None, font: str = None, size: str = None, intensity: int = 255):
         """Update segment text and properties WITHOUT activating the segment.
         Segments are only activated by layout presets."""
         with self._lock:
@@ -228,6 +231,8 @@ class SegmentManager:
                 seg.effect = _parse_effect(effect)
             if font is not None:
                 seg.font = font.lower()
+            if size is not None:
+                seg.size = size.lower()
             # Do NOT activate segment here - only layout presets activate segments
             # seg.is_active = True  # REMOVED
             seg.is_dirty  = True

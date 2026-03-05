@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 # Expanded font size range for maximum granularity (tries every size from 32 down to 6)
 _FONT_SIZES = [32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 13, 12, 11, 10, 9, 8, 7, 6]
 
+# Size mode ranges
+_SIZE_RANGES = {
+    'auto': _FONT_SIZES,  # Full range, auto-scale
+    'small': [12, 11, 10, 9, 8, 7, 6],  # Small readable fonts
+    'medium': [20, 18, 16, 14, 13],  # Medium fonts
+    'large': [32, 30, 28, 26, 24, 22],  # Large fonts
+}
+
 # Cache loaded fonts keyed by (path, size) to avoid repeated disk I/O.
 _font_cache: dict[tuple, ImageFont.FreeTypeFont] = {}
 
@@ -93,12 +101,18 @@ def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     return rgb
 
 
-def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
+def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", size_mode: str = "auto", debug_seg_id: int = -1) -> tuple[ImageFont.ImageFont, int]:
     """Return (font, font_size) for the largest size that fits within max_w × max_h.
-    Uses cached measurements for performance."""
+    Uses cached measurements for performance.
+    
+    size_mode: 'auto' (full range), 'small' (6-12), 'medium' (13-20), 'large' (22-32)
+    """
+    
+    # Get size range for the mode
+    size_range = _SIZE_RANGES.get(size_mode, _FONT_SIZES)
     
     # Try to use cached measurement first
-    for size in _FONT_SIZES:
+    for size in size_range:
         cache_key = (text, font_name, size)
         
         if cache_key in _text_measurement_cache:
@@ -117,10 +131,11 @@ def _fit_text(text: str, max_w: int, max_h: int, font_name: str = "arial", debug
                 logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → size {size} ({tw}×{th} in {max_w}×{max_h})")
             return _load_font(font_name, size), size
     
-    # Fallback: smallest size
+    # Fallback: smallest size in range
+    min_size = size_range[-1]
     if debug_seg_id >= 0:
-        logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {_FONT_SIZES[-1]} (text too long)")
-    return _load_font(font_name, _FONT_SIZES[-1]), _FONT_SIZES[-1]
+        logger.debug(f"[FONT] Seg {debug_seg_id}: '{text[:20]}' → min size {min_size} (text too long)")
+    return _load_font(font_name, min_size), min_size
 
 
 class TextRenderer:
@@ -286,7 +301,11 @@ class TextRenderer:
     # ─── Private ───────────────────────────────────────────────────────────
 
     def _render_group_indicator(self, canvas_width: int, canvas_height: int):
-        """Draw a small colored square in the bottom-left corner to indicate the group."""
+        """Draw a small colored square to indicate the group.
+        
+        For layouts 8 & 9 (VO layouts), fills segment 2 position (BR corner).
+        For other layouts, draws 2×2 square in bottom-left.
+        """
         group_id = udp_handler.get_group_id()
         
         # Update cache if group changed
@@ -302,7 +321,31 @@ class TextRenderer:
         if self._cached_group_color == (0, 0, 0):
             return
         
-        # Position: bottom-left corner (2×2 pixel square by default)
+        # Check if we're in VO layout mode (8 or 9)
+        from config import LAYOUT_PRESETS, LAYOUT_PRESETS_PORTRAIT
+        current_layout = udp_handler.get_current_layout()
+        use_segment_position = (current_layout in [8, 9])
+        
+        if use_segment_position:
+            # Get segment 2 position from current layout preset
+            rotation = udp_handler.get_rotation()
+            orientation = udp_handler.get_orientation()
+            use_portrait = (orientation == "portrait") or (rotation in (90, 270))
+            
+            if use_portrait:
+                zones = LAYOUT_PRESETS_PORTRAIT.get(current_layout)
+            else:
+                zones = LAYOUT_PRESETS.get(current_layout)
+            
+            if zones and len(zones) > 2:
+                # Use segment 2 (index 2) position and size
+                x1, y1, w, h = zones[2]
+                x2 = x1 + w - 1
+                y2 = y1 + h - 1
+                self._draw.rectangle([x1, y1, x2, y2], fill=self._cached_group_color)
+                return
+        
+        # Default: bottom-left corner (2×2 pixel square)
         indicator_size = GROUP_INDICATOR_SIZE
         x1 = 0
         y1 = canvas_height - indicator_size
@@ -335,11 +378,11 @@ class TextRenderer:
         if snap['effect'] == TextEffect.BLINK and not snap['blink_state']:
             return
 
-        # Auto-fit font with 1px margin on all borders
-        avail_w = max(1, snap['width']  - 2)  # 1px margin left and right
-        avail_h = max(1, snap['height'] - 2)  # 1px margin top and bottom
+        # Auto-fit font - no margin for maximum text size
+        avail_w = max(1, snap['width'])
+        avail_h = max(1, snap['height'])
 
-        font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), debug_seg_id=snap['id'])
+        font, font_size = _fit_text(text, avail_w, avail_h, font_name=snap.get('font', 'arial'), size_mode=snap.get('size', 'auto'), debug_seg_id=snap['id'])
         if not font:
             return
 
@@ -351,11 +394,11 @@ class TextRenderer:
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]
         
-        # Calculate position based on alignment
+        # Calculate position based on alignment (no margins)
         if snap['align'] == TextAlign.LEFT:
-            tx = 1
+            tx = 0
         elif snap['align'] == TextAlign.RIGHT:
-            tx = snap['width'] - tw - 1
+            tx = snap['width'] - tw
         else:  # CENTER
             tx = (snap['width'] - tw) // 2
             # Fix for Mono Regular font - it renders 1px too far left
@@ -438,10 +481,10 @@ class TextRenderer:
         if seg.effect == TextEffect.BLINK and not seg.blink_state:
             return
 
-        # Auto-fit font with 1px margin on all borders
-        avail_w = max(1, seg.width  - 2)  # 1px margin left and right
-        avail_h = max(1, seg.height - 2)  # 1px margin top and bottom
-        font, font_size = _fit_text(text, avail_w, avail_h, font_name=seg.font, debug_seg_id=seg.id)
+        # Auto-fit font - no margin for maximum text size
+        avail_w = max(1, seg.width)
+        avail_h = max(1, seg.height)
+        font, font_size = _fit_text(text, avail_w, avail_h, font_name=seg.font, size_mode=seg.size, debug_seg_id=seg.id)
 
         # Measure text
         try:
@@ -461,11 +504,11 @@ class TextRenderer:
             offset = seg.scroll_offset % total_scroll
             draw_x = seg.x + seg.width - offset
         else:
-            # Static alignment - minimal margins for maximum font size
+            # Static alignment - no margins for maximum font size
             if seg.align == TextAlign.LEFT:
-                draw_x = seg.x + 1
+                draw_x = seg.x
             elif seg.align == TextAlign.RIGHT:
-                draw_x = seg.x + seg.width - tw - 1
+                draw_x = seg.x + seg.width - tw
             else:  # CENTER
                 draw_x = seg.x + (seg.width - tw) // 2
                 # Fix for Mono Regular font - it renders 1px too far left

@@ -2,7 +2,7 @@
 """
 main.py — Entry point for the RPi Zero 2 W LED Matrix controller.
 
-Version: 7.0.0 (Curtain Mode)
+Version: 7.0.36 (Fixed __slots__)
 
 Port of src/main.cpp (ESP32 Arduino firmware) to Python / Linux.
 
@@ -390,6 +390,10 @@ def main():
                      curtain_callback=on_curtain_trigger,
                      curtain_config_callback=on_curtain_config)
     udp.start()
+    
+    # Set global handler reference for cross-module access
+    import udp_handler
+    udp_handler._handler = udp
     
     # Apply the correct layout based on loaded orientation
     # This ensures segments match the canvas dimensions on startup

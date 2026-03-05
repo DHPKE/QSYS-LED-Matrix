@@ -138,28 +138,24 @@ GROUP_INDICATOR_Y = -1     # Y position (-1 = auto-calculate bottom position)
 # ──────────────────────────────────────────────────────────────────────────────
 # Curtain Mode (v7.0+)
 # ──────────────────────────────────────────────────────────────────────────────
-# Curtain mode creates two 3-pixel wide vertical bars on the left and right edges
-# of the display. Think of curtains as TWO SEGMENTS (left bar + right bar).
+# Curtain mode creates a 2-pixel frame around the entire display.
 #
 # When curtain mode is active for a group:
-# - Left curtain segment:  pixels 0-2   (3 pixels wide, full height, x=0, w=3)
-# - Right curtain segment: pixels 61-63 (3 pixels wide, full height, x=61, w=3)
-# - Middle area reserved:  pixels 3-60  (58 pixels wide, for regular segments)
+# - 2-pixel frame rendered on all four edges (top, right, bottom, left)
+# - Inner display area: (2,2) to (61,29) on 64x32 panel
+# - Frame is rendered on top of all segments (highest z-index)
 #
-# Segments 1-4 are AUTOMATICALLY REMAPPED when curtain is active:
-# - All segment x positions shifted right by 3 pixels
-# - All segment widths reduced by 6 pixels (3 left + 3 right)
-# - Example: Fullscreen segment (x=0, w=64) becomes (x=3, w=58)
+# Segments 1-4 positions are NOT automatically remapped - they render as configured,
+# with the frame appearing as an overlay on top.
 #
 # Usage: Configure curtain for specific groups (e.g., groups 1,4,6)
-# When panel switches to those groups, curtain automatically shows and
-# segments are remapped to avoid overlap.
+# When panel switches to those groups, curtain frame automatically shows.
 
-CURTAIN_WIDTH = 3          # Width of each curtain bar in pixels
+CURTAIN_WIDTH = 2          # Width of frame border in pixels (used for compatibility)
 CURTAIN_DEFAULT_COLOR = (255, 255, 255)  # Default color (white) RGB tuple
 
-# Curtain remap mode: automatically adjust segment positions when curtain is active
-CURTAIN_AUTO_REMAP = True  # True = auto-shift segments, False = segments stay as-is
+# Curtain remap mode: deprecated (segments no longer auto-remapped)
+CURTAIN_AUTO_REMAP = False  # False = segments stay as-is, frame overlays
 
 # Curtain state per group (1-8) - persisted to storage
 # Format: {group_id: {"enabled": bool, "color": (R,G,B)}}
@@ -243,13 +239,19 @@ SEGMENT_FILE = "/var/lib/led-matrix/segments.json"
 # Each entry is a list of (x, y, w, h) tuples, one per active segment.
 # Segments beyond the list length are deactivated (w=0).
 #
-#  Layout 1 — Fullscreen         [seg0: full 64×32]
-#  Layout 2 — Top/Bottom halves  [seg0: top, seg1: bottom]
-#  Layout 3 — Left/Right halves  [seg0: left, seg1: right]
-#  Layout 4 — Triple left        [seg0: left half, seg1: right-top, seg2: right-bottom]
-#  Layout 5 — Triple right       [seg0: left-top, seg1: left-bottom, seg2: right half]
-#  Layout 6 — Thirds vertical    [seg0 | seg1 | seg2]
-#  Layout 7 — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+#  Layout 1  — Fullscreen         [seg0: full 64×32]
+#  Layout 2  — Top/Bottom halves  [seg0: top, seg1: bottom]
+#  Layout 3  — Left/Right halves  [seg0: left, seg1: right]
+#  Layout 4  — Triple left        [seg0: left half, seg1: right-top, seg2: right-bottom]
+#  Layout 5  — Triple right       [seg0: left-top, seg1: left-bottom, seg2: right half]
+#  Layout 6  — Thirds vertical    [seg0 | seg1 | seg2]
+#  Layout 7  — Quad view          [seg0: TL, seg1: TR, seg2: BL, seg3: BR]
+#  Layout 11 — Segment 0 only     [seg0 fullscreen, others hidden]
+#  Layout 12 — Segment 1 only     [seg1 fullscreen, others hidden]
+#  Layout 13 — Segment 2 only     [seg2 fullscreen, others hidden]
+#  Layout 14 — Segment 3 only     [seg3 fullscreen, others hidden]
+#  Layout 15 — VO-left            [seg1: 5/6 width left (53×32), seg3: quarter BR (32×16)]
+#  Layout 16 — VO-right           [seg2: 1/2 width, 1/3 height top-right (32×11), seg3: quarter BR (32×16)]
 # ──────────────────────────────────────────────────────────────────────────────
 W = MATRIX_WIDTH
 H = MATRIX_HEIGHT
@@ -273,6 +275,17 @@ LAYOUT_PRESETS = {
         (W//2,      0,         W//2,  H//2 ),                            # top-right
         (0,         H//2,      W//2,  H//2 ),                            # bottom-left
         (W//2,      H//2,      W//2,  H//2 )],                           # bottom-right
+    # Voice-over layouts (8 & 9) - Use these preset numbers directly
+    # Curtain: 2px frame (0-1, 62-63 horizontal / 0-1, 30-31 vertical) rendered ON TOP
+    # Segments positioned with 1px gap from curtain (start at pixel 3, end at pixel 60)
+    8: [(3,        3,         49,    26   ),                            # segment 0: large left (49×26, 1px gap from curtain) - Q-SYS "Segment 1"
+        (0,        0,         1,     1    ),                            # segment 1 hidden
+        (52,       22,        9,     7    ),                            # segment 2: BR indicator (9×7, down 1px, right 1px) - Q-SYS "Segment 3"
+        (0,        0,         1,     1    )],                           # segment 3 hidden (VO-left)
+    9: [(0,        0,         1,     1    ),                            # segment 0 hidden
+        (29,       2,         33,    20   ),                            # segment 1: top-right main (33×20, up 1px, right 1px) - Q-SYS "Segment 2"
+        (52,       22,        9,     7    ),                            # segment 2: BR indicator (9×7, down 1px, right 1px) - Q-SYS "Segment 3"
+        (0,        0,         1,     1    )],                           # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
     # Other segments set to 1x1 to hide them (segment index matches tuple position)
     11: [(0,        0,         W,     H    )],                           # segment 0 fullscreen only
@@ -318,6 +331,15 @@ LAYOUT_PRESETS_PORTRAIT = {
         (PW//2,      0,         PW//2,  PH//2 ),                         # top-right
         (0,          PH//2,     PW//2,  PH//2 ),                         # bottom-left
         (PW//2,      PH//2,     PW//2,  PH//2 )],                        # bottom-right
+    # Voice-over layouts (8 & 9) - Portrait mode
+    8: [(3,          3,         PW-6,   (5*PH)//6-6),                    # segment 0: 5/6 height top (26×47)
+        (0,          0,         1,      1     ),                         # segment 1 hidden
+        (PW//2+3,    PH//2+3,   PW//2-6,PH//2-6),                        # segment 2: quarter BR (10×26)
+        (0,          0,         1,      1     )],                        # segment 3 hidden (VO-left)
+    9: [(0,          0,         1,      1     ),                         # segment 0 hidden
+        (3,          3,         PW-6,   PH//3-6),                        # segment 1: larger top area (26×15)
+        (PW//2+3,    PH//2+3,   PW//2-6,PH//4-6),                        # segment 2: smaller BR (10×10)
+        (0,          0,         1,      1     )],                        # segment 3 hidden (VO-right)
     # Single segment fullscreen layouts (for QSYS plugin presets 11-14)
     # Other segments set to 1x1 to hide them (segment index matches tuple position)
     11: [(0,         0,         PW,     PH    )],                        # segment 0 fullscreen only

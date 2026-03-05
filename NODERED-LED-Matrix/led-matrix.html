@@ -212,14 +212,14 @@
     </div>
     
     <hr>
-    <h4>Curtain Mode (v7.0)</h4>
+    <h4>Curtain Mode (v7.0.9 - 2px Frame)</h4>
     
     <div class="form-row">
-        <label for="node-input-curtainEnable"><i class="fa fa-columns"></i> Curtain Enable</label>
+        <label for="node-input-curtainEnable"><i class="fa fa-square-o"></i> Curtain Enable</label>
         <select id="node-input-curtainEnable" style="width: 200px;">
             <option value="">From message</option>
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
+            <option value="true">Show Curtain</option>
+            <option value="false">Hide Curtain</option>
         </select>
     </div>
     
@@ -230,11 +230,18 @@
     </div>
     
     <div class="form-row">
-        <label for="node-input-curtain"><i class="fa fa-eye"></i> Curtain Show/Hide</label>
+        <label for="node-input-curtain"><i class="fa fa-hashtag"></i> Group</label>
         <select id="node-input-curtain" style="width: 200px;">
             <option value="">From message</option>
-            <option value="true">Show</option>
-            <option value="false">Hide</option>
+            <option value="0">0 - Broadcast (All)</option>
+            <option value="1">1 - Group 1</option>
+            <option value="2">2 - Group 2</option>
+            <option value="3">3 - Group 3</option>
+            <option value="4">4 - Group 4</option>
+            <option value="5">5 - Group 5</option>
+            <option value="6">6 - Group 6</option>
+            <option value="7">7 - Group 7</option>
+            <option value="8">8 - Group 8</option>
         </select>
     </div>
     
@@ -312,25 +319,21 @@ msg.framewidth = 2;         // Optional width (default: 1)</pre>
     <pre>msg.frame = false;
 msg.segment = 0;</pre>
 
-    <h3>Curtain Mode (v7.0)</h3>
-    <p>Curtain Mode creates two 3-pixel wide vertical bars on the left (0-2) and right (61-63) edges. 
-       Each group (1-8) has independent curtain configuration.</p>
+    <h3>Curtain Mode (v7.0.9 - 2px Frame)</h3>
+    <p>Curtain Mode creates a 2-pixel frame around the entire display (all 4 edges: top, right, bottom, left).
+       Each group (1-8) has independent curtain configuration. The frame overlays on top of segments.</p>
     
-    <p>Configure curtain for a group:</p>
-    <pre>msg.curtainEnable = true;     // Enable curtain for group
-msg.curtainColor = "FF0000";  // Red curtain bars
-msg.group = 1;                // Group 1</pre>
-    
-    <p>Toggle curtain visibility:</p>
-    <pre>msg.curtain = true;   // Show curtain
-msg.group = 1;        // For group 1</pre>
+    <p>Show curtain for a group:</p>
+    <pre>msg.curtainEnable = true;     // Show curtain frame
+msg.curtainColor = "FF0000";  // Red frame (optional)
+msg.group = 1;                // Group 1 (1-8 or 0 for all)</pre>
     
     <p>Hide curtain:</p>
-    <pre>msg.curtain = false;
+    <pre>msg.curtainEnable = false;
 msg.group = 1;</pre>
     
-    <p><strong>Note:</strong> Segments continue using their configured positions when curtain is active. 
-       To avoid overlap, configure segments with x=3, w=58 in your layout.</p>
+    <p><strong>Note:</strong> The curtain is a 2-pixel frame on all edges, overlaying segment content. 
+       Use different colors for different groups to indicate status/zones.</p>
 
     <h3>Group</h3>
     <p>Define segment groups:</p>

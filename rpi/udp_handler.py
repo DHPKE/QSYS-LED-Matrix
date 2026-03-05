@@ -44,6 +44,13 @@ _rotation_lock = threading.Lock()
 _group_id = GROUP_ID
 _group_id_lock = threading.Lock()
 
+# Current layout preset number
+_current_layout = 1
+_current_layout_lock = threading.Lock()
+
+# Global handler instance for cross-module access (set in main.py)
+_handler = None
+
 
 def get_brightness() -> int:
     with _brightness_lock:
@@ -119,6 +126,12 @@ def get_group_id() -> int:
     """Get current group ID (0 = no grouping, 1-8 = assigned group)"""
     with _group_id_lock:
         return _group_id
+
+
+def get_current_layout() -> int:
+    """Get current layout preset number"""
+    with _current_layout_lock:
+        return _current_layout
 
 
 def set_group_id(value: int):
@@ -297,10 +310,11 @@ class UDPHandler:
             align   = str(doc.get("align",   "C"))
             effect  = str(doc.get("effect",  "none"))
             font    = str(doc.get("font",    "arial"))
+            size    = str(doc.get("size",    "auto")).lower()  # auto, small, medium, large
             intens  = int(doc.get("intensity", 255))
-            logger.info(f"[UDP] Text command -> seg={seg}, text='{text}', color={color}, bgcolor={bgcolor}, align={align}, effect={effect}, font={font}, intensity={intens}")
+            logger.info(f"[UDP] Text command -> seg={seg}, text='{text}', color={color}, bgcolor={bgcolor}, align={align}, effect={effect}, font={font}, size={size}, intensity={intens}")
             self._sm.update_text(seg, text, color=color, bgcolor=bgcolor,
-                                 align=align, effect=effect, font=font, intensity=intens)
+                                 align=align, effect=effect, font=font, size=size, intensity=intens)
 
         elif cmd == "layout":
             preset = int(doc.get("preset", 1))
@@ -435,6 +449,11 @@ class UDPHandler:
         
         # Remember the current layout preset number
         self._current_layout = preset
+        
+        # Update global layout variable
+        global _current_layout
+        with _current_layout_lock:
+            _current_layout = preset
         
         layout_type = "portrait (32×64)" if use_portrait_layout else "landscape (64×32)"
         logger.info(f"[UDP] LAYOUT preset={preset} ({len(zones)} segment(s)) {layout_type} (rotation={rotation}°)")

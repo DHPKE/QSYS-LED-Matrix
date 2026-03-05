@@ -1,17 +1,4 @@
 -- Q-SYS LED Matrix Controller Plugin
--- Version 7.0.27 - Font size modes (Auto/Small/Medium/Large), removed Verdana/Mono fonts
--- Version 7.0.26 - Fixed layout 8/9 selection (added layout 10 placeholder)
--- Version 7.0.12 - Apply button flushes ALL curtain groups (1-8), then sets only specified group
--- Version 7.0.11 - Clear curtains from all groups on group switch, apply only to current
--- Version 7.0.10 - Fixed num_segments scope with fallback default
--- Version 7.0.9 - Dynamic segment count via property window (1-4 segments)
--- Version 7.0.7 - Fixed Pi auto-show on group switch + per-group curtain state tracking
--- Version 7.0.6 - Fixed curtain visibility control (only show when enabled=true)
--- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
--- Version 7.0.4 - Curtain group field, enable button works immediately, removed apply button
--- Version 7.0.3 - Fixed dynamic curtain group tracking (minimal changes to v7.0.1)
--- Version 7.0.1 - Automatic curtain activation on group assignment
--- Version 7.0.0 - Added Curtain Mode support (3px vertical bars on edges)
 -- Version 6.7.0 - Added display enable/disable control, improved test mode restoration
 -- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
 -- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
@@ -23,6 +10,7 @@
 -- Version 6.5.0 - Added HTTP health check for accurate connection status
 -- Version 6.4.0 - Added test mode toggle button
 -- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
+-- Controls RPi Zero 2 W / CM4 64x32 LED Matrix via UDP (JSON format)
 --
 -- NOTE: Uses HttpClient.Upload() and HttpClient.Download() per Q-SYS API
 --       https://q-syshelp.qsc.com/DeveloperHelp/Content/Code_Examples/HTTPClient.htm
@@ -35,7 +23,6 @@
 --   {"cmd":"rotation","value":0,"group":1}  -- 0, 90, 180, or 270 degrees
 --   {"cmd":"layout","preset":N,"group":1}
 --   {"cmd":"group","value":3}   -- Assign panel to group 3
---   {"cmd":"curtain","group":1,"enabled":true,"color":"FF0000"}  -- Show/hide curtain with color
 --
 -- ROTATION (v6.0+):
 --   Supports 0°, 90°, 180°, and 270° rotation of the entire display.
@@ -55,19 +42,6 @@
 --     Group 3 = Orange   Group 7 = Cyan
 --     Group 4 = Red      Group 8 = Green
 --
--- CURTAIN MODE (v7.0, fixed in v7.0.6):
---   Creates two 3-pixel wide vertical bars on the left (0-2) and right (61-63) edges.
---   Each group (1-8) has independent curtain configuration.
---   Use "Curtain Config" to set color (curtain starts hidden).
---   Use "Curtain Enable" toggle to show/hide.
---   
---   Workflow:
---     1. Apply button: {"cmd":"curtain","group":4,"enabled":false,"color":"FF0000"} (configure, hidden)
---     2. Enable toggle: {"cmd":"curtain","group":4,"enabled":true,"color":"FF0000"}  (show)
---     3. Disable toggle: {"cmd":"curtain","group":4,"enabled":false,"color":"FF0000"} (hide)
---   
---   Curtain bars only visible when enabled=true.
---
 -- LAYOUT PRESETS:
 --   1  = Fullscreen
 --   2  = Top / Bottom halves
@@ -76,39 +50,26 @@
 --   5  = Triple Right
 --   6  = Thirds
 --   7  = Quad View
---   8  = VO-left (voice-over: seg1 5/6 left, seg3 quarter BR)
---   9  = VO-right (voice-over: seg2 1/3 right, seg3 quarter BR)
 --   11-14 = Single segment fullscreen
 
 PluginInfo = {
-    Name = "PKE~LED Matrix Display VO",
-    Version = "7.0.13",
-    Id = "dhpke.olimex.led.matrix.7.0.13",
-    Description = "RPi 64x32 LED Matrix - Added VO-left & VO-right layouts (8/9→15/16)",
+    Name = "PKE~LED Matrix Display (Groups+Rotation+Reboot)",
+    Version = "6.7.0",
+    Id = "dhpke.olimex.led.matrix.6.7.0",
+    Description = "RPi 64x32 LED Matrix - Display enable/disable + test mode fixes",
     ShowDebug = true,
     Author = "DHPKE"
 }
 
 function GetProperties()
     return {
-        { Name = "IP Address",       Type = "string",  Value = "192.168.1.100" },
-        { Name = "UDP Port",         Type = "integer", Min = 1, Max = 65535, Value = 21324 },
-        { Name = "Number of Segments", Type = "integer", Min = 1, Max = 4, Value = 4 }
+        { Name = "IP Address", Type = "string",  Value = "192.168.1.100" },
+        { Name = "UDP Port",   Type = "integer", Min = 1, Max = 65535, Value = 21324 }
     }
 end
 
 function GetControls(props)
     local controls = {}
-    
-    -- Get number of segments from properties (default to 4 if not set)
-    local num_segments = 4
-    if props and props["Number of Segments"] then
-        if type(props["Number of Segments"]) == "table" then
-            num_segments = props["Number of Segments"].Value or 4
-        else
-            num_segments = props["Number of Segments"] or 4
-        end
-    end
 
     -- Connection
     table.insert(controls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
@@ -128,8 +89,8 @@ function GetControls(props)
     table.insert(controls, { Name="layout_preset", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_layout",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
 
-    -- Segment controls (dynamic based on property)
-    for seg = 0, num_segments - 1 do
+    -- Segment controls (seg1 .. seg4)
+    for seg = 0, 3 do
         local n = seg + 1
         table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=false, PinStyle="Both" })
         table.insert(controls, { Name=string.format("seg%d_text_color", n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
@@ -156,13 +117,6 @@ function GetControls(props)
     table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="display_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
-    
-    -- Curtain Mode (v7.0)
-    table.insert(controls, { Name="curtain_group", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="curtain_color", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
-    table.insert(controls, { Name="curtain_apply", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
-    table.insert(controls, { Name="curtain_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
-    
     table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
     table.insert(controls, { Name="test_mode", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
     table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
@@ -173,16 +127,6 @@ end
 function GetControlLayout(props)
     local layout   = {}
     local graphics = {}
-
-    -- Get number of segments from properties (default to 4 if not set)
-    local num_segments = 4
-    if props and props["Number of Segments"] then
-        if type(props["Number of Segments"]) == "table" then
-            num_segments = props["Number of Segments"].Value or 4
-        else
-            num_segments = props["Number of Segments"] or 4
-        end
-    end
 
     local W  = 600
     local CH = 24
@@ -394,7 +338,7 @@ function GetControlLayout(props)
         {"Effect",     "effect",     "Effect",   114},
     }
 
-    for seg = 0, num_segments - 1 do
+    for seg = 0, 3 do
         local n   = seg + 1
         local sn  = "seg"..n.."_"
         local grp = "Seg"..n
@@ -443,7 +387,7 @@ function GetControlLayout(props)
 
     -- ── Global Controls ─────────────────────────────────────────────
     y = y + 4 * (SEG_H + 4) + 4
-    GBox(0, y, W, 148, "Global Controls")
+    GBox(0, y, W, 102, "Global Controls")
     
     Lbl("Brightness (0-255)", 6, y+16, 120)
     layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
@@ -468,26 +412,6 @@ function GetControlLayout(props)
         ButtonStyle="Trigger", Legend="Reboot", Color={200, 80, 80},
         Position={516, y+30}, Size={78, 36} }
     
-    -- Curtain Mode (v7.0)
-    Lbl("Curtain Mode", 6, y+74, 120)
-    
-    Lbl("Group", 6, y+88, 50)
-    layout["curtain_group"] = { PrettyName="Curtain~Group", Style="Text",
-        Position={6, y+102}, Size={60, 36} }
-    
-    Lbl("Color", 72, y+88, 50)
-    layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox",
-        IsReadOnly=false,
-        Position={72, y+102}, Size={110, 36} }
-    
-    layout["curtain_apply"] = { PrettyName="Curtain~Apply", Style="Button",
-        ButtonStyle="Trigger", Legend="Apply", Color=C_BTN_O,
-        Position={188, y+102}, Size={80, 36} }
-    
-    layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
-        ButtonStyle="Toggle", Legend="Show", Color=C_BTN_G,
-        Position={274, y+102}, Size={80, 36} }
-    
     layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
         ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
         Position={112, y+72}, Size={100, 36} }
@@ -502,9 +426,6 @@ if Controls then
     local socket   = nil
     local ip_addr  = Properties["IP Address"].Value
     local udp_port = Properties["UDP Port"].Value
-    local num_segments = (Properties["Number of Segments"] and Properties["Number of Segments"].Value) or 4  -- Default to 4 if not set
-    
-    print(string.format("[LED Matrix] Runtime initialized with %d segments", num_segments))
 
     local activeLayoutSegments = {}
     local debounceTimers = {}
@@ -518,7 +439,7 @@ if Controls then
         ["DarkGreen"] = "008000", ["Gold"]   = "FFD700",
         ["Gray"]    = "808080", ["Black"]    = "000000"
     }
-    local FontMap  = { ["Arial"]="arial", ["Digital"]="digital12" }
+    local FontMap  = { ["Arial"]="arial", ["Verdana"]="verdana", ["Digital"]="digital12", ["Mono"]="mono9" }
     local AlignMap = { ["Left"]="L", ["Center"]="C", ["Right"]="R" }
 
     local LayoutPresets = {
@@ -529,9 +450,6 @@ if Controls then
         [5]  = { name="5 - Triple Right",          activeSegments={0,1,2},   preset=5  },
         [6]  = { name="6 - Thirds",                activeSegments={0,1,2},   preset=6  },
         [7]  = { name="7 - Quad View",             activeSegments={0,1,2,3}, preset=7  },
-        [8]  = { name="8 - VO-left",               activeSegments={0,2},     preset=8 },
-        [9]  = { name="9 - VO-right",              activeSegments={1,2},     preset=9 },
-        [10] = { name="10 - (reserved)",           activeSegments={0},       preset=1 },  -- placeholder to maintain numbering
         [11] = { name="11 - Fullscreen Seg 1",     activeSegments={0},       preset=11 },
         [12] = { name="12 - Fullscreen Seg 2",     activeSegments={1},       preset=12 },
         [13] = { name="13 - Fullscreen Seg 3",     activeSegments={2},       preset=13 },
@@ -544,7 +462,6 @@ if Controls then
     local LayoutChoices = {
         "1 - Fullscreen", "2 - Top / Bottom", "3 - Left / Right",
         "4 - Triple Left", "5 - Triple Right", "6 - Thirds", "7 - Quad View",
-        "8 - VO-left", "9 - VO-right", "10 - (reserved)",
         "11 - Fullscreen Seg 1", "12 - Fullscreen Seg 2",
         "13 - Fullscreen Seg 3", "14 - Fullscreen Seg 4",
     }
@@ -552,10 +469,6 @@ if Controls then
     local commandCounter = 0
     local lastError = nil
     local errorCount = 0
-    
-    -- Curtain state tracking (v7.0.6)
-    local curtainEnabledGroups = {}  -- Track which groups have curtain configured
-    local curtainVisibleGroups = {}  -- Track which groups have curtain visible (enabled=true)
     
     local function ReopenSocket()
         print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
@@ -646,13 +559,6 @@ if Controls then
 
     local function BuildTextCommand(seg)
         local s     = "seg" .. (seg+1) .. "_"
-        
-        -- Safety check: ensure all required controls exist
-        if not Controls[s.."text"] then
-            print(string.format("[ERROR] Control %s does not exist (seg=%d, num_segments=%d)", s.."text", seg, num_segments))
-            return "", "{}"
-        end
-        
         local text    = Controls[s.."text"].String
         local color   = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
         local bgcolor = ColorNames[Controls[s.."bg_color"].String]   or "000000"
@@ -703,27 +609,13 @@ if Controls then
                                "Orange","Purple","DarkGreen","Gold","Gray","Black"}
         local bgChoices     = {"Black","White","Red","Green","Blue","Yellow","Magenta","Cyan",
                                "Orange","Purple","DarkGreen","Gold","Gray"}
-        local fontChoices   = {"Arial","Digital"}
-        local sizeChoices   = {"Auto","Small","Medium","Large"}
+        local fontChoices   = {"Arial","Verdana","Digital","Mono"}
+        local sizeChoices   = {"auto","8","12","16","24","32"}
         local alignChoices  = {"Left","Center","Right"}
         local effectChoices = {"none","scroll","blink","fade"}
         local defaultColors = {"Red","Green","Blue","White"}  -- Seg1=Red, Seg2=Green, Seg3=Blue, Seg4=White
 
-        -- Curtain initialization
-        if Controls.curtain_group and Controls.curtain_group.String == "" then
-            Controls.curtain_group.String = "1"
-        end
-        if Controls.curtain_color then
-            Controls.curtain_color.Choices = colorChoices
-            if Controls.curtain_color.String == "" then
-                Controls.curtain_color.String = "White"
-            end
-        end
-        if Controls.curtain_enable and Controls.curtain_enable.Boolean == nil then
-            Controls.curtain_enable.Boolean = false
-        end
-
-        for seg = 0, num_segments - 1 do
+        for seg = 0, 3 do
             local s = "seg" .. (seg+1) .. "_"
             if Controls[s.."text_color"] then Controls[s.."text_color"].Choices = colorChoices end
             if Controls[s.."bg_color"] then Controls[s.."bg_color"].Choices   = bgChoices end
@@ -742,7 +634,7 @@ if Controls then
                 Controls[s.."font"].String = "Arial"
             end
             if Controls[s.."size"] and Controls[s.."size"].String == "" then
-                Controls[s.."size"].String = "Auto"
+                Controls[s.."size"].String = "auto"
             end
             if Controls[s.."align"] and Controls[s.."align"].String == "" then
                 Controls[s.."align"].String = "Center"
@@ -757,7 +649,7 @@ if Controls then
         end
 
         activeLayoutSegments = activeLayoutSegments or {[0]=true}
-        for seg = 0, num_segments - 1 do
+        for seg = 0, 3 do
             Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
         end
 
@@ -788,46 +680,6 @@ if Controls then
                     local groupName = grp == 0 and "All" or tostring(grp)
                     Controls.active_group.String = groupName
                     SendCommand(buildJson({cmd="group", value=grp}))
-                    
-                    -- ✅ v7.0.11: Clear curtains from ALL groups, then apply only to current group
-                    Timer.CallAfter(function()
-                        -- Step 1: Disable curtains on all groups (1-8)
-                        for g = 1, 8 do
-                            if g ~= grp and curtainEnabledGroups[g] then
-                                local payload = {
-                                    cmd = "curtain",
-                                    group = g,
-                                    enabled = false,
-                                    color = "FFFFFF"
-                                }
-                                SendCommand(buildJson(payload))
-                                print(string.format("[CURTAIN] Cleared group %d", g))
-                            end
-                        end
-                        
-                        -- Step 2: Apply curtain to current group if configured
-                        if grp > 0 and curtainEnabledGroups[grp] then
-                            local curtainVisible = curtainVisibleGroups[grp] or false
-                            print(string.format("[CURTAIN] Group %d switch: applying curtain enabled=%s", grp, tostring(curtainVisible)))
-                            
-                            -- Update UI
-                            Controls.curtain_group.String = tostring(grp)
-                            Controls.curtain_enable.Boolean = curtainVisible
-                            
-                            -- Send curtain state
-                            local colorName = Controls.curtain_color.String or "White"
-                            local color = ColorNames[colorName] or colorName
-                            color = color:gsub("#", "")
-                            
-                            local payload = {
-                                cmd = "curtain",
-                                group = grp,
-                                enabled = curtainVisible,
-                                color = color
-                            }
-                            SendCommand(buildJson(payload))
-                        end
-                    end, 0.15)
                 end, 0.05)
             else
                 ctl.Boolean = true
@@ -849,7 +701,7 @@ if Controls then
             activeLayoutSegments[seg] = true
         end
 
-        for seg = 0, num_segments - 1 do
+        for seg = 0, 3 do
             Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
         end
 
@@ -891,7 +743,7 @@ if Controls then
         if key then ApplyLayoutByKey(key) end
     end
 
-    for seg = 0, num_segments - 1 do
+    for seg = 0, 3 do
         local s = "seg" .. (seg+1) .. "_"
 
         Controls[s.."send"].EventHandler = function()
@@ -981,7 +833,7 @@ if Controls then
 
     Controls.clear_all.EventHandler = function()
         if SendCommand(buildJson({cmd="clear_all", group=activeGroup})) then
-            for seg = 0, num_segments - 1 do
+            for seg = 0, 3 do
                 Controls["seg"..(seg+1).."_active"].Boolean = false
             end
             activeLayoutSegments = {}
@@ -1068,119 +920,6 @@ if Controls then
             print(string.format("⚠ [DISPLAY] Send failed: %s", result))
             Controls.last_command.String = "Display toggle failed"
         end
-    end
-
-    -- Curtain Mode Event Handlers (v7.0.5)
-    -- Apply button: Configure curtain for a group (color + enable)
-    -- ✅ FIXED v7.0.12: Apply flushes ALL groups, then sets only the specified group
-    Controls.curtain_apply.EventHandler = function()
-        print("[CURTAIN] Apply button clicked")
-        
-        if not socket then
-            print("[CURTAIN] ERROR: Socket not ready yet")
-            Controls.last_command.String = "Error: Socket not ready"
-            return
-        end
-        
-        local curtainGroup = tonumber(Controls.curtain_group.String) or 1
-        local colorName = Controls.curtain_color.String or "White"
-        local color = ColorNames[colorName] or colorName
-        color = color:gsub("#", "")
-        
-        -- Validate group
-        if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
-            Controls.last_command.String = "Error: Group must be 1-8"
-            return
-        end
-        
-        print(string.format("[CURTAIN] Step 1: Flushing all curtain groups (1-8)"))
-        
-        -- ✅ v7.0.12: Step 1 - Flush ALL curtain groups (1-8)
-        for g = 1, 8 do
-            curtainEnabledGroups[g] = nil  -- Clear config tracking
-            curtainVisibleGroups[g] = nil  -- Clear visibility tracking
-            
-            local payload = {
-                cmd = "curtain",
-                group = g,
-                enabled = false,
-                color = "000000"  -- Black = cleared
-            }
-            SendCommand(buildJson(payload))
-            print(string.format("[CURTAIN] Flushed group %d", g))
-        end
-        
-        -- Brief delay to ensure flush completes
-        Timer.CallAfter(function()
-            print(string.format("[CURTAIN] Step 2: Configuring group %d (color=%s, enabled=false)", curtainGroup, color))
-            
-            -- ✅ Step 2 - Configure ONLY the specified group
-            curtainEnabledGroups[curtainGroup] = true
-            curtainVisibleGroups[curtainGroup] = false  -- Start hidden
-            
-            -- Send config with enabled=false (invisible by default)
-            local payload = {
-                cmd = "curtain",
-                group = curtainGroup,
-                enabled = false,
-                color = color
-            }
-            
-            local json = buildJson(payload)
-            print(string.format("[CURTAIN] Sending: %s", json))
-            SendCommand(json)
-            
-            -- Update UI
-            Controls.curtain_enable.Boolean = false
-            Controls.last_command.String = string.format("Curtain configured (Group %d, hidden)", curtainGroup)
-            
-            print(string.format("✓ [CURTAIN] Group %d configured with color %s (hidden)", curtainGroup, color))
-        end, 0.2)  -- 200ms delay
-    end
-    
-    -- ✅ FIXED v7.0.6: Enable toggle controls visibility using enabled parameter
-    Controls.curtain_enable.EventHandler = function(ctl)
-        print(string.format("[CURTAIN] Enable toggle: %s", tostring(ctl.Boolean)))
-        
-        if not socket then
-            print("[CURTAIN] ERROR: Socket not ready yet")
-            Controls.last_command.String = "Error: Socket not ready"
-            return
-        end
-        
-        local visible = ctl.Boolean
-        local curtainGroup = tonumber(Controls.curtain_group.String) or 1
-        local colorName = Controls.curtain_color.String or "White"
-        local color = ColorNames[colorName] or colorName
-        color = color:gsub("#", "")
-        
-        -- Validate group
-        if curtainGroup < 1 or curtainGroup > 8 then
-            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
-            Controls.last_command.String = "Error: Group must be 1-8"
-            return
-        end
-        
-        print(string.format("[CURTAIN] Setting visibility: group=%d, enabled=%s", curtainGroup, tostring(visible)))
-        
-        -- ✅ v7.0.6: Store visibility state for this group
-        curtainVisibleGroups[curtainGroup] = visible
-        
-        -- ✅ FIX: Send enabled (not state) with current color
-        local payload = {
-            cmd = "curtain",
-            group = curtainGroup,
-            enabled = visible,  -- ✅ Changed from state to enabled
-            color = color       -- ✅ Include color to maintain config
-        }
-        
-        local json = buildJson(payload)
-        print(string.format("[CURTAIN] Sending: %s", json))
-        SendCommand(json)
-        
-        Controls.last_command.String = string.format("Curtain %s (Group %d)", 
-            visible and "shown" or "hidden", curtainGroup)
     end
 
     -- Test Mode Toggle Handler using Q-SYS HttpClient.Upload()
