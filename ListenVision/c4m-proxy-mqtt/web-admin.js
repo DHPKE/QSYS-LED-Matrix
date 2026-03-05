@@ -831,6 +831,20 @@ class WebAdmin {
         return;
       }
       
+      // Number names mapping
+      const numberNames = [
+        '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+        'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty',
+        'TwentyOne', 'TwentyTwo', 'TwentyThree', 'TwentyFour', 'TwentyFive', 'TwentySix', 'TwentySeven', 'TwentyEight', 'TwentyNine', 'Thirty',
+        'ThirtyOne', 'ThirtyTwo', 'ThirtyThree', 'ThirtyFour', 'ThirtyFive', 'ThirtySix', 'ThirtySeven', 'ThirtyEight', 'ThirtyNine', 'Fourty',
+        'FourtyOne', 'FourtyTwo', 'FourtyThree', 'FourtyFour', 'FourtyFive', 'FourtySix', 'FourtySeven', 'FourtyEight', 'FourtyNine', 'Fifty',
+        'FiftyOne', 'FiftyTwo', 'FiftyThree', 'FiftyFour', 'FiftyFive', 'FiftySix', 'FiftySeven', 'FiftyEight', 'FiftyNine', 'Sixty',
+        'SixtyOne', 'SixtyTwo', 'SixtyThree', 'SixtyFour', 'SixtyFive', 'SixtySix', 'SixtySeven', 'SixtyEight', 'SixtyNine', 'Seventy',
+        'SeventyOne', 'SeventyTwo', 'SeventyThree', 'SeventyFour', 'SeventyFive', 'SeventySix', 'SeventySeven', 'SeventyEight', 'SeventyNine', 'Eighty',
+        'EightyOne', 'EightyTwo', 'EightyThree', 'EightyFour', 'EightyFive', 'EightySix', 'EightySeven', 'EightyEight', 'EightyNine', 'Ninety',
+        'NinetyOne', 'NinetyTwo', 'NinetyThree', 'NinetyFour', 'NinetyFive', 'NinetySix', 'NinetySeven', 'NinetyEight', 'NinetyNine', 'OneHundred'
+      ];
+      
       try {
         // Get existing device IDs
         const existingIds = new Set(devices.map(d => d.id));
@@ -841,7 +855,7 @@ class WebAdmin {
           if (!existingIds.has(i)) {
             newDevices.push({
               id: i,
-              name: \`Device-\${String(i).padStart(2, '0')}\`,
+              name: numberNames[i] || \`Device-\${i}\`,
               ip: \`10.1.1.\${100 + i}\`,
               group: 0,
               enabled: true
