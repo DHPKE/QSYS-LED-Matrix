@@ -1,0 +1,617 @@
+-- Q-SYS LED Matrix Controller Plugin - MQTT Version for ListenVision C4M
+-- Version 1.0.0 - MQTT-based control for c4m-proxy-mqtt server
+-- Based on LED Matrix v7.0.13 (RPi UDP version)
+--
+-- MQTT ARCHITECTURE:
+--   Q-SYS Plugin → MQTT Broker → Node.js Proxy → C4M SDK → C4M Cards → LED Display
+--
+-- MQTT TOPICS:
+--   led/display/{id}/cmd/segment    - Individual display control
+--   led/display/all/cmd/segment     - Broadcast to all displays
+--   led/group/{group}/cmd/segment   - Group control
+--   led/display/{id}/status         - Status feedback (subscribe)
+--
+-- CHANGES FROM UDP VERSION:
+--   - Replaced UDP socket with MQTT publish
+--   - Added Device ID field (replaces IP address)
+--   - MQTT broker configuration (host, port, username, password)
+--   - Simplified command structure (no direct HTTP access to displays)
+--   - Group routing via MQTT topics instead of UDP payload
+
+PluginInfo = {
+    Name = "PKE~LED Matrix (ListenVision C4M via MQTT)",
+    Version = "1.0.0",
+    Id = "dhpke.listenvision.c4m.mqtt.1.0.0",
+    Description = "ListenVision C4M LED Matrix - MQTT proxy control",
+    ShowDebug = true,
+    Author = "DHPKE"
+}
+
+function GetProperties()
+    return {
+        { Name = "MQTT Broker",       Type = "string",  Value = "localhost" },
+        { Name = "MQTT Port",         Type = "integer", Min = 1, Max = 65535, Value = 1883 },
+        { Name = "MQTT Username",     Type = "string",  Value = "" },
+        { Name = "MQTT Password",     Type = "string",  Value = "" },
+        { Name = "Device ID",         Type = "integer", Min = 1, Max = 255, Value = 1 },
+        { Name = "Number of Segments", Type = "integer", Min = 1, Max = 4, Value = 4 }
+    }
+end
+
+function GetControls(props)
+    local controls = {}
+    
+    -- Get number of segments from properties (default to 4 if not set)
+    local num_segments = 4
+    if props and props["Number of Segments"] then
+        if type(props["Number of Segments"]) == "table" then
+            num_segments = props["Number of Segments"].Value or 4
+        else
+            num_segments = props["Number of Segments"] or 4
+        end
+    end
+
+    -- MQTT Connection
+    table.insert(controls, { Name="mqtt_broker",       ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="mqtt_port",         ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="device_id",         ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="reconnect",         ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
+    table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
+
+    -- Group routing controls (0=all, 1-8=groups)
+    table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })
+    for grp = 0, 8 do
+        table.insert(controls, { Name=string.format("group%d_select", grp), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
+    end
+
+    -- Layout preset
+    table.insert(controls, { Name="layout_preset", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_layout",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+
+    -- Segment controls (dynamic based on property)
+    for seg = 0, num_segments - 1 do
+        local n = seg + 1
+        table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=false, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_color",      n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_align",      n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_effect",     n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_send",   n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_clear",  n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, {
+            Name=string.format("seg%d_active", n),
+            ControlType="Indicator", IndicatorType="LED",
+            Count=1, UserPin=true, PinStyle="Output"
+        })
+    end
+
+    -- Global
+    table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="test_pattern", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+
+    return controls
+end
+
+function GetControlLayout(props)
+    local layout   = {}
+    local graphics = {}
+
+    -- Get number of segments
+    local num_segments = 4
+    if props and props["Number of Segments"] then
+        if type(props["Number of Segments"]) == "table" then
+            num_segments = props["Number of Segments"].Value or 4
+        else
+            num_segments = props["Number of Segments"] or 4
+        end
+    end
+
+    local W  = 600
+    local CH = 24
+    local BH = 28
+
+    local C_GRP   = {62,  62,  62 }
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55 }
+    local C_BTN_R = {165, 38,  38 }
+    local C_BTN_B = {45,  105, 195}
+    local C_BTN_O = {200, 110, 0  }
+    
+    -- Group colors for buttons
+    local C_GRP_COLORS = {
+        [0] = {128, 128, 128},  -- Gray (All/Broadcast)
+        [1] = {255, 255, 255},  -- White
+        [2] = {255, 255, 0},    -- Yellow
+        [3] = {255, 165, 0},    -- Orange
+        [4] = {255, 0, 0},      -- Red
+        [5] = {255, 0, 255},    -- Magenta
+        [6] = {0, 0, 255},      -- Blue
+        [7] = {0, 255, 255},    -- Cyan
+        [8] = {0, 255, 0},      -- Green
+    }
+
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, {
+            Type="GroupBox", Text=title or "", Fill=C_GRP,
+            StrokeWidth=1, CornerRadius=4,
+            Position={x, y}, Size={w, h}
+        })
+    end
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, {
+            Type="Text", Text=text, Font="Roboto", FontSize=9,
+            HTextAlign="Left", Color=C_LBL,
+            Position={x, y}, Size={w, 12}
+        })
+    end
+
+    -- ── Title bar ──────────────────────────────────────────────────
+    table.insert(graphics, {
+        Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5,
+        Position={0,0}, Size={W,36}
+    })
+    table.insert(graphics, {
+        Type="Text", Text="LED Matrix (C4M MQTT)  v1.0",
+        Font="Roboto", FontSize=14, FontStyle="Bold",
+        HTextAlign="Center", Color={255,255,255},
+        Position={0,9}, Size={W,20}
+    })
+
+    -- ── MQTT Connection ─────────────────────────────────────────────────
+    local y = 42
+    GBox(0, y, W, 54, "MQTT Connection")
+    Lbl("Broker",      6,   y+5, 124)
+    Lbl("Port",        138, y+5, 62)
+    Lbl("Device ID",   208, y+5, 62)
+    Lbl("Status",      278, y+5, 62)
+    Lbl("Last Command",348, y+5, W-354)
+    layout["mqtt_broker"]       = { PrettyName="MQTT~Broker",   Style="Text",      Position={6,   y+18}, Size={124,   CH} }
+    layout["mqtt_port"]         = { PrettyName="MQTT~Port",     Style="Text",      Position={138, y+18}, Size={62,    CH} }
+    layout["device_id"]         = { PrettyName="MQTT~DeviceID", Style="Text",      Position={208, y+18}, Size={62,    CH} }
+    layout["reconnect"]         = { PrettyName="MQTT~Reconnect", Style="Button",   ButtonStyle="Trigger", Legend="Connect", Color=C_BTN_B, Position={278, y+18}, Size={62, BH} }
+    layout["connection_status"] = { PrettyName="MQTT~Status",   Style="Indicator", Position={348, y+18}, Size={62,    CH} }
+    layout["last_command"]      = { PrettyName="MQTT~LastCmd",  Style="Text",      Position={418, y+18}, Size={W-424, CH} }
+
+    -- ── Group Selection ─────────────────────────────────────────────
+    y = y + 60
+    GBox(0, y, W, 72, "Target Selection")
+    Lbl("Select target: ALL (broadcast), specific group, or individual device", 6, y+5, W-12)
+    
+    -- Group buttons: 9 buttons (All + 1-8)
+    local btnW = 56
+    local btnGap = 6
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
+    for grp = 0, 8 do
+        local bx = 6 + grp * (btnW + btnGap)
+        layout[string.format("group%d_select", grp)] = {
+            PrettyName="Target~"..groupLabels[grp+1],
+            Style="Button", ButtonStyle="Toggle",
+            Legend=groupLabels[grp+1],
+            Color=C_GRP_COLORS[grp],
+            Position={bx, y+22}, Size={btnW, 36}
+        }
+    end
+    layout["active_group"] = { PrettyName="Target~Active", Style="Text", Position={6, y+62}, Size={0, 0} }
+
+    -- ── Display Layout ──────────────────────────────────────────────
+    y = y + 78
+    GBox(0, y, W, 90, "Display Layout")
+    
+    Lbl("Layout Preset", 6, y+18, 210)
+    layout["layout_preset"] = {
+        PrettyName="Layout~Preset",
+        Style="ComboBox", IsReadOnly=false,
+        Position={6, y+32}, Size={220, CH}
+    }
+    layout["apply_layout"] = {
+        PrettyName="Layout~Apply",
+        Style="Button", ButtonStyle="Trigger",
+        Legend="Apply Layout", Color=C_BTN_O,
+        Position={234, y+32}, Size={160, CH}
+    }
+
+    -- ── Segment rows ────────────────────────────────────────────────
+    y = y + 98
+    local SEG_H = 90
+
+    for seg = 0, num_segments - 1 do
+        local n   = seg + 1
+        local sn  = "seg"..n.."_"
+        local grp = "Seg"..n
+        local sy  = y + seg * (SEG_H + 4)
+
+        GBox(0, sy, W, SEG_H, grp)
+
+        local r1 = sy + 20
+        layout[sn.."active"] = { PrettyName=grp.."~Active", Style="Led",
+            Position={6, r1+5}, Size={14, 14} }
+        Lbl("Text", 26, r1-12, W-330)
+        layout[sn.."text"]   = { PrettyName=grp.."~Text",   Style="Text",
+            Position={26, r1}, Size={W-332, CH} }
+        layout[sn.."send"]   = { PrettyName=grp.."~Send",   Style="Button",
+            ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
+            Position={W-300, r1}, Size={94, BH} }
+        layout[sn.."clear"]  = { PrettyName=grp.."~Clear",  Style="Button",
+            ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R,
+            Position={W-200, r1}, Size={94, BH} }
+
+        local r2 = sy + 57
+        Lbl("Color", 6, r2-15, 80)
+        layout[sn.."color"] = { PrettyName=grp.."~Color", Style="ComboBox",
+            IsReadOnly=false,
+            Position={6, r2}, Size={110, CH} }
+        
+        Lbl("Align", 122, r2-15, 70)
+        layout[sn.."align"] = { PrettyName=grp.."~Align", Style="ComboBox",
+            IsReadOnly=false,
+            Position={122, r2}, Size={76, CH} }
+        
+        Lbl("Effect", 204, r2-15, 100)
+        layout[sn.."effect"] = { PrettyName=grp.."~Effect", Style="ComboBox",
+            IsReadOnly=false,
+            Position={204, r2}, Size={114, CH} }
+    end
+
+    -- ── Global Controls ─────────────────────────────────────────────
+    y = y + 4 * (SEG_H + 4) + 4
+    GBox(0, y, W, 90, "Global Controls")
+    
+    Lbl("Brightness (0-255)", 6, y+16, 120)
+    layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
+        Position={6, y+30}, Size={100, 36} }
+    
+    Lbl("Rotation (°)", 112, y+16, 100)
+    layout["rotation"] = { PrettyName="Global~Rotation", Style="ComboBox",
+        Position={112, y+30}, Size={100, 36} }
+    
+    layout["test_pattern"] = { PrettyName="Global~Test", Style="Button",
+        ButtonStyle="Trigger", Legend="Test", Color={255, 193, 7},
+        Position={218, y+30}, Size={80, 36} }
+    
+    layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
+        ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
+        Position={304, y+30}, Size={100, 36} }
+
+    return layout, graphics
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- Runtime
+-- ══════════════════════════════════════════════════════════════════
+if Controls then
+    local mqttClient = nil
+    local mqtt_broker  = Properties["MQTT Broker"].Value
+    local mqtt_port    = Properties["MQTT Port"].Value
+    local device_id    = Properties["Device ID"].Value
+    local num_segments = (Properties["Number of Segments"] and Properties["Number of Segments"].Value) or 4
+    
+    print(string.format("[LED Matrix MQTT] Runtime initialized - Device ID: %d, Segments: %d", device_id, num_segments))
+
+    local activeLayoutSegments = {}
+    local activeGroup = 0
+    local updatingGroups = false
+    local commandCounter = 0
+
+    local ColorNames = {
+        ["White"]   = "FFFFFF", ["Red"]      = "FF0000", ["Green"]     = "00FF00",
+        ["Blue"]    = "0000FF", ["Yellow"]   = "FFFF00", ["Magenta"]   = "FF00FF",
+        ["Cyan"]    = "00FFFF", ["Orange"]   = "FFA500", ["Purple"]    = "800080",
+        ["DarkGreen"] = "008000", ["Gold"]   = "FFD700",
+        ["Gray"]    = "808080", ["Black"]    = "000000"
+    }
+    local AlignMap  = { ["Left"]=0, ["Center"]=1, ["Right"]=2 }
+    local EffectMap = { ["Static"]=0, ["Scroll"]=1, ["Blink"]=5 }
+
+    local LayoutPresets = {
+        [1]  = { name="1 - Fullscreen",           activeSegments={0},       preset=1  },
+        [2]  = { name="2 - Top / Bottom",         activeSegments={0,1},     preset=2  },
+        [3]  = { name="3 - Left / Right",         activeSegments={0,1},     preset=3  },
+        [4]  = { name="4 - Triple",               activeSegments={0,1,2},   preset=4  },
+        [5]  = { name="5 - Quad View",            activeSegments={0,1,2,3}, preset=5  },
+    }
+
+    local LayoutNameToKey = {}
+    for k, v in pairs(LayoutPresets) do LayoutNameToKey[v.name] = k end
+
+    local LayoutChoices = {
+        "1 - Fullscreen", "2 - Top / Bottom", "3 - Left / Right",
+        "4 - Triple", "5 - Quad View"
+    }
+
+    -- Build MQTT topic based on current target
+    local function BuildTopic(command)
+        local target
+        if activeGroup == 0 then
+            target = "all"
+        else
+            target = string.format("group/%d", activeGroup)
+        end
+        return string.format("led/display/%s/cmd/%s", target, command)
+    end
+
+    -- Send MQTT command
+    local function SendMQTT(topic, payload)
+        commandCounter = commandCounter + 1
+        local cmdId = commandCounter
+        
+        local json = rapidjson.encode(payload)
+        print(string.format("[CMD #%d] MQTT Publish: %s → %s", cmdId, topic, json))
+        
+        if not mqttClient or not mqttClient.IsConnected then
+            print(string.format("✗ [CMD #%d ERROR] MQTT not connected", cmdId))
+            Controls.connection_status.Value = 2
+            Controls.last_command.String = "ERROR: Not connected"
+            return false
+        end
+        
+        local ok, err = pcall(function()
+            mqttClient:Publish(topic, json, 0, false)  -- QoS 0, not retained
+        end)
+        
+        if ok then
+            Controls.last_command.String = string.format("%s: %s", topic, json:sub(1, 40))
+            Controls.connection_status.Value = 0
+            print(string.format("✓ [CMD #%d SUCCESS] Published", cmdId))
+            return true
+        else
+            Controls.last_command.String = "ERROR: " .. tostring(err)
+            Controls.connection_status.Value = 2
+            print(string.format("✗ [CMD #%d ERROR] %s", cmdId, tostring(err)))
+            return false
+        end
+    end
+
+    -- Connect to MQTT broker
+    local function ConnectMQTT()
+        print(string.format("[MQTT] Connecting to %s:%d", mqtt_broker, mqtt_port))
+        
+        if mqttClient then
+            pcall(function() mqttClient:Disconnect() end)
+        end
+        
+        mqttClient = Mqtt.New(mqtt_broker, mqtt_port, {
+            Username = Properties["MQTT Username"].Value,
+            Password = Properties["MQTT Password"].Value,
+            KeepAlive = 60
+        })
+        
+        mqttClient.OnConnect = function()
+            print("✓ [MQTT] Connected")
+            Controls.connection_status.Value = 0
+            Controls.last_command.String = "Connected"
+            
+            -- Subscribe to status topic for this device
+            local statusTopic = string.format("led/display/%d/status", device_id)
+            mqttClient:Subscribe(statusTopic, 0)
+            print(string.format("[MQTT] Subscribed to: %s", statusTopic))
+        end
+        
+        mqttClient.OnDisconnect = function()
+            print("✗ [MQTT] Disconnected")
+            Controls.connection_status.Value = 2
+            Controls.last_command.String = "Disconnected"
+        end
+        
+        mqttClient.OnMessage = function(topic, payload)
+            print(string.format("[MQTT] Message: %s → %s", topic, payload))
+            -- Could parse status updates here
+        end
+        
+        mqttClient.OnError = function(error)
+            print(string.format("✗ [MQTT ERROR] %s", tostring(error)))
+            Controls.connection_status.Value = 2
+            Controls.last_command.String = "Error: " .. tostring(error)
+        end
+        
+        mqttClient:Connect()
+    end
+
+    local function Initialize()
+        print("=======================================================")
+        print("=== LED Matrix (C4M MQTT) v1.0.0                    ===")
+        print("=======================================================")
+        
+        -- Initialize controls
+        if Controls.mqtt_broker.String == "" then
+            Controls.mqtt_broker.String = mqtt_broker
+        end
+        if Controls.mqtt_port.String == "" then
+            Controls.mqtt_port.String = tostring(mqtt_port)
+        end
+        if Controls.device_id.String == "" then
+            Controls.device_id.String = tostring(device_id)
+        end
+        
+        Controls.rotation.Choices = {"0", "90", "180", "270"}
+        Controls.layout_preset.Choices = LayoutChoices
+        
+        if Controls.rotation.String == "" then
+            Controls.rotation.String = "0"
+        end
+        if Controls.brightness.String == "" then
+            Controls.brightness.String = "128"
+        end
+        if Controls.last_command.String == "" then
+            Controls.last_command.String = "Ready"
+        end
+        Controls.layout_preset.String = LayoutChoices[1]
+
+        -- Initialize group selection (default to "All")
+        Controls.group0_select.Boolean = true
+        for grp = 1, 8 do
+            Controls[string.format("group%d_select", grp)].Boolean = false
+        end
+        Controls.active_group.String = "All"
+
+        local colorChoices  = {"White","Red","Green","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","DarkGreen","Gold","Gray","Black"}
+        local alignChoices  = {"Left","Center","Right"}
+        local effectChoices = {"Static","Scroll","Blink"}
+        local defaultColors = {"Red","Green","Blue","White"}
+
+        for seg = 0, num_segments - 1 do
+            local s = "seg" .. (seg+1) .. "_"
+            if Controls[s.."color"] then Controls[s.."color"].Choices = colorChoices end
+            if Controls[s.."align"] then Controls[s.."align"].Choices = alignChoices end
+            if Controls[s.."effect"] then Controls[s.."effect"].Choices = effectChoices end
+            
+            if Controls[s.."color"] and Controls[s.."color"].String == "" then
+                Controls[s.."color"].String = defaultColors[seg+1]
+            end
+            if Controls[s.."align"] and Controls[s.."align"].String == "" then
+                Controls[s.."align"].String = "Center"
+            end
+            if Controls[s.."effect"] and Controls[s.."effect"].String == "" then
+                Controls[s.."effect"].String = "Static"
+            end
+        end
+
+        activeLayoutSegments = activeLayoutSegments or {[0]=true}
+        for seg = 0, num_segments - 1 do
+            Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+        end
+
+        ConnectMQTT()
+        
+        print("=== Plugin Ready ===")
+    end
+
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or "Group " .. tostring(grp)
+                    Controls.active_group.String = groupName
+                    print(string.format("[GROUP] Selected: %s", groupName))
+                end, 0.05)
+            else
+                ctl.Boolean = true
+            end
+        end
+    end
+
+    -- Segment controls
+    for seg = 0, num_segments - 1 do
+        local n = seg + 1
+        local s = "seg" .. n .. "_"
+
+        Controls[s.."send"].EventHandler = function()
+            local text = Controls[s.."text"].String
+            local color = ColorNames[Controls[s.."color"].String] or "FFFFFF"
+            local align = AlignMap[Controls[s.."align"].String] or 1
+            local effect = EffectMap[Controls[s.."effect"].String] or 0
+            
+            local payload = {
+                seg = seg,
+                enabled = true,
+                text = text,
+                color = color,
+                align = align,
+                effect = effect
+            }
+            
+            if SendMQTT(BuildTopic("segment"), payload) then
+                Controls[s.."active"].Boolean = true
+                activeLayoutSegments[seg] = true
+            end
+        end
+
+        Controls[s.."clear"].EventHandler = function()
+            local payload = { seg = seg }
+            if SendMQTT(BuildTopic("clear"), payload) then
+                Controls[s.."active"].Boolean = false
+                activeLayoutSegments[seg] = nil
+            end
+        end
+
+        -- Auto-send on text change
+        Controls[s.."text"].EventHandler = function()
+            if activeLayoutSegments[seg] then
+                Controls[s.."send"]:Trigger()
+            end
+        end
+    end
+
+    -- Global controls
+    Controls.clear_all.EventHandler = function()
+        if SendMQTT(BuildTopic("clear"), {}) then
+            for seg = 0, num_segments - 1 do
+                Controls["seg"..(seg+1).."_active"].Boolean = false
+            end
+            activeLayoutSegments = {}
+        end
+    end
+
+    Controls.brightness.EventHandler = function(ctl)
+        local value = tonumber(ctl.String) or 128
+        value = math.max(0, math.min(255, math.floor(value)))
+        ctl.String = tostring(value)
+        SendMQTT(BuildTopic("brightness"), { value = value })
+    end
+
+    Controls.rotation.EventHandler = function(ctl)
+        local rotation = tonumber(ctl.String) or 0
+        SendMQTT(BuildTopic("rotation"), { value = rotation })
+    end
+
+    Controls.test_pattern.EventHandler = function()
+        SendMQTT(BuildTopic("test"), {})
+    end
+
+    Controls.apply_layout.EventHandler = function()
+        local key = LayoutNameToKey[Controls.layout_preset.String]
+        if key then
+            local p = LayoutPresets[key]
+            SendMQTT(BuildTopic("layout"), { preset = p.preset })
+            
+            activeLayoutSegments = {}
+            for _, seg in ipairs(p.activeSegments) do
+                activeLayoutSegments[seg] = true
+            end
+
+            for seg = 0, num_segments - 1 do
+                Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+            end
+        end
+    end
+
+    Controls.reconnect.EventHandler = function()
+        ConnectMQTT()
+    end
+
+    Controls.mqtt_broker.EventHandler = function(ctl)
+        mqtt_broker = ctl.String
+        ConnectMQTT()
+    end
+
+    Controls.mqtt_port.EventHandler = function(ctl)
+        mqtt_port = tonumber(ctl.String) or 1883
+        ConnectMQTT()
+    end
+
+    Controls.device_id.EventHandler = function(ctl)
+        device_id = tonumber(ctl.String) or 1
+        print(string.format("[DEVICE] ID changed to: %d", device_id))
+    end
+
+    function Cleanup()
+        if mqttClient then
+            pcall(function() mqttClient:Disconnect() end)
+        end
+    end
+
+    Initialize()
+end
