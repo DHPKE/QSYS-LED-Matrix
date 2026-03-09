@@ -1,0 +1,1305 @@
+-- Q-SYS LED Matrix Controller Plugin
+-- Version 7.1.0 - Adapted for 128x64 pixel matrix with BGR color order
+-- Version 7.0.27 - Font size modes (Auto/Small/Medium/Large), removed Verdana/Mono fonts
+-- Version 7.0.26 - Fixed layout 8/9 selection (added layout 10 placeholder)
+-- Version 7.0.12 - Apply button flushes ALL curtain groups (1-8), then sets only specified group
+-- Version 7.0.11 - Clear curtains from all groups on group switch, apply only to current
+-- Version 7.0.10 - Fixed num_segments scope with fallback default
+-- Version 7.0.9 - Dynamic segment count via property window (1-4 segments)
+-- Version 7.0.7 - Fixed Pi auto-show on group switch + per-group curtain state tracking
+-- Version 7.0.6 - Fixed curtain visibility control (only show enabled=true)
+-- Version 7.0.5 - Fix enable button (show/hide) + proportional segment scaling
+-- Version 7.0.4 - Curtain group field, enable button works immediately, removed apply button
+-- Version 7.0.3 - Fixed dynamic curtain group tracking (minimal changes to v7.0.1)
+-- Version 7.0.1 - Automatic curtain activation on group assignment
+-- Version 7.0.0 - Added Curtain Mode support (3px vertical bars on edges)
+-- Version 6.7.0 - Added display enable/disable control, improved test mode restoration
+-- Version 6.6.3 - Updated segment 3→Blue, segment 4→White
+-- Version 6.6.2 - Changed color names: Lime→Green, Green→DarkGreen; defaults: Seg1=Red, Seg2=Green
+-- Version 6.6.1 - Added Data parameter to HttpClient.Upload (required even for empty POST)
+-- Version 6.6.0 - Fixed to use correct Q-SYS HttpClient API (Upload/Download, not New)
+-- Version 6.5.3 - Disabled HTTP health check (HttpClient not available in all Q-SYS cores)
+-- Version 6.5.2 - Fixed HttpClient constructor syntax (use constructor, set properties after)
+-- Version 6.5.1 - Added HttpClient availability checks and error handling
+-- Version 6.5.0 - Added HTTP health check for accurate connection status
+-- Version 6.4.0 - Added test mode toggle button
+-- Version 6.2.1 - Fixed reboot button (using HttpClient instead of os.execute)
+--
+-- NOTE: Uses HttpClient.Upload() and HttpClient.Download() per Q-SYS API
+--       https://q-syshelp.qsc.com/DeveloperHelp/Content/Code_Examples/HTTPClient.htm
+--
+-- FIRMWARE PROTOCOL (JSON over UDP):
+--   {"cmd":"text","seg":0,"group":1,"text":"Hello","color":"FFFFFF","bgcolor":"000000",
+--    "font":"arial","size":"auto","align":"C","effect":"none","intensity":255}
+--   {"cmd":"clear","seg":0,"group":1}  |  {"cmd":"clear_all","group":1}
+--   {"cmd":"brightness","value":200,"group":1}
+--   {"cmd":"rotation","value":0,"group":1}  -- 0, 90, 180, or 270 degrees
+--   {"cmd":"layout","preset":N,"group":1}
+--   {"cmd":"group","value":3}   -- Assign panel to group 3
+--   {"cmd":"curtain","group":1,"enabled":true,"color":"FF0000"}  -- Show/hide curtain with color
+--
+-- ROTATION (v6.0+):
+--   Supports 0°, 90°, 180°, and 270° rotation of the entire display.
+--   Rotation is applied at matrix initialization, so changes require a service restart.
+--   Setting is persisted in config.json and survives reboots.
+--   Layouts automatically adapt: 90°/270° use portrait coords
+--   Use the "Apply Rotation" button, then "Reboot Panel" to apply.
+--
+-- GROUPING (v5.0):
+--   Each LED panel can be assigned to a group (1-8) via the panel's WebUI or UDP command.
+--   Commands sent with "group":N will only be executed by panels assigned to that group.
+--   Commands with "group":0 are broadcast to all panels (default behavior).
+--   
+--   Group visual indicators (bottom-left corner, 4x4 pixels):
+--     Group 1 = White    Group 5 = Magenta
+--     Group 2 = Yellow   Group 6 = Blue
+--     Group 3 = Orange   Group 7 = Cyan
+--     Group 4 = Red      Group 8 = Green
+--
+-- CURTAIN MODE (v7.0, fixed in v7.0.6):
+--   Creates vertical bars on the left and right edges (width adjusted for 128x64).
+--   Each group (1-8) has independent curtain configuration.
+--   Use "Curtain Config" to set color (curtain starts hidden).
+--   Use "Curtain Enable" toggle to show/hide.
+--   
+--   Workflow:
+--     1. Apply button: {"cmd":"curtain","group":4,"enabled":false,"color":"FF0000"} (configure, hidden)
+--     2. Enable toggle: {"cmd":"curtain","group":4,"enabled":true,"color":"FF0000"}  (show)
+--     3. Disable toggle: {"cmd":"curtain","group":4,"enabled":false,"color":"FF0000"} (hide)
+--   
+--   Curtain bars only visible when enabled=true.
+--
+-- LAYOUT PRESETS (adapted for 128x64):
+--   1  = Fullscreen
+--   2  = Top / Bottom halves
+--   3  = Left / Right halves
+--   4  = Triple Left
+--   5  = Triple Right
+--   6  = Thirds
+--   7  = Quad View
+--   8  = VO-left (voice-over: seg1 5/6 left, seg3 quarter BR)
+--   9  = VO-right (voice-over: seg2 1/3 right, seg3 quarter BR)
+--   11-14 = Single segment fullscreen
+--
+-- v7.1 CHANGES:
+--   - Matrix size: 128x64 pixels (was 64x32)
+--   - Color order: BGR (was RGB) - colors converted automatically
+--   - Curtain bars adjusted for wider display
+--   - All layout coordinates scaled 2x
+
+PluginInfo = {
+    Name = "PKE~LED Matrix 128x64 BGR",
+    Version = "7.1.0",
+    Id = "dhpke.olimex.led.matrix.128x64.bgr",
+    Description = "128x64 LED Matrix with BGR color order",
+    ShowDebug = true,
+    Author = "DHPKE"
+}
+
+function GetProperties()
+    return {
+        { Name = "IP Address",       Type = "string",  Value = "192.168.1.100" },
+        { Name = "UDP Port",         Type = "integer", Min = 1, Max = 65535, Value = 21324 },
+        { Name = "Number of Segments", Type = "integer", Min = 1, Max = 4, Value = 4 }
+    }
+end
+
+function GetControls(props)
+    local controls = {}
+    
+    -- Get number of segments from properties (default to 4 if not set)
+    local num_segments = 4
+    if props and props["Number of Segments"] then
+        if type(props["Number of Segments"]) == "table" then
+            num_segments = props["Number of Segments"].Value or 4
+        else
+            num_segments = props["Number of Segments"] or 4
+        end
+    end
+
+    -- Connection
+    table.insert(controls, { Name="ip_address",        ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="udp_port",          ControlType="Text",      Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="reconnect",         ControlType="Button",    ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input"  })
+    table.insert(controls, { Name="connection_status", ControlType="Indicator", IndicatorType="Status", Count=1, UserPin=true, PinStyle="Output" })
+    table.insert(controls, { Name="last_command",      ControlType="Text",      Count=1, UserPin=true, PinStyle="Output" })
+
+    -- Group routing controls (8 groups + broadcast)
+    table.insert(controls, { Name="active_group", ControlType="Text", Count=1, UserPin=false, PinStyle="Output" })  -- Shows current active group
+    for grp = 0, 8 do
+        local nm = grp == 0 and "All" or tostring(grp)
+        table.insert(controls, { Name=string.format("group%d_select", grp), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
+    end
+
+    -- Layout preset
+    table.insert(controls, { Name="layout_preset", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_layout",  ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+
+    -- Segment controls (dynamic based on property)
+    for seg = 0, num_segments - 1 do
+        local n = seg + 1
+        table.insert(controls, { Name=string.format("seg%d_text",       n), ControlType="Text",    Count=1, UserPin=false, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_text_color", n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_bg_color",   n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_align",      n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_effect",     n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_font",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_size",       n), ControlType="Text",    Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_send",   n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_clear",  n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_invert", n), ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, { Name=string.format("seg%d_frame",  n), ControlType="Button", ButtonType="Toggle",  Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_frame_color", n), ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+        table.insert(controls, { Name=string.format("seg%d_frame_link", n), ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Input" })
+        table.insert(controls, {
+            Name=string.format("seg%d_active", n),
+            ControlType="Indicator", IndicatorType="LED",
+            Count=1, UserPin=true, PinStyle="Output"
+        })
+    end
+
+    -- Global
+    table.insert(controls, { Name="brightness", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="rotation", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="apply_rotation", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="display_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    
+    -- Curtain Mode (v7.0)
+    table.insert(controls, { Name="curtain_group", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_color", ControlType="Text", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="curtain_apply", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="curtain_enable", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    
+    table.insert(controls, { Name="reboot_panel", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+    table.insert(controls, { Name="test_mode", ControlType="Button", ButtonType="Toggle", Count=1, UserPin=true, PinStyle="Both" })
+    table.insert(controls, { Name="clear_all", ControlType="Button", ButtonType="Trigger", Count=1, UserPin=true, PinStyle="Input" })
+
+    return controls
+end
+
+function GetControlLayout(props)
+    local layout   = {}
+    local graphics = {}
+
+    -- Get number of segments from properties (default to 4 if not set)
+    local num_segments = 4
+    if props and props["Number of Segments"] then
+        if type(props["Number of Segments"]) == "table" then
+            num_segments = props["Number of Segments"].Value or 4
+        else
+            num_segments = props["Number of Segments"] or 4
+        end
+    end
+
+    local W  = 600
+    local CH = 24
+    local BH = 28
+
+    local C_GRP   = {62,  62,  62 }
+    local C_LBL   = {205, 205, 205}
+    local C_BTN_G = {0,   148, 55 }
+    local C_BTN_R = {165, 38,  38 }
+    local C_BTN_B = {45,  105, 195}
+    local C_BTN_O = {200, 110, 0  }
+    
+    -- Group colors for buttons
+    local C_GRP_COLORS = {
+        [0] = {128, 128, 128},  -- Gray (All/Broadcast)
+        [1] = {255, 255, 255},  -- White
+        [2] = {255, 255, 0},    -- Yellow
+        [3] = {255, 165, 0},    -- Orange
+        [4] = {255, 0, 0},      -- Red
+        [5] = {255, 0, 255},    -- Magenta
+        [6] = {0, 0, 255},      -- Blue
+        [7] = {0, 255, 255},    -- Cyan
+        [8] = {0, 255, 0},      -- Green
+    }
+
+    local function GBox(x, y, w, h, title)
+        table.insert(graphics, {
+            Type="GroupBox", Text=title or "", Fill=C_GRP,
+            StrokeWidth=1, CornerRadius=4,
+            Position={x, y}, Size={w, h}
+        })
+    end
+    local function Lbl(text, x, y, w)
+        table.insert(graphics, {
+            Type="Text", Text=text, Font="Roboto", FontSize=9,
+            HTextAlign="Left", Color=C_LBL,
+            Position={x, y}, Size={w, 12}
+        })
+    end
+
+    -- ── Title bar ──────────────────────────────────────────────────
+    table.insert(graphics, {
+        Type="GroupBox", Text="", Fill={38,38,38},
+        StrokeWidth=0, CornerRadius=5,
+        Position={0,0}, Size={W,36}
+    })
+    table.insert(graphics, {
+        Type="Text", Text="LED Matrix 128x64 BGR v7.1.0",
+        Font="Roboto", FontSize=14, FontStyle="Bold",
+        HTextAlign="Center", Color={255,255,255},
+        Position={0,9}, Size={W,20}
+    })
+
+    -- ── Connection ─────────────────────────────────────────────────
+    local y = 42
+    GBox(0, y, W, 54, "Connection")
+    Lbl("IP Address",    6,   y+5, 124)
+    Lbl("Port",        138,   y+5,  62)
+    Lbl("Status",      278,   y+5,  62)
+    Lbl("Last Command",348,   y+5, W-354)
+    layout["ip_address"]        = { PrettyName="Conn~IP",       Style="Text",      Position={6,   y+18}, Size={124,   CH} }
+    layout["udp_port"]          = { PrettyName="Conn~Port",     Style="Text",      Position={138, y+18}, Size={62,    CH} }
+    layout["reconnect"]         = { PrettyName="Conn~Reconnect", Style="Button",   ButtonStyle="Trigger", Legend="Reconnect", Color=C_BTN_B, Position={208, y+18}, Size={62, BH} }
+    layout["connection_status"] = { PrettyName="Conn~Status",   Style="Indicator", Position={278, y+18}, Size={62,    CH} }
+    layout["last_command"]      = { PrettyName="Conn~LastCmd",  Style="Text",      Position={348, y+18}, Size={W-354, CH} }
+
+    -- ── Group Selection ─────────────────────────────────────────────
+    y = y + 60
+    GBox(0, y, W, 72, "Group Routing")
+    Lbl("Select target group for commands (broadcast to ALL or specific group 1-8)", 6, y+5, W-12)
+    
+    -- Group buttons: 9 buttons (All + 1-8), each 56px wide with 6px gap
+    local btnW = 56
+    local btnGap = 6
+    local groupLabels = {"All", "1", "2", "3", "4", "5", "6", "7", "8"}
+    for grp = 0, 8 do
+        local bx = 6 + grp * (btnW + btnGap)
+        layout[string.format("group%d_select", grp)] = {
+            PrettyName="Group~"..groupLabels[grp+1],
+            Style="Button", ButtonStyle="Toggle",
+            Legend=groupLabels[grp+1],
+            Color=C_GRP_COLORS[grp],
+            Position={bx, y+22}, Size={btnW, 36}
+        }
+    end
+    layout["active_group"] = { PrettyName="Group~Active", Style="Text", Position={6, y+62}, Size={0, 0} }
+
+    -- ── Display Layout ──────────────────────────────────────────────
+    y = y + 78
+    GBox(0, y, W, 148, "Display Layout")
+    
+    local TW  = 62
+    local TH  = 26
+    local GAP = 6
+    local TX  = 6
+
+    local function TRect(col, x, gy, w, h)
+        table.insert(graphics, {
+            Type="GroupBox", Text="", Fill=col,
+            StrokeWidth=0, CornerRadius=0,
+            Position={x, gy}, Size={w, h}
+        })
+    end
+
+    -- Thumbnails for presets
+    local thumbLabels = {"1 Full","2 Top/Bot","3 L/R","4 Tri-L","5 Tri-R","6 Thirds","7 Quad"}
+    for i = 0, 6 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 14
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        table.insert(graphics, {Type="Text", Text=thumbLabels[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+    
+    local thumbLabels2 = {"11 Seg1","12 Seg2","13 Seg3","14 Seg4"}
+    for i = 0, 3 do
+        local tx = TX + i*(TW+GAP)
+        local ty = y + 56
+        table.insert(graphics, {Type="GroupBox", Text="", Fill={18,18,18},
+            StrokeWidth=1, CornerRadius=2, Position={tx,ty}, Size={TW,TH}})
+        table.insert(graphics, {Type="Text", Text=thumbLabels2[i+1],
+            Font="Roboto", FontSize=7, HTextAlign="Center", Color=C_LBL,
+            Position={tx, ty+TH+2}, Size={TW, 10}})
+    end
+
+    -- Thumbnail fills
+    local cA = {70, 160,  70}
+    local cB = {70,  80, 160}
+    local cC = {160, 70,  70}
+    local cD = {160,160,  40}
+
+    local HW = 31
+    local HH = 13
+    local T1 = 20
+    local T2 = 20
+    local T3 = 22
+
+    do local tx=TX+0*(TW+GAP); local ty=y+14
+        TRect(cA, tx, ty, TW, TH)
+    end
+    do local tx=TX+1*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    TW, HH)
+        TRect(cB, tx,    ty+HH, TW, HH)
+    end
+    do local tx=TX+2*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty, HW, TH)
+        TRect(cB, tx+HW, ty, HW, TH)
+    end
+    do local tx=TX+3*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, TH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx+HW, ty+HH, HW, HH)
+    end
+    do local tx=TX+4*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx,    ty+HH, HW, HH)
+        TRect(cC, tx+HW, ty,    HW, TH)
+    end
+    do local tx=TX+5*(TW+GAP); local ty=y+14
+        TRect(cA, tx,       ty, T1, TH)
+        TRect(cB, tx+T1,    ty, T2, TH)
+        TRect(cC, tx+T1+T2, ty, T3, TH)
+    end
+    do local tx=TX+6*(TW+GAP); local ty=y+14
+        TRect(cA, tx,    ty,    HW, HH)
+        TRect(cB, tx+HW, ty,    HW, HH)
+        TRect(cC, tx,    ty+HH, HW, HH)
+        TRect(cD, tx+HW, ty+HH, HW, HH)
+    end
+    
+    do local tx=TX+0*(TW+GAP); local ty=y+56
+        TRect(cA, tx, ty, TW, TH)
+    end
+    do local tx=TX+1*(TW+GAP); local ty=y+56
+        TRect(cB, tx, ty, TW, TH)
+    end
+    do local tx=TX+2*(TW+GAP); local ty=y+56
+        TRect(cC, tx, ty, TW, TH)
+    end
+    do local tx=TX+3*(TW+GAP); local ty=y+56
+        TRect(cD, tx, ty, TW, TH)
+    end
+    
+    Lbl("Layout Preset", TX, y+96, 210)
+    layout["layout_preset"] = {
+        PrettyName="Layout~Preset",
+        Style="ComboBox", IsReadOnly=false,
+        Position={TX, y+110}, Size={220, CH}
+    }
+    layout["apply_layout"] = {
+        PrettyName="Layout~Apply",
+        Style="Button", ButtonStyle="Trigger",
+        Legend="Apply Layout", Color=C_BTN_O,
+        Position={234, y+110}, Size={160, CH}
+    }
+
+    -- ── Segment rows ────────────────────────────────────────────────
+    y = y + 166
+    local SEG_H = 145
+
+    local comboCols = {
+        {"Text Color", "text_color", "TxtColor", 110},
+        {"BG Color",   "bg_color",   "BgColor",  110},
+        {"Font",       "font",       "Font",      82},
+        {"Size",       "size",       "Size",      66},
+        {"Align",      "align",      "Align",     76},
+        {"Effect",     "effect",     "Effect",   114},
+    }
+
+    for seg = 0, num_segments - 1 do
+        local n   = seg + 1
+        local sn  = "seg"..n.."_"
+        local grp = "Seg"..n
+        local sy  = y + seg * (SEG_H + 4)
+
+        GBox(0, sy, W, SEG_H, grp)
+
+        local r1 = sy + 20
+        layout[sn.."active"] = { PrettyName=grp.."~Active", Style="Led",
+            Position={6, r1+5}, Size={14, 14} }
+        Lbl("Text", 26, r1-12, W-330)
+        layout[sn.."text"]   = { PrettyName=grp.."~Text",   Style="Text",
+            Position={26, r1}, Size={W-332, CH} }
+        layout[sn.."send"]   = { PrettyName=grp.."~Send",   Style="Button",
+            ButtonStyle="Trigger", Legend="Display", Color=C_BTN_G,
+            Position={W-300, r1}, Size={94, BH} }
+        layout[sn.."invert"] = { PrettyName=grp.."~Invert", Style="Button",
+            ButtonStyle="Trigger", Legend="Invert",  Color=C_BTN_B,
+            Position={W-200, r1}, Size={94, BH} }
+        layout[sn.."clear"]  = { PrettyName=grp.."~Clear",  Style="Button",
+            ButtonStyle="Trigger", Legend="Clear",   Color=C_BTN_R,
+            Position={W-100, r1}, Size={94, BH} }
+
+        local r2 = sy + 70
+        local cx = 6
+        for _, col in ipairs(comboCols) do
+            Lbl(col[1], cx, r2-20, col[4])
+            layout[sn..col[2]] = { PrettyName=grp.."~"..col[3], Style="ComboBox",
+                IsReadOnly=false,
+                Position={cx, r2}, Size={col[4], CH} }
+            cx = cx + col[4] + 6
+        end
+
+        local r3 = sy + 107
+        layout[sn.."frame"] = { PrettyName=grp.."~Frame", Style="Button",
+            ButtonStyle="Toggle", Legend="Frame", Color={120,120,120},
+            Position={6, r3}, Size={80, BH} }
+        Lbl("Color", 92, r3-15, 50)
+        layout[sn.."frame_color"] = { PrettyName=grp.."~FrameColor", Style="ComboBox",
+            IsReadOnly=false,
+            Position={92, r3}, Size={110, CH} }
+        layout[sn.."frame_link"] = { PrettyName=grp.."~LinkColor", Style="Button",
+            ButtonStyle="Toggle", Legend="→", Color={80,120,180}, OffColor={60,60,60}, UnlinkOffColor=true,
+            Position={208, r3}, Size={32, BH}, FontSize=18 }
+    end
+
+    -- ── Global Controls ─────────────────────────────────────────────
+    y = y + 4 * (SEG_H + 4) + 4
+    GBox(0, y, W, 148, "Global Controls")
+    
+    Lbl("Brightness (0-255)", 6, y+16, 120)
+    layout["brightness"] = { PrettyName="Global~Bright", Style="Text",
+        Position={6, y+30}, Size={100, 36} }
+    
+    Lbl("Rotation (°)", 112, y+16, 100)
+    layout["rotation"] = { PrettyName="Global~Rotation", Style="ComboBox",
+        Position={112, y+30}, Size={100, 36} }
+    layout["apply_rotation"] = { PrettyName="Global~ApplyRot", Style="Button",
+        ButtonStyle="Trigger", Legend="Apply Rotation", Color=C_BTN_O,
+        Position={218, y+30}, Size={120, 36} }
+    
+    layout["display_enable"] = { PrettyName="Global~Display", Style="Button",
+        ButtonStyle="Toggle", Legend="Display", Color=C_BTN_G,
+        Position={344, y+30}, Size={80, 36} }
+    
+    layout["test_mode"] = { PrettyName="Global~TestMode", Style="Button",
+        ButtonStyle="Toggle", Legend="Test Mode", Color={255, 193, 7},
+        Position={430, y+30}, Size={80, 36} }
+    
+    layout["reboot_panel"] = { PrettyName="Global~Reboot", Style="Button",
+        ButtonStyle="Trigger", Legend="Reboot", Color={200, 80, 80},
+        Position={516, y+30}, Size={78, 36} }
+    
+    -- Curtain Mode (v7.0)
+    Lbl("Curtain Mode", 6, y+74, 120)
+    
+    Lbl("Group", 6, y+88, 50)
+    layout["curtain_group"] = { PrettyName="Curtain~Group", Style="Text",
+        Position={6, y+102}, Size={60, 36} }
+    
+    Lbl("Color", 72, y+88, 50)
+    layout["curtain_color"] = { PrettyName="Curtain~Color", Style="ComboBox",
+        IsReadOnly=false,
+        Position={72, y+102}, Size={110, 36} }
+    
+    layout["curtain_apply"] = { PrettyName="Curtain~Apply", Style="Button",
+        ButtonStyle="Trigger", Legend="Apply", Color=C_BTN_O,
+        Position={188, y+102}, Size={80, 36} }
+    
+    layout["curtain_enable"] = { PrettyName="Curtain~Enable", Style="Button",
+        ButtonStyle="Toggle", Legend="Show", Color=C_BTN_G,
+        Position={274, y+102}, Size={80, 36} }
+    
+    layout["clear_all"]  = { PrettyName="Global~ClearAll", Style="Button",
+        ButtonStyle="Trigger", Legend="Clear All", Color=C_BTN_R,
+        Position={112, y+72}, Size={100, 36} }
+
+    return layout, graphics
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- Runtime
+-- ══════════════════════════════════════════════════════════════════
+if Controls then
+    local socket   = nil
+    local ip_addr  = Properties["IP Address"].Value
+    local udp_port = Properties["UDP Port"].Value
+    local num_segments = (Properties["Number of Segments"] and Properties["Number of Segments"].Value) or 4  -- Default to 4 if not set
+    
+    print(string.format("[LED Matrix 128x64 BGR] Runtime initialized with %d segments", num_segments))
+
+    local activeLayoutSegments = {}
+    local debounceTimers = {}
+    local activeGroup = 0
+    local updatingGroups = false
+
+    -- ✅ v7.1: RGB to BGR color conversion helper
+    local function ConvertRGBtoBGR(hexColor)
+        -- Input: "RRGGBB" (hex string)
+        -- Output: "BBGGRR" (hex string with swapped R and B)
+        if not hexColor or #hexColor ~= 6 then
+            return hexColor  -- Return as-is if invalid
+        end
+        local r = hexColor:sub(1,2)
+        local g = hexColor:sub(3,4)
+        local b = hexColor:sub(5,6)
+        return b .. g .. r  -- BGR order
+    end
+
+    local ColorNames = {
+        ["White"]   = "FFFFFF", ["Red"]      = "FF0000", ["Green"]     = "00FF00",
+        ["Blue"]    = "0000FF", ["Yellow"]   = "FFFF00", ["Magenta"]   = "FF00FF",
+        ["Cyan"]    = "00FFFF", ["Orange"]   = "FFA500", ["Purple"]    = "800080",
+        ["DarkGreen"] = "008000", ["Gold"]   = "FFD700",
+        ["Gray"]    = "808080", ["Black"]    = "000000"
+    }
+    local FontMap  = { ["Arial"]="arial", ["Digital"]="digital12" }
+    local AlignMap = { ["Left"]="L", ["Center"]="C", ["Right"]="R" }
+
+    local LayoutPresets = {
+        [1]  = { name="1 - Fullscreen",           activeSegments={0},       preset=1  },
+        [2]  = { name="2 - Top / Bottom",          activeSegments={0,1},     preset=2  },
+        [3]  = { name="3 - Left / Right",          activeSegments={0,1},     preset=3  },
+        [4]  = { name="4 - Triple Left",           activeSegments={0,1,2},   preset=4  },
+        [5]  = { name="5 - Triple Right",          activeSegments={0,1,2},   preset=5  },
+        [6]  = { name="6 - Thirds",                activeSegments={0,1,2},   preset=6  },
+        [7]  = { name="7 - Quad View",             activeSegments={0,1,2,3}, preset=7  },
+        [8]  = { name="8 - VO-left",               activeSegments={0,2},     preset=8 },
+        [9]  = { name="9 - VO-right",              activeSegments={1,2},     preset=9 },
+        [10] = { name="10 - (reserved)",           activeSegments={0},       preset=1 },  -- placeholder to maintain numbering
+        [11] = { name="11 - Fullscreen Seg 1",     activeSegments={0},       preset=11 },
+        [12] = { name="12 - Fullscreen Seg 2",     activeSegments={1},       preset=12 },
+        [13] = { name="13 - Fullscreen Seg 3",     activeSegments={2},       preset=13 },
+        [14] = { name="14 - Fullscreen Seg 4",     activeSegments={3},       preset=14 },
+    }
+
+    local LayoutNameToKey = {}
+    for k, v in pairs(LayoutPresets) do LayoutNameToKey[v.name] = k end
+
+    local LayoutChoices = {
+        "1 - Fullscreen", "2 - Top / Bottom", "3 - Left / Right",
+        "4 - Triple Left", "5 - Triple Right", "6 - Thirds", "7 - Quad View",
+        "8 - VO-left", "9 - VO-right", "10 - (reserved)",
+        "11 - Fullscreen Seg 1", "12 - Fullscreen Seg 2",
+        "13 - Fullscreen Seg 3", "14 - Fullscreen Seg 4",
+    }
+
+    local commandCounter = 0
+    local lastError = nil
+    local errorCount = 0
+    
+    -- Curtain state tracking (v7.0.6)
+    local curtainEnabledGroups = {}  -- Track which groups have curtain configured
+    local curtainVisibleGroups = {}  -- Track which groups have curtain visible (enabled=true)
+    
+    local function ReopenSocket()
+        print(string.format("[SOCKET] Reopening socket (IP: %s, Port: %s)", ip_addr, tostring(udp_port)))
+        if socket then 
+            pcall(function() socket:Close() end) 
+        end
+        local ok, err = pcall(function()
+            socket = UdpSocket.New()
+            socket:Open()
+        end)
+        if ok then
+            Controls.connection_status.Value = 0
+            errorCount = 0
+            print(string.format("✓ [SOCKET] UDP socket ready -> %s:%s", ip_addr, tostring(udp_port)))
+        else
+            Controls.connection_status.Value = 2
+            errorCount = errorCount + 1
+            print(string.format("✗ [SOCKET ERROR #%d] %s", errorCount, tostring(err)))
+        end
+    end
+
+    local function ValidatePort(port)
+        local num = tonumber(port)
+        if num and num >= 1 and num <= 65535 then return num end
+        return nil
+    end
+
+    local function jsonStr(v)
+        if v == nil then return "null" end
+        if type(v) == "number"  then return tostring(math.floor(v)) end
+        if type(v) == "boolean" then return v and "true" or "false" end
+        v = tostring(v):gsub('\\','\\\\'):gsub('"','\\"')
+        return '"' .. v .. '"'
+    end
+    
+    local function buildJson(t)
+        local parts = {}
+        for k, v in pairs(t) do
+            table.insert(parts, jsonStr(k) .. ":" .. jsonStr(v))
+        end
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+
+    local function SendCommand(json)
+        commandCounter = commandCounter + 1
+        local cmdId = commandCounter
+        
+        print(string.format("[CMD #%d] Preparing to send: %s", cmdId, json))
+        
+        if not socket then
+            print(string.format("✗ [CMD #%d ERROR] No socket available", cmdId))
+            Controls.connection_status.Value = 2
+            Controls.last_command.String = "ERROR: No socket"
+            errorCount = errorCount + 1
+            lastError = "No socket"
+            
+            if errorCount < 3 then
+                print(string.format("[CMD #%d] Attempting auto-reconnect...", cmdId))
+                ReopenSocket()
+            end
+            return false
+        end
+        
+        local ok, err = pcall(function() 
+            socket:Send(ip_addr, udp_port, json .. "\n") 
+        end)
+        
+        if ok then
+            Controls.last_command.String = json
+            Controls.connection_status.Value = 0
+            errorCount = 0
+            lastError = nil
+            print(string.format("✓ [CMD #%d SUCCESS] Sent to %s:%d", cmdId, ip_addr, udp_port))
+            return true
+        else
+            errorCount = errorCount + 1
+            lastError = tostring(err)
+            Controls.last_command.String = "ERROR: " .. tostring(err)
+            Controls.connection_status.Value = 2
+            print(string.format("✗ [CMD #%d ERROR #%d] %s", cmdId, errorCount, tostring(err)))
+            
+            if errorCount >= 2 then
+                ReopenSocket()
+            end
+            return false
+        end
+    end
+
+    local function BuildTextCommand(seg)
+        local s     = "seg" .. (seg+1) .. "_"
+        
+        -- Safety check: ensure all required controls exist
+        if not Controls[s.."text"] then
+            print(string.format("[ERROR] Control %s does not exist (seg=%d, num_segments=%d)", s.."text", seg, num_segments))
+            return "", "{}"
+        end
+        
+        local text    = Controls[s.."text"].String
+        local colorRGB   = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+        local bgcolorRGB = ColorNames[Controls[s.."bg_color"].String]   or "000000"
+        
+        -- ✅ v7.1: Convert RGB to BGR
+        local color = ConvertRGBtoBGR(colorRGB)
+        local bgcolor = ConvertRGBtoBGR(bgcolorRGB)
+        
+        local font    = FontMap[Controls[s.."font"].String]          or "arial"
+        local size    = Controls[s.."size"].String                   or "auto"
+        local align   = AlignMap[Controls[s.."align"].String]        or "C"
+        local effect  = Controls[s.."effect"].String                 or "none"
+        
+        return text, buildJson({
+            cmd="text", seg=seg, group=activeGroup, text=text, color=color, bgcolor=bgcolor,
+            font=font, size=size, align=align, effect=effect, intensity=255
+        })
+    end
+
+    local function Initialize()
+        print("=======================================================")
+        print("=== LED Matrix 128x64 BGR v7.1.0                    ===")
+        print("=======================================================")
+        
+        if Controls.ip_address.String == "" then
+            Controls.ip_address.String = ip_addr
+        end
+        if Controls.udp_port.String == "" then
+            Controls.udp_port.String = tostring(udp_port)
+        end
+        
+        Controls.rotation.Choices = {"0", "90", "180", "270"}
+        Controls.layout_preset.Choices = LayoutChoices
+        
+        if Controls.rotation.String == "" then
+            Controls.rotation.String = "0"
+        end
+        if Controls.brightness.String == "" or Controls.brightness.String == "0" then
+            Controls.brightness.String = "128"
+        end
+        if Controls.last_command.String == "" then
+            Controls.last_command.String = "Ready"
+        end
+        Controls.layout_preset.String = LayoutChoices[1]
+
+        Controls.group0_select.Boolean = true
+        for grp = 1, 8 do
+            Controls[string.format("group%d_select", grp)].Boolean = false
+        end
+        Controls.active_group.String = "All"
+
+        local colorChoices  = {"White","Red","Green","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","DarkGreen","Gold","Gray","Black"}
+        local bgChoices     = {"Black","White","Red","Green","Blue","Yellow","Magenta","Cyan",
+                               "Orange","Purple","DarkGreen","Gold","Gray"}
+        local fontChoices   = {"Arial","Digital"}
+        local sizeChoices   = {"Auto","Small","Medium","Large"}
+        local alignChoices  = {"Left","Center","Right"}
+        local effectChoices = {"none","scroll","blink","fade"}
+        local defaultColors = {"Red","Green","Blue","White"}  -- Seg1=Red, Seg2=Green, Seg3=Blue, Seg4=White
+
+        -- Curtain initialization
+        if Controls.curtain_group and Controls.curtain_group.String == "" then
+            Controls.curtain_group.String = "1"
+        end
+        if Controls.curtain_color then
+            Controls.curtain_color.Choices = colorChoices
+            if Controls.curtain_color.String == "" then
+                Controls.curtain_color.String = "White"
+            end
+        end
+        if Controls.curtain_enable and Controls.curtain_enable.Boolean == nil then
+            Controls.curtain_enable.Boolean = false
+        end
+
+        for seg = 0, num_segments - 1 do
+            local s = "seg" .. (seg+1) .. "_"
+            if Controls[s.."text_color"] then Controls[s.."text_color"].Choices = colorChoices end
+            if Controls[s.."bg_color"] then Controls[s.."bg_color"].Choices   = bgChoices end
+            if Controls[s.."font"] then Controls[s.."font"].Choices       = fontChoices end
+            if Controls[s.."size"] then Controls[s.."size"].Choices       = sizeChoices end
+            if Controls[s.."align"] then Controls[s.."align"].Choices      = alignChoices end
+            if Controls[s.."effect"] then Controls[s.."effect"].Choices     = effectChoices end
+            
+            if Controls[s.."text_color"] and Controls[s.."text_color"].String == "" then
+                Controls[s.."text_color"].String = defaultColors[seg+1]
+            end
+            if Controls[s.."bg_color"] and Controls[s.."bg_color"].String == "" then
+                Controls[s.."bg_color"].String = "Black"
+            end
+            if Controls[s.."font"] and Controls[s.."font"].String == "" then
+                Controls[s.."font"].String = "Arial"
+            end
+            if Controls[s.."size"] and Controls[s.."size"].String == "" then
+                Controls[s.."size"].String = "Auto"
+            end
+            if Controls[s.."align"] and Controls[s.."align"].String == "" then
+                Controls[s.."align"].String = "Center"
+            end
+            if Controls[s.."effect"] and Controls[s.."effect"].String == "" then
+                Controls[s.."effect"].String = "none"
+            end
+            if Controls[s.."frame_color"] and Controls[s.."frame_color"].String == "" then
+                Controls[s.."frame_color"].String = "White"
+            end
+            if Controls[s.."frame_color"] then Controls[s.."frame_color"].Choices = colorChoices end
+        end
+
+        activeLayoutSegments = activeLayoutSegments or {[0]=true}
+        for seg = 0, num_segments - 1 do
+            Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+        end
+
+        ReopenSocket()
+        
+        -- Initialize display_enable to ON by default (after socket is ready)
+        if Controls.display_enable.Boolean == nil then
+            Controls.display_enable.Boolean = true
+        end
+        
+        print("=== Plugin Ready ===")
+    end
+
+    -- Group selection handlers
+    for grp = 0, 8 do
+        Controls[string.format("group%d_select", grp)].EventHandler = function(ctl)
+            if updatingGroups then return end
+            if ctl.Boolean then
+                Timer.CallAfter(function()
+                    updatingGroups = true
+                    for g = 0, 8 do
+                        if g ~= grp then
+                            Controls[string.format("group%d_select", g)].Boolean = false
+                        end
+                    end
+                    updatingGroups = false
+                    activeGroup = grp
+                    local groupName = grp == 0 and "All" or tostring(grp)
+                    Controls.active_group.String = groupName
+                    SendCommand(buildJson({cmd="group", value=grp}))
+                    
+                    -- ✅ v7.0.11: Clear curtains from ALL groups, then apply only to current group
+                    Timer.CallAfter(function()
+                        -- Step 1: Disable curtains on all groups (1-8)
+                        for g = 1, 8 do
+                            if g ~= grp and curtainEnabledGroups[g] then
+                                local colorRGB = "FFFFFF"
+                                local colorBGR = ConvertRGBtoBGR(colorRGB)
+                                local payload = {
+                                    cmd = "curtain",
+                                    group = g,
+                                    enabled = false,
+                                    color = colorBGR
+                                }
+                                SendCommand(buildJson(payload))
+                                print(string.format("[CURTAIN] Cleared group %d", g))
+                            end
+                        end
+                        
+                        -- Step 2: Apply curtain to current group if configured
+                        if grp > 0 and curtainEnabledGroups[grp] then
+                            local curtainVisible = curtainVisibleGroups[grp] or false
+                            print(string.format("[CURTAIN] Group %d switch: applying curtain enabled=%s", grp, tostring(curtainVisible)))
+                            
+                            -- Update UI
+                            Controls.curtain_group.String = tostring(grp)
+                            Controls.curtain_enable.Boolean = curtainVisible
+                            
+                            -- Send curtain state
+                            local colorName = Controls.curtain_color.String or "White"
+                            local colorRGB = ColorNames[colorName] or colorName
+                            local color = ConvertRGBtoBGR(colorRGB:gsub("#", ""))
+                            
+                            local payload = {
+                                cmd = "curtain",
+                                group = grp,
+                                enabled = curtainVisible,
+                                color = color
+                            }
+                            SendCommand(buildJson(payload))
+                        end
+                    end, 0.15)
+                end, 0.05)
+            else
+                ctl.Boolean = true
+            end
+        end
+    end
+
+    local function ApplyLayoutByKey(key)
+        local p = LayoutPresets[key]
+        if not p then
+            Controls.last_command.String = "ERROR: unknown preset"
+            return false
+        end
+
+        SendCommand(buildJson({cmd="layout", preset=p.preset, group=activeGroup}))
+
+        activeLayoutSegments = {}
+        for _, seg in ipairs(p.activeSegments) do
+            activeLayoutSegments[seg] = true
+        end
+
+        for seg = 0, num_segments - 1 do
+            Controls["seg"..(seg+1).."_active"].Boolean = (activeLayoutSegments[seg] == true)
+        end
+
+        Timer.CallAfter(function()
+            for _, seg in ipairs(p.activeSegments) do
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
+                local s = "seg" .. (seg+1) .. "_"
+                if Controls[s.."frame"].Boolean then
+                    local colorRGB = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+                    local color = ConvertRGBtoBGR(colorRGB)
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                    }))
+                end
+            end
+        end, 0.3)
+
+        return true
+    end
+
+    local function ResolvePreset(input)
+        local num = tonumber(input)
+        if num then return math.floor(num) end
+        return LayoutNameToKey[input]
+    end
+
+    Controls.reconnect.EventHandler = function()
+        ReopenSocket()
+        Controls.last_command.String = "Reconnected"
+    end
+
+    Controls.apply_layout.EventHandler = function()
+        local key = ResolvePreset(Controls.layout_preset.String)
+        if key then ApplyLayoutByKey(key) end
+    end
+
+    Controls.layout_preset.EventHandler = function(ctl)
+        local key = ResolvePreset(ctl.String)
+        if key then ApplyLayoutByKey(key) end
+    end
+
+    for seg = 0, num_segments - 1 do
+        local s = "seg" .. (seg+1) .. "_"
+
+        Controls[s.."send"].EventHandler = function()
+            local _, cmd = BuildTextCommand(seg)
+            if SendCommand(cmd) then
+                Controls[s.."active"].Boolean = true
+                activeLayoutSegments[seg] = true
+            end
+        end
+
+        Controls[s.."clear"].EventHandler = function()
+            if SendCommand(buildJson({cmd="clear", seg=seg, group=activeGroup})) then
+                Controls[s.."active"].Boolean = false
+                activeLayoutSegments[seg] = nil
+            end
+        end
+
+        Controls[s.."invert"].EventHandler = function()
+            local tc  = Controls[s.."text_color"]
+            local bc  = Controls[s.."bg_color"]
+            local tmp = tc.String
+            tc.String = bc.String
+            bc.String = tmp
+            if activeLayoutSegments[seg] then
+                local _, cmd = BuildTextCommand(seg)
+                SendCommand(cmd)
+            end
+        end
+
+        local function AutoSend()
+            if not activeLayoutSegments[seg] then return end
+            local _, cmd = BuildTextCommand(seg)
+            SendCommand(cmd)
+        end
+
+        Controls[s.."text"].EventHandler       = AutoSend
+        Controls[s.."text_color"].EventHandler = function(ctl)
+            -- Send text update
+            AutoSend()
+            -- If frame link is enabled, sync frame color to text color
+            if Controls[s.."frame_link"].Boolean then
+                Controls[s.."frame_color"].String = ctl.String
+                if Controls[s.."frame"].Boolean then
+                    local colorRGB = ColorNames[ctl.String] or "FFFFFF"
+                    local color = ConvertRGBtoBGR(colorRGB)
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                    }))
+                end
+            end
+        end
+        Controls[s.."bg_color"].EventHandler   = AutoSend
+        Controls[s.."font"].EventHandler       = AutoSend
+        Controls[s.."align"].EventHandler      = AutoSend
+        Controls[s.."size"].EventHandler       = AutoSend
+        Controls[s.."effect"].EventHandler     = AutoSend
+        
+        Controls[s.."frame"].EventHandler = function(ctl)
+            local enabled = ctl.Boolean
+            local colorRGB = ColorNames[Controls[s.."frame_color"].String] or "FFFFFF"
+            local color = ConvertRGBtoBGR(colorRGB)
+            SendCommand(buildJson({
+                cmd="frame", seg=seg, enabled=enabled, color=color, width=1, group=activeGroup
+            }))
+        end
+        
+        Controls[s.."frame_color"].EventHandler = function(ctl)
+            if Controls[s.."frame"].Boolean then
+                local colorRGB = ColorNames[ctl.String] or "FFFFFF"
+                local color = ConvertRGBtoBGR(colorRGB)
+                SendCommand(buildJson({
+                    cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                }))
+            end
+        end
+        
+        Controls[s.."frame_link"].EventHandler = function(ctl)
+            -- When enabled, sync frame color to text color and keep it synced
+            if ctl.Boolean then
+                Controls[s.."frame_color"].String = Controls[s.."text_color"].String
+                if Controls[s.."frame"].Boolean then
+                    local colorRGB = ColorNames[Controls[s.."text_color"].String] or "FFFFFF"
+                    local color = ConvertRGBtoBGR(colorRGB)
+                    SendCommand(buildJson({
+                        cmd="frame", seg=seg, enabled=true, color=color, width=1, group=activeGroup
+                    }))
+                end
+            end
+        end
+    end
+
+    Controls.clear_all.EventHandler = function()
+        if SendCommand(buildJson({cmd="clear_all", group=activeGroup})) then
+            for seg = 0, num_segments - 1 do
+                Controls["seg"..(seg+1).."_active"].Boolean = false
+            end
+            activeLayoutSegments = {}
+        end
+    end
+
+    Controls.brightness.EventHandler = function(ctl)
+        local value = tonumber(ctl.String) or 128
+        value = math.max(0, math.min(255, math.floor(value)))
+        ctl.String = tostring(value)
+        SendCommand(buildJson({cmd="brightness", value=value, group=activeGroup}))
+    end
+
+    Controls.apply_rotation.EventHandler = function()
+        local rotation = tonumber(Controls.rotation.String) or 0
+        if SendCommand(buildJson({cmd="rotation", value=rotation, group=activeGroup})) then
+            print("✓ Rotation set to: " .. rotation .. "°")
+            Controls.last_command.String = "Rotation saved - click Reboot Panel to apply"
+        end
+    end
+
+    -- ✅ Reboot button using Q-SYS HttpClient.Upload()
+    Controls.reboot_panel.EventHandler = function()
+        print("[REBOOT] Sending HTTP POST to /api/reboot")
+        Controls.last_command.String = "Rebooting panel..."
+        
+        -- Check if HttpClient is available
+        if not HttpClient then
+            print("[REBOOT] HttpClient not available - use WebUI at http://IP:8080/")
+            Controls.last_command.String = "HttpClient unavailable - use WebUI"
+            return
+        end
+        
+        -- Use HttpClient.Upload for POST requests (Q-SYS API)
+        -- Note: Data parameter is required even for empty POST body
+        HttpClient.Upload({
+            Url = string.format("http://%s:8080/api/reboot", ip_addr),
+            Method = "POST",
+            Data = "",  -- Empty string for POST with no body
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 then
+                    print("✓ [REBOOT] Command sent successfully")
+                    Controls.last_command.String = "Panel rebooting (offline ~30s)"
+                else
+                    print(string.format("⚠ [REBOOT] Response code=%s, err=%s", tostring(code), tostring(err or "none")))
+                    Controls.last_command.String = "Reboot command sent"
+                end
+            end
+        })
+    end
+
+    -- Display Enable/Disable Toggle Handler
+    Controls.display_enable.EventHandler = function(ctl)
+        if not socket then
+            print("[DISPLAY] Socket not ready yet")
+            return
+        end
+        
+        local enabled = ctl.Boolean
+        print(string.format("[DISPLAY] Toggle: %s", enabled and "ON" or "OFF"))
+        Controls.last_command.String = string.format("Display %s", enabled and "enabling..." or "disabling...")
+        
+        -- Send UDP command to enable/disable display
+        local payload = {
+            cmd = "display",
+            enabled = enabled,
+            group = activeGroup
+        }
+        local ok, json_str = pcall(function() return rapidjson.encode(payload) end)
+        if not ok then
+            print("[DISPLAY ERROR] JSON encode failed")
+            Controls.last_command.String = "JSON error"
+            return
+        end
+        
+        socket.Data = json_str
+        print(string.format("[DISPLAY] Sending: %s", json_str))
+        local result = socket:Send()
+        if result == 0 then
+            print(string.format("✓ [DISPLAY] Command sent: %s", enabled and "ENABLED" or "DISABLED"))
+            Controls.last_command.String = string.format("Display %s", enabled and "ON" or "OFF")
+        else
+            print(string.format("⚠ [DISPLAY] Send failed: %s", result))
+            Controls.last_command.String = "Display toggle failed"
+        end
+    end
+
+    -- Curtain Mode Event Handlers (v7.0.5)
+    -- Apply button: Configure curtain for a group (color + enable)
+    -- ✅ FIXED v7.0.12: Apply flushes ALL groups, then sets only the specified group
+    Controls.curtain_apply.EventHandler = function()
+        print("[CURTAIN] Apply button clicked")
+        
+        if not socket then
+            print("[CURTAIN] ERROR: Socket not ready yet")
+            Controls.last_command.String = "Error: Socket not ready"
+            return
+        end
+        
+        local curtainGroup = tonumber(Controls.curtain_group.String) or 1
+        local colorName = Controls.curtain_color.String or "White"
+        local colorRGB = ColorNames[colorName] or colorName
+        local color = ConvertRGBtoBGR(colorRGB:gsub("#", ""))
+        
+        -- Validate group
+        if curtainGroup < 1 or curtainGroup > 8 then
+            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
+            Controls.last_command.String = "Error: Group must be 1-8"
+            return
+        end
+        
+        print(string.format("[CURTAIN] Step 1: Flushing all curtain groups (1-8)"))
+        
+        -- ✅ v7.0.12: Step 1 - Flush ALL curtain groups (1-8)
+        for g = 1, 8 do
+            curtainEnabledGroups[g] = nil  -- Clear config tracking
+            curtainVisibleGroups[g] = nil  -- Clear visibility tracking
+            
+            local payload = {
+                cmd = "curtain",
+                group = g,
+                enabled = false,
+                color = ConvertRGBtoBGR("000000")  -- Black = cleared
+            }
+            SendCommand(buildJson(payload))
+            print(string.format("[CURTAIN] Flushed group %d", g))
+        end
+        
+        -- Brief delay to ensure flush completes
+        Timer.CallAfter(function()
+            print(string.format("[CURTAIN] Step 2: Configuring group %d (color=%s, enabled=false)", curtainGroup, color))
+            
+            -- ✅ Step 2 - Configure ONLY the specified group
+            curtainEnabledGroups[curtainGroup] = true
+            curtainVisibleGroups[curtainGroup] = false  -- Start hidden
+            
+            -- Send config with enabled=false (invisible by default)
+            local payload = {
+                cmd = "curtain",
+                group = curtainGroup,
+                enabled = false,
+                color = color
+            }
+            
+            local json = buildJson(payload)
+            print(string.format("[CURTAIN] Sending: %s", json))
+            SendCommand(json)
+            
+            -- Update UI
+            Controls.curtain_enable.Boolean = false
+            Controls.last_command.String = string.format("Curtain configured (Group %d, hidden)", curtainGroup)
+            
+            print(string.format("✓ [CURTAIN] Group %d configured with color %s (hidden)", curtainGroup, color))
+        end, 0.2)  -- 200ms delay
+    end
+    
+    -- ✅ FIXED v7.0.6: Enable toggle controls visibility using enabled parameter
+    Controls.curtain_enable.EventHandler = function(ctl)
+        print(string.format("[CURTAIN] Enable toggle: %s", tostring(ctl.Boolean)))
+        
+        if not socket then
+            print("[CURTAIN] ERROR: Socket not ready yet")
+            Controls.last_command.String = "Error: Socket not ready"
+            return
+        end
+        
+        local visible = ctl.Boolean
+        local curtainGroup = tonumber(Controls.curtain_group.String) or 1
+        local colorName = Controls.curtain_color.String or "White"
+        local colorRGB = ColorNames[colorName] or colorName
+        local color = ConvertRGBtoBGR(colorRGB:gsub("#", ""))
+        
+        -- Validate group
+        if curtainGroup < 1 or curtainGroup > 8 then
+            print(string.format("[CURTAIN] ERROR: Invalid group %d", curtainGroup))
+            Controls.last_command.String = "Error: Group must be 1-8"
+            return
+        end
+        
+        print(string.format("[CURTAIN] Setting visibility: group=%d, enabled=%s", curtainGroup, tostring(visible)))
+        
+        -- ✅ v7.0.6: Store visibility state for this group
+        curtainVisibleGroups[curtainGroup] = visible
+        
+        -- ✅ FIX: Send enabled (not state) with current color
+        local payload = {
+            cmd = "curtain",
+            group = curtainGroup,
+            enabled = visible,  -- ✅ Changed from state to enabled
+            color = color       -- ✅ Include color to maintain config
+        }
+        
+        local json = buildJson(payload)
+        print(string.format("[CURTAIN] Sending: %s", json))
+        SendCommand(json)
+        
+        Controls.last_command.String = string.format("Curtain %s (Group %d)", 
+            visible and "shown" or "hidden", curtainGroup)
+    end
+
+    -- Test Mode Toggle Handler using Q-SYS HttpClient.Upload()
+    Controls.test_mode.EventHandler = function(ctl)
+        local enabled = ctl.Boolean
+        print(string.format("[TEST] Test mode toggle: %s", enabled and "ON" or "OFF"))
+        Controls.last_command.String = "Toggling test mode..."
+        
+        -- Check if HttpClient is available
+        if not HttpClient then
+            print("[TEST] HttpClient not available - use WebUI at http://IP:8080/")
+            Controls.last_command.String = "HttpClient unavailable - use WebUI"
+            ctl.Boolean = not enabled  -- Revert toggle
+            return
+        end
+        
+        -- Use HttpClient.Upload for POST requests (Q-SYS API)
+        -- Note: Data parameter is required even for empty POST body
+        HttpClient.Upload({
+            Url = string.format("http://%s:8080/api/testmode", ip_addr),
+            Method = "POST",
+            Data = "",  -- Empty string for POST with no body
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 then
+                    print(string.format("✓ [TEST] Test mode %s", enabled and "enabled" or "disabled"))
+                    Controls.last_command.String = string.format("Test mode %s", enabled and "ON" or "OFF")
+                else
+                    print(string.format("⚠ [TEST] Failed: code=%s, err=%s", tostring(code), tostring(err or "none")))
+                    Controls.last_command.String = "Test mode toggle failed"
+                    ctl.Boolean = not enabled  -- Revert on failure
+                end
+            end
+        })
+    end
+
+    Controls.ip_address.EventHandler = function(ctl)
+        ip_addr = ctl.String
+        ReopenSocket()
+    end
+
+    Controls.udp_port.EventHandler = function(ctl)
+        local v = ValidatePort(ctl.String)
+        if v then
+            udp_port = v
+            ReopenSocket()
+        end
+    end
+
+    local healthCheckTimer = Timer.New()
+    healthCheckTimer.EventHandler = function()
+        -- Check if HttpClient is available
+        if not HttpClient then
+            return  -- Silent skip
+        end
+        
+        -- Ping the web server using HttpClient.Download (Q-SYS API)
+        HttpClient.Download({
+            Url = string.format("http://%s:8080/", ip_addr),
+            Method = "GET",
+            Timeout = 2,
+            EventHandler = function(tbl, code, data, err)
+                if code == 200 or code == 404 then
+                    -- Panel is reachable
+                    Controls.connection_status.Value = 0
+                    errorCount = 0
+                else
+                    -- Panel unreachable
+                    Controls.connection_status.Value = 2
+                    errorCount = errorCount + 1
+                    if errorCount >= 5 then
+                        ReopenSocket()
+                    end
+                end
+            end
+        })
+    end
+    healthCheckTimer:Start(5)  -- Check every 5 seconds
+
+    function Cleanup()
+        if healthCheckTimer then 
+            pcall(function() healthCheckTimer:Stop() end)
+        end
+        if socket then 
+            pcall(function() socket:Close() end) 
+        end
+    end
+
+    Initialize()
+end
