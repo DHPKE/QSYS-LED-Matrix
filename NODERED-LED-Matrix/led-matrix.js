@@ -1,5 +1,6 @@
 /**
  * Node-RED LED Matrix Controller - Single Node with Optional Defaults
+ * Version 7.1 - 128×64 BGR support with all parameters
  * Node properties provide defaults, message values override
  */
 
@@ -11,19 +12,23 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        node.ip = config.ip || "10.1.1.24";
+        node.ip = config.ip || "10.10.10.99";
         node.port = parseInt(config.port) || 21324;
         
         // Default values from node config (empty string means "use message value")
         node.defaults = {
             segment: config.segment !== "" ? parseInt(config.segment) : null,
+            group: config.group !== "" ? parseInt(config.group) : null,
             color: config.color || null,
             bgcolor: config.bgcolor || null,
             font: config.font || null,
+            size: config.size || null,
             align: config.align || null,
+            effect: config.effect || null,
             intensity: config.intensity !== "" ? parseInt(config.intensity) : null,
             layout: config.layout !== "" ? parseInt(config.layout) : null,
             brightness: config.brightness !== "" ? parseInt(config.brightness) : null,
+            rotation: config.rotation !== "" ? parseInt(config.rotation) : null,
             frame: config.frame === "true" ? true : (config.frame === "false" ? false : null),
             framecolor: config.framecolor || null,
             framewidth: config.framewidth !== "" ? parseInt(config.framewidth) : null,
@@ -74,13 +79,14 @@ module.exports = function(RED) {
                 cmdObj = {
                     cmd: "text",
                     seg: getValue(msg.segment !== undefined ? msg.segment : msg.seg, node.defaults.segment, 0),
+                    group: getValue(msg.group, node.defaults.group, 0),
                     text: msg.text !== undefined ? String(msg.text) : String(msg.payload || ""),
                     color: getValue(msg.color, node.defaults.color, "FFFFFF").replace('#', ''),
                     bgcolor: getValue(msg.bgcolor, node.defaults.bgcolor, "000000").replace('#', ''),
                     font: getValue(msg.font, node.defaults.font, "arial"),
-                    size: msg.size || "auto",
+                    size: getValue(msg.size, node.defaults.size, "auto"),
                     align: getValue(msg.align, node.defaults.align, "C"),
-                    effect: msg.effect || "none",
+                    effect: getValue(msg.effect, node.defaults.effect, "none"),
                     intensity: getValue(msg.intensity, node.defaults.intensity, 255)
                 };
             } else if (msg.layout !== undefined || msg.preset !== undefined) {
@@ -91,7 +97,8 @@ module.exports = function(RED) {
                 if (layoutValue !== null && layoutValue !== undefined) {
                     cmdObj = {
                         cmd: "layout",
-                        preset: layoutValue
+                        preset: layoutValue,
+                        group: getValue(msg.group, node.defaults.group, 0)
                     };
                 } else {
                     node.warn("Layout command requires msg.layout or node default");
@@ -104,34 +111,47 @@ module.exports = function(RED) {
                 if (brightnessValue !== null && brightnessValue !== undefined) {
                     cmdObj = {
                         cmd: "brightness",
-                        value: brightnessValue
+                        value: brightnessValue,
+                        group: getValue(msg.group, node.defaults.group, 0)
                     };
                 } else {
                     node.warn("Brightness command requires msg.brightness or node default");
                     return;
                 }
+            } else if (msg.rotation !== undefined) {
+                // ROTATION command (0, 90, 180, 270 degrees) - persists across reboots
+                const rotationValue = msg.rotation !== undefined ? msg.rotation : node.defaults.rotation;
+                
+                if (rotationValue !== null && rotationValue !== undefined) {
+                    cmdObj = {
+                        cmd: "rotation",
+                        value: rotationValue,
+                        group: getValue(msg.group, node.defaults.group, 0)
+                    };
+                } else {
+                    node.warn("Rotation command requires msg.rotation or node default");
+                    return;
+                }
             } else if (msg.clear !== undefined) {
                 // CLEAR command
                 if (msg.clear === "all" || msg.clear === true) {
-                    cmdObj = { cmd: "clear_all" };
+                    cmdObj = { 
+                        cmd: "clear_all",
+                        group: getValue(msg.group, node.defaults.group, 0)
+                    };
                 } else {
                     cmdObj = {
                         cmd: "clear",
-                        seg: msg.clear
+                        seg: msg.clear,
+                        group: getValue(msg.group, node.defaults.group, 0)
                     };
                 }
             } else if (msg.orientation !== undefined) {
-                // ORIENTATION command
+                // ORIENTATION command (temporary, doesn't persist)
                 cmdObj = {
                     cmd: "orientation",
-                    value: msg.orientation
-                };
-            } else if (msg.rotation !== undefined) {
-                // ROTATION command (0, 90, 180, 270 degrees)
-                cmdObj = {
-                    cmd: "rotation",
-                    value: msg.rotation,
-                    group: msg.group || 0
+                    value: msg.orientation,
+                    group: getValue(msg.group, node.defaults.group, 0)
                 };
             } else if (msg.testmode !== undefined) {
                 // TEST MODE command (via HTTP POST to web API)
@@ -179,7 +199,7 @@ module.exports = function(RED) {
                         enabled: !!frameValue,
                         color: getValue(msg.framecolor, node.defaults.framecolor, "FFFFFF").replace('#', ''),
                         width: getValue(msg.framewidth, node.defaults.framewidth, 1),
-                        group: msg.group || 0
+                        group: getValue(msg.group, node.defaults.group, 0)
                     };
                 }
             } else if (msg.curtainEnable !== undefined || node.defaults.curtainEnable !== null) {
@@ -189,7 +209,7 @@ module.exports = function(RED) {
                 if (enableValue !== null && enableValue !== undefined) {
                     cmdObj = {
                         cmd: "curtain",
-                        group: msg.group || 1,
+                        group: getValue(msg.group, node.defaults.group, 1),
                         enabled: !!enableValue,
                         color: getValue(msg.curtainColor, node.defaults.curtainColor, "FFFFFF").replace('#', '')
                     };
@@ -201,11 +221,11 @@ module.exports = function(RED) {
                 if (curtainValue !== null && curtainValue !== undefined) {
                     cmdObj = {
                         cmd: "curtain",
-                        group: msg.group || 1,
+                        group: getValue(msg.group, node.defaults.group, 1),
                         state: !!curtainValue
                     };
                 }
-            } else if (msg.group !== undefined) {
+            } else if (msg.group !== undefined && msg.segments !== undefined) {
                 // GROUP command
                 cmdObj = {
                     cmd: "group",
@@ -221,7 +241,7 @@ module.exports = function(RED) {
                 if (msg.config.name !== undefined) cmdObj.name = msg.config.name;
                 if (msg.config.orientation !== undefined) cmdObj.orientation = msg.config.orientation;
             } else {
-                node.warn("No valid command found in message. Use msg.text, msg.layout, msg.brightness, msg.clear, etc.");
+                node.warn("No valid command found in message. Use msg.text, msg.layout, msg.brightness, msg.rotation, msg.clear, etc.");
                 return;
             }
 
@@ -240,6 +260,9 @@ module.exports = function(RED) {
         let statusText = `ready @ ${node.ip}:${node.port}`;
         if (node.defaults.segment !== null) {
             statusText += ` | seg${node.defaults.segment}`;
+        }
+        if (node.defaults.group !== null) {
+            statusText += ` | grp${node.defaults.group}`;
         }
         node.status({fill:"yellow", shape:"ring", text: statusText});
     }

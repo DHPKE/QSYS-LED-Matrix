@@ -1,338 +1,316 @@
-# Node-RED LED Matrix Controller v2.2 🎯
+# node-red-contrib-led-matrix
 
-**One node, flat message structure with optional defaults!**
+Node-RED node for controlling **128×64 BGR LED Matrix** panels via UDP.
 
-## ✨ Flexible Configuration
+Compatible with [QSYS-LED-Matrix](https://github.com/DHPKE/QSYS-LED-Matrix) v7.1+ Raspberry Pi controller.
 
-Set default values in the node properties, or leave them empty to use message values:
+## Features
 
-- **Set in node:** Values used when message doesn't provide them
-- **Leave empty:** Always use values from incoming messages
-- **Message always wins:** Message values override node defaults
+- **128×64 BGR LED Matrix** support
+- **All parameters configurable** from Node-RED
+- **Rotation support** (0°, 90°, 180°, 270°) - persists across reboots
+- **Font sizes** from 6px to 64px (auto-fit or fixed)
+- **Text effects** (none, scroll, fade, blink)
+- **Curtain mode** with auto-scale (3px frame)
+- **8 independent groups** with segment management
+- **9 layout presets** (fullscreen, splits, VO modes)
+- **Frame/border** per segment (configurable color & width)
+- **Color pickers** in UI for easy color selection
+- **Node defaults** with message override
 
-Perfect for:
-- **Fixed displays:** Set segment/color once in node, just send text
-- **Dynamic displays:** Leave empty, control everything via messages
-- **Hybrid:** Set some defaults, override others per message
-
-## 🎨 Node Configuration
-
-Configure defaults in the node properties:
-
-### Connection (Required)
-- **IP Address:** LED Matrix IP (default: 10.1.1.24)
-- **UDP Port:** UDP port (default: 21324)
-
-### Text Defaults (Optional)
-- **Segment:** Default segment (0-3) or leave empty
-- **Text Color:** Default text color (hex) or leave empty
-- **Background:** Default background color or leave empty
-- **Font:** Default font (arial/mono) or leave empty
-- **Alignment:** Default alignment (L/C/R) or leave empty
-- **Intensity:** Default intensity (0-255) or leave empty
-
-**Leave any field empty to always use message values.**
-
----
-
-## 💡 Usage Patterns
-
-### Pattern 1: Fixed Segment Display
-Configure in node:
-- Segment: 0
-- Color: 00FF00 (green)
-- Font: mono
-
-Then just send:
-```javascript
-msg.payload = "22°C";  // Uses node defaults
-```
-
-### Pattern 2: Dynamic Control
-Leave all fields empty in node.
-
-Send complete messages:
-```javascript
-msg.text = "Hello";
-msg.segment = 0;
-msg.color = "FF0000";
-```
-
-### Pattern 3: Hybrid (Recommended)
-Set common defaults in node:
-- Font: mono
-- Alignment: C
-
-Override per message:
-```javascript
-msg.text = "Warning!";
-msg.segment = 1;
-msg.color = "FF0000";  // Override for this message
-// Uses node defaults for font and alignment
-```
-
----
-
-## 🚀 Quick Examples
-
-### 🔤 Text Display
-```javascript
-// Minimal (uses node defaults if configured)
-msg.payload = "Hello";
-
-// Full control (overrides node defaults)
-msg.text = "Hello World";
-msg.segment = 0;             // Segment 0-3
-msg.color = "FF0000";        // Text color (hex)
-msg.bgcolor = "000000";      // Background color
-msg.font = "arial";          // "arial" or "mono"
-msg.align = "C";             // "L", "C", "R"
-msg.intensity = 255;         // 0-255
-```
-
-**Priority:** Message values > Node defaults > Built-in defaults
-
-### Change Layout
-```javascript
-msg.layout = 7;  // Quad view
-```
-
-### Set Brightness
-```javascript
-msg.brightness = 128;  // 0-255
-```
-
-### Clear Display
-```javascript
-msg.clear = "all";  // Clear everything
-// or
-msg.clear = 0;      // Clear segment 0
-```
-
----
-
-## 📋 All Commands
-
-### 🔤 Text Display
-```javascript
-msg.text = "Hello";          // Text to display (or msg.payload)
-msg.segment = 0;             // Segment 0-3
-msg.color = "FF0000";        // Text color (hex)
-msg.bgcolor = "000000";      // Background color
-msg.font = "arial";          // "arial" or "mono"
-msg.align = "C";             // "L", "C", "R"
-msg.intensity = 255;         // 0-255
-```
-
-### 📐 Layout
-```javascript
-msg.layout = 7;              // Layout preset 1-7, 11-14
-```
-
-**Presets:**
-- 1 - Fullscreen
-- 2 - Top/Bottom (2 segments)
-- 3 - Left/Right (2 segments)
-- 4 - Triple Left (3 segments)
-- 5 - Triple Right (3 segments)
-- 6 - Thirds (3 columns)
-- 7 - Quad View (4 segments)
-- 11 - Fullscreen Segment 1
-- 12 - Fullscreen Segment 2
-- 13 - Fullscreen Segment 3
-- 14 - Fullscreen Segment 4
-
-### ☀️ Brightness
-```javascript
-msg.brightness = 200;        // 0-255 (0=off, 255=max)
-```
-
-### 🧹 Clear
-```javascript
-msg.clear = "all";           // Clear entire display
-// or
-msg.clear = 0;               // Clear segment 0 (0-3)
-// or
-msg.clear = true;            // Also clears all
-```
-
-### 🔄 Orientation
-```javascript
-msg.orientation = 180;       // 0, 90, 180, 270
-```
-
-### 👥 Group
-```javascript
-msg.group = 1;               // Group number 0-8
-msg.segments = [0, 1];       // Segments in group
-```
-
-### ⚙️ Config
-```javascript
-msg.config = {
-    network: true,           // Get network info
-    name: true,             // Get device name
-    orientation: true       // Get orientation
-};
-```
-
----
-
-## 💡 Common Use Cases
-
-### Real-Time Clock
-```
-[Inject: every 1s] → [Function] → [LED Matrix]
-```
-
-Function:
-```javascript
-msg.text = new Date().toLocaleTimeString();
-msg.segment = 0;
-msg.color = "00FFFF";
-msg.font = "mono";
-return msg;
-```
-
-### Temperature Display with Color
-```javascript
-const temp = msg.payload;
-msg.text = `${temp}°C`;
-msg.segment = 0;
-msg.color = temp > 25 ? "FF0000" : "00FF00";  // Red if hot
-return msg;
-```
-
-### Dashboard with Layout Buttons
-```
-[Button: Quad] → [Change: msg.layout=7] → [LED Matrix]
-[Button: Full] → [Change: msg.layout=1] → [LED Matrix]
-```
-
-### Time-Based Brightness
-```javascript
-const hour = new Date().getHours();
-msg.brightness = (hour >= 22 || hour < 7) ? 50 : 200;
-return msg;
-```
-
-### Four-Segment Display
-```javascript
-// Use function with 4 outputs
-return [
-    { text: "CPU: 45%", segment: 0, color: "00FF00" },
-    { text: "RAM: 2GB", segment: 1, color: "00FFFF" },
-    { text: "Disk: 50GB", segment: 2, color: "FFFF00" },
-    { text: "22°C", segment: 3, color: "FF8800" }
-];
-```
-
-Connect all 4 outputs to the same LED Matrix node!
-
----
-
-## 📦 Installation
+## Installation
 
 ```bash
 cd ~/.node-red
-npm install /path/to/QSYS-LED-Matrix/NODERED-LED-Matrix
-node-red-restart
+npm install node-red-contrib-led-matrix
 ```
 
-Find the **led-matrix** node in your palette under "output" category.
+Or install via Node-RED palette manager: Search for "led-matrix"
 
----
+## Quick Start
 
-## 🎯 Node Configuration
-
-Drag the **LED Matrix** node onto your canvas and configure:
-
-- **Name:** Display name (optional)
-- **IP Address:** LED Matrix IP (default: 10.1.1.24)
-- **UDP Port:** UDP port (default: 21324)
-
-That's it! Now send messages to control it.
-
----
-
-## 🔄 Message Priority
-
-The node detects the command automatically from message properties:
-
-1. **Text** - If `msg.text` or `msg.payload` exists
-2. **Layout** - If `msg.layout` exists
-3. **Brightness** - If `msg.brightness` exists
-4. **Clear** - If `msg.clear` exists
-5. **Orientation** - If `msg.orientation` exists
-6. **Group** - If `msg.group` exists
-7. **Config** - If `msg.config` exists
-
-Only **one command per message** is processed.
-
----
-
-## 📊 Examples File
-
-Import `examples.json` to get ready-to-use flows:
-
-1. ✅ Text display with color
-2. ✅ Layout switching (Quad/Full)
-3. ✅ Brightness control
-4. ✅ Clear display
-5. ✅ Real-time clock
-6. ✅ Four-segment display
-
----
-
-## 🆚 v2.1 vs Old Versions
-
-| Feature | Old (v1.0) | New (v2.1) |
-|---------|-----------|-----------|
-| **Command Style** | `msg.command="layout"`<br/>`msg.preset=7` | `msg.layout=7` |
-| **Text Display** | `msg.command="text"`<br/>`msg.text="Hello"` | `msg.text="Hello"` |
-| **Brightness** | `msg.command="brightness"`<br/>`msg.brightness=128` | `msg.brightness=128` |
-| **Clear** | `msg.command="clear"` or `"clear_all"` | `msg.clear=0` or `"all"` |
-| **Complexity** | 🟡 Medium | 🟢 Simple |
-| **Typing** | More | Less |
-
----
-
-## 🐛 Troubleshooting
-
-**Node not appearing?**
-```bash
-node-red-restart
+### Send Text
+```javascript
+msg.text = "Hello World";
+msg.segment = 0;        // Segment 0-3
+msg.color = "FF0000";   // Red text
+msg.bgcolor = "000000"; // Black background
+return msg;
 ```
 
-**Commands not working?**
-- Check IP address matches your LED Matrix
-- Verify UDP port 21324 is correct
-- Test with simple command: `msg.layout = 1`
+### Change Layout
+```javascript
+msg.layout = 7;  // Quad view (4 segments)
+return msg;
+```
 
-**Text not displaying?**
-- Ensure `msg.text` or `msg.payload` contains a string
-- Check segment number (0-3)
-- Verify color format (6-digit hex without #)
+### Rotate Display
+```javascript
+msg.rotation = 90;  // Rotate 90° clockwise
+return msg;
+```
 
----
+### Show Curtain
+```javascript
+msg.curtainEnable = true;
+msg.curtainColor = "FF0000";  // Red frame
+msg.group = 1;
+return msg;
+```
 
-## 📚 Full Documentation
+## Configuration
 
-- **Installation:** See INSTALL.md
-- **Quick Reference:** See QUICK-REFERENCE.md
-- **Protocol Details:** See main README.md
+### Node Properties
 
----
+All properties are **optional defaults**. Leave empty to use message values.
 
-## ✨ Why v2.2?
+- **IP Address**: Default: `10.10.10.99` (fallback static IP)
+- **UDP Port**: Default: `21324`
+- **Segment**: Default segment (0-3)
+- **Group**: Default group (0-8, 0=all)
+- **Color**: Default text color (hex)
+- **Background**: Default background color (hex)
+- **Font**: arial, mono
+- **Size**: auto or 6-64 pixels
+- **Alignment**: L (left), C (center), R (right)
+- **Effect**: none, scroll, fade, blink
+- **Intensity**: 0-255
+- **Layout**: 1-9, 11-14
+- **Brightness**: 0-255
+- **Rotation**: 0, 90, 180, 270
+- **Frame**: Enable/disable segment border
+- **Curtain**: Enable/disable 3px frame
 
-✅ **Simpler** - No `msg.command` hierarchy  
-✅ **Cleaner** - Flat message structure  
-✅ **Flexible defaults** - Set once in node or control via messages  
-✅ **Message priority** - Message values always override node defaults  
-✅ **Less typing** - Set defaults for common values, only send what changes  
-✅ **Works both ways** - Fixed displays OR dynamic control
+### Message Properties
 
----
+**Text Display**:
+```javascript
+{
+  text: "Hello",           // Text to display (or use payload)
+  segment: 0,              // Segment 0-3
+  group: 1,                // Group 0-8 (0=all)
+  color: "FFFFFF",         // Text color hex
+  bgcolor: "000000",       // Background color hex
+  font: "arial",           // Font: arial, mono
+  size: 32,                // Size: auto or 6-64
+  align: "C",              // Align: L, C, R
+  effect: "scroll",        // Effect: none, scroll, fade, blink
+  intensity: 255           // Intensity 0-255
+}
+```
 
-**Version 2.2.0 - Flexible Configuration with Smart Defaults! 🚀**
+**Layout & Display**:
+```javascript
+{
+  layout: 7,               // Layout preset 1-9, 11-14
+  brightness: 128,         // Brightness 0-255
+  rotation: 90,            // Rotation 0, 90, 180, 270
+  group: 0                 // Optional group filter
+}
+```
+
+**Clear**:
+```javascript
+{
+  clear: 0,                // Clear segment 0-3
+  group: 1                 // Optional group filter
+}
+
+// Or clear all:
+{ clear: "all" }
+```
+
+**Frame**:
+```javascript
+{
+  frame: true,             // Enable frame
+  segment: 0,              // Target segment
+  framecolor: "FF0000",    // Frame color hex
+  framewidth: 2,           // Width 1-5
+  group: 0                 // Optional
+}
+```
+
+**Curtain Mode**:
+```javascript
+{
+  curtainEnable: true,     // Show curtain
+  curtainColor: "FF0000",  // Curtain color hex
+  group: 1                 // Group 1-8 (0=all)
+}
+```
+
+**Test Mode** (via HTTP):
+```javascript
+{
+  testmode: true           // Enable test mode (color bars + IP)
+}
+```
+
+## Layouts
+
+| Preset | Description |
+|--------|-------------|
+| 1 | Fullscreen (single segment) |
+| 2 | Top / Bottom (2 segments) |
+| 3 | Left / Right (2 segments) |
+| 4 | Triple Left (3 segments) |
+| 5 | Triple Right (3 segments) |
+| 6 | Thirds (3 segments) |
+| 7 | Quad View (4 segments) |
+| 8 | VO Left (main + small) |
+| 9 | VO Right (main + small) |
+| 11-14 | Fullscreen per segment |
+
+## Curtain Mode
+
+Curtain mode creates a **3-pixel frame** around the entire display (all edges).
+
+### Auto-Scale Behavior
+- **Layouts 1-7, 11-14**: Auto-scale to **122×58** when curtain enabled
+- **VO layouts 8-9**: Keep fixed **3px margins** (no scaling)
+
+### Use Cases
+- **Status indication** (red = error, green = ok)
+- **Zone highlighting** per group
+- **Frame overlay** on all segments
+
+## Groups
+
+Groups allow independent control of segment sets:
+
+```javascript
+// Define group 1 with segments 0 and 1
+msg.group = 1;
+msg.segments = [0, 1];
+
+// Send text to group 1
+msg.text = "Group 1";
+msg.group = 1;
+
+// Broadcast to all groups
+msg.group = 0;
+```
+
+## Font Sizes
+
+Fixed sizes: 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 60, 64 pixels
+
+Or use `"auto"` to fit text to segment size.
+
+## Effects
+
+- **none**: Static text
+- **scroll**: Horizontal scroll
+- **fade**: Fade in/out
+- **blink**: Blink on/off
+
+## Hardware
+
+### Display Specs
+- **Resolution**: 128×64 pixels
+- **Color order**: BGR (not RGB)
+- **Usable area**: 122×58 (with curtain)
+- **Anti-flicker**: PWM_BITS=5 (optimized)
+- **Text padding**: 1px from edges
+
+### Raspberry Pi Controller
+- **QSYS-LED-Matrix** v7.1+
+- **UDP port**: 21324
+- **HTTP port**: 8080 (test mode)
+- **Network**: DHCP + fallback 10.10.10.99/24
+
+## Examples
+
+### Dynamic Temperature Display
+```javascript
+const temp = msg.payload.temperature;
+msg.text = temp + "°C";
+msg.segment = 0;
+msg.color = temp > 25 ? "FF0000" : "00FF00";
+msg.size = 48;
+return msg;
+```
+
+### Scrolling Status Text
+```javascript
+msg.text = "System Status: All OK";
+msg.segment = 1;
+msg.effect = "scroll";
+msg.color = "00FF00";
+return msg;
+```
+
+### Multi-Segment Dashboard
+```javascript
+// Layout: Quad view
+flow.set("layout", { layout: 7 });
+
+// Top-left: Time
+msg[0] = { segment: 0, text: new Date().toLocaleTimeString() };
+
+// Top-right: Temp
+msg[1] = { segment: 1, text: "22°C", color: "00FF00" };
+
+// Bottom-left: Status
+msg[2] = { segment: 2, text: "ONLINE", color: "FFFFFF" };
+
+// Bottom-right: Counter
+msg[3] = { segment: 3, text: String(flow.get("counter") || 0) };
+
+return msg;
+```
+
+### Error Notification with Red Curtain
+```javascript
+// Show error text
+msg[0] = {
+  text: "ERROR",
+  segment: 0,
+  color: "FF0000",
+  effect: "blink"
+};
+
+// Enable red curtain
+msg[1] = {
+  curtainEnable: true,
+  curtainColor: "FF0000",
+  group: 1
+};
+
+return msg;
+```
+
+## Priority
+
+**Message values always override node configuration.**
+
+Node defaults are used only when message doesn't provide a value.
+
+## License
+
+MIT
+
+## Repository
+
+https://github.com/DHPKE/QSYS-LED-Matrix
+
+## Changelog
+
+### v3.0.0 (2026-03-09)
+- **128×64 BGR** matrix support
+- **Rotation** support (0°, 90°, 180°, 270°)
+- **Font sizes** 6-64px + auto-fit
+- **Effects** (scroll, fade, blink)
+- **Curtain auto-scale** (layouts 1-7, 11-14)
+- **Group** parameter support
+- **VO layouts** 8-9 (voice-over modes)
+- Updated default IP to **10.10.10.99** (fallback static)
+- Enhanced UI with all parameters
+
+### v2.4.0
+- Curtain mode support (2px frame)
+- Frame color & width configuration
+
+### v2.0.0
+- Initial release (64×32 RGB support)
