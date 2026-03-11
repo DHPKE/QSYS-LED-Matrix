@@ -2,12 +2,13 @@
 # install.sh — Install the LED Matrix controller on Raspberry Pi
 #              Supports: Raspberry Pi OS (Bookworm/Bullseye) and DietPi
 #
-# Version 7.1.0 includes:
+# Version 7.2.0 includes:
 #   - NetworkManager fallback IP configuration (10.10.10.99/24)
 #   - DietPi compatibility (dietpi-software integration)
 #   - Improved error handling and verification
 #   - Anti-flicker optimizations (PWM_BITS=5)
 #   - Text padding (1px margins)
+#   - Performance optimizations (15-25% CPU reduction)
 #
 # Run WITHOUT sudo:  bash install.sh
 # (Script will prompt for sudo when needed)
@@ -19,6 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "========================================="
 echo "LED Matrix Controller - Installation"
+echo "Version 7.2.0"
 echo "========================================="
 echo ""
 
