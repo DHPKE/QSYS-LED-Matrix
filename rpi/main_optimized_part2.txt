@@ -1,0 +1,159 @@
+        
+        # ── Test mode rendering ──────────────────────────────────────────
+        if test_mode_active:
+            # Refresh hostname every 10 seconds
+            if now - last_hostname_fetch >= 10:
+                hostname = socket.gethostname()
+                last_hostname_fetch = now
+            
+            # Refresh IP every 10 seconds
+            if now - last_ip_fetch >= 10:
+                test_device_ip = _get_first_up_ip() or "No IP"
+                last_ip_fetch = now
+            
+            # 4-state cycle: 0=hostname, 1=blank, 2=IP, 3=blank
+            if now - last_cycle_switch >= 1.0:
+                test_cycle_state = (test_cycle_state + 1) % 4
+                last_cycle_switch = now
+                
+                # Update segment 0 text based on cycle state
+                # Segment 0 is already configured as full-screen on entry to test mode
+                if test_cycle_state == 0:
+                    # Hostname
+                    sm.activate(0, True)
+                    sm.update_text(0, hostname, color="FFFFFF", bgcolor="010101", align="C")
+                    logger.info(f"[TEST] Displaying hostname: '{hostname}'")
+                elif test_cycle_state == 2:
+                    # IP
+                    sm.activate(0, True)
+                    sm.update_text(0, test_device_ip, color="FFFFFF", bgcolor="010101", align="C")
+                    logger.info(f"[TEST] Displaying IP: '{test_device_ip}'")
+                else:
+                    # Blank (deactivate segment, just show bars)
+                    sm.activate(0, False)
+                    logger.info(f"[TEST] Blank cycle (state {test_cycle_state})")
+                # States 1 and 3 are blank (no text, just bars)
+            
+            # RENDER TEST MODE PATTERN
+            # Import PIL here for test mode rendering
+            from PIL import Image, ImageDraw
+            
+            # Create image for this frame
+            test_img = Image.new("RGB", (MATRIX_WIDTH, MATRIX_HEIGHT), (0, 0, 0))
+            
+            # Draw 5 vertical color bars (full height)
+            bar_width = MATRIX_WIDTH // 5  # 64/5 = ~13px per bar
+            colors = [
+                (255, 0, 0),    # Red
+                (0, 255, 0),    # Green
+                (0, 0, 255),    # Blue
+                (255, 255, 0),  # Yellow
+                (255, 255, 255) # White
+            ]
+            
+            # Move bars every 2 frames for smooth animation
+            frame_counter += 1
+            if frame_counter % 2 == 0:
+                test_bar_offset = (test_bar_offset + 1) % (bar_width * len(colors))
+            
+            # STEP 1: Draw color bars to image
+            pixels = test_img.load()
+            for x in range(MATRIX_WIDTH):
+                bar_index = ((x + test_bar_offset) // bar_width) % len(colors)
+                r, g, b = colors[bar_index]
+                for y in range(MATRIX_HEIGHT):
+                    pixels[x, y] = (r, g, b)
+            
+            # STEP 2: Render text on top of bars (only if text is active)
+            if renderer and (test_cycle_state == 0 or test_cycle_state == 2):
+                try:
+                    # Get segment snapshots
+                    segment_snapshots, any_dirty = sm.get_render_snapshot()
+                    
+                    # Temporarily use test_img as the renderer's image
+                    old_image = renderer._image
+                    old_draw = renderer._draw
+                    renderer._image = test_img
+                    renderer._draw = ImageDraw.Draw(test_img)
+                    
+                    # Render text segments with transparent background
+                    for snap in segment_snapshots:
+                        if snap['is_active'] and snap['width'] > 1 and snap['height'] > 1:
+                            renderer._render_segment_from_snapshot(snap)
+                    
+                    # Restore renderer's original image
+                    renderer._image = old_image
+                    renderer._draw = old_draw
+                    
+                    # Clear dirty flags
+                    sm.clear_dirty_flags()
+                except Exception as exc:
+                    logger.error(f"[TEST] Render exception: {exc}")
+            
+            # STEP 3: Send combined image to matrix
+            if matrix and canvas:
+                canvas.SetImage(test_img)
+                canvas = matrix.SwapOnVSync(canvas)
+            
+            time.sleep(0.016)  # ~60fps for smooth bars
+            continue
+
+        # ── Normal mode rendering ────────────────────────────────────────
+
+        # Watchdog: Auto-blank if no UDP commands for 30 seconds (Q-SYS plugin disabled)
+        time_since_last_command = now - udp.get_last_command_time()
+        if time_since_last_command > WATCHDOG_TIMEOUT and not watchdog_blanked and not ip_splash_active:
+            logger.warning(f"[WATCHDOG] No UDP commands for {WATCHDOG_TIMEOUT}s - blanking display")
+            if canvas and matrix:
+                canvas.Clear()
+                canvas = matrix.SwapOnVSync(canvas)
+            elif matrix:
+                matrix.Clear()
+            watchdog_blanked = True
+        elif time_since_last_command <= WATCHDOG_TIMEOUT and watchdog_blanked:
+            # Commands resumed - restore display
+            logger.info("[WATCHDOG] Commands resumed - restoring display")
+            watchdog_blanked = False
+            sm.mark_all_dirty()
+
+        # Skip rendering if display is disabled or watchdog blanked
+        if not display_enabled or watchdog_blanked:
+            time.sleep(EFFECT_INTERVAL)
+            continue
+
+        # Dismiss IP splash on first received command.
+        # Do NOT call sm.clear_all() here — the command has already written its
+        # content into the target segment inside dispatch().  Wiping here would
+        # race and blank the display until the next command arrives.
+        if ip_splash_active and udp.has_received_command():
+            ip_splash_active = False
+            
+            # Restore saved rotation to global config
+            from udp_handler import set_rotation
+            set_rotation(saved_rotation)
+            logger.info(f"[SPLASH] Restored rotation to {saved_rotation}°")
+            
+            if renderer:
+                renderer.set_rotation_override(None)  # Clear renderer override
+                # Re-apply layout for the actual rotation (might have changed from 0° to 90°/270°)
+                udp._apply_layout(udp._current_layout if hasattr(udp, '_current_layout') else 1)
+            logger.info("[SPLASH] First command received — IP splash dismissed, rotation restored")
+
+        # Update effects and render at fixed interval
+        if now - last_effect >= EFFECT_INTERVAL:
+            sm.update_effects()
+            last_effect = now
+
+            if renderer:
+                try:
+                    renderer.render_all()
+                except Exception as exc:
+                    logger.error(f"[RENDER] Exception: {exc}")
+        
+        # Sleep to yield CPU and allow matrix library clean refresh cycles
+        # Aligned with EFFECT_INTERVAL for consistent timing
+        time.sleep(EFFECT_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()
