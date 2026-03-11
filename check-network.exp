@@ -1,0 +1,58 @@
+#!/usr/bin/expect -f
+# Check and fix network fallback on Pi
+# Usage: ./check-network.exp
+
+set timeout 30
+set PI_IP "10.1.1.21"
+set PI_USER "node"
+set PI_PASS "node"
+set FALLBACK_IP "10.10.10.99"
+
+puts "================================================"
+puts "Checking Network Configuration on Pi"
+puts "================================================\n"
+
+# Connect to Pi
+spawn ssh $PI_USER@$PI_IP
+expect {
+    "password:" {
+        send "$PI_PASS\r"
+    }
+    "yes/no" {
+        send "yes\r"
+        expect "password:"
+        send "$PI_PASS\r"
+    }
+}
+
+expect "$ " {
+    puts "\n✅ Connected to Pi\n"
+}
+
+# Check current IP addresses
+puts "Current IP addresses:"
+send "ip addr show eth0 | grep 'inet '\r"
+expect "$ "
+
+puts "\n"
+
+# Check NetworkManager connection
+puts "NetworkManager connection details:"
+send "nmcli connection show | grep eth0\r"
+expect "$ "
+
+puts "\n"
+
+# Check connection settings
+send "CONNECTION=\$(nmcli -t -f NAME,DEVICE con show | grep ':eth0\$' | cut -d: -f1 | head -1); echo \"Connection name: \$CONNECTION\"\r"
+expect "$ "
+
+send "nmcli -f ipv4.method,ipv4.addresses,ipv4.gateway,ipv4.dns,ipv4.may-fail connection show \"\$CONNECTION\" 2>/dev/null || echo 'Connection not found'\r"
+expect "$ "
+
+puts "\n================================================"
+puts "Analysis Complete"
+puts "================================================\n"
+
+# Keep session open for manual commands
+interact
