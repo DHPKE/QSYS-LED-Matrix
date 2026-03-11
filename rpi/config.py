@@ -41,11 +41,11 @@ PoE HAT notes:
 # ──────────────────────────────────────────────────────────────────────────────
 # Matrix hardware
 # ──────────────────────────────────────────────────────────────────────────────
-MATRIX_WIDTH   = 64
-MATRIX_HEIGHT  = 32
+MATRIX_WIDTH   = 128
+MATRIX_HEIGHT  = 64
 MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
-# Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
+# Scan rate: 64px tall panel = 1/32 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
 MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
                                       # ANTI-FLICKER: Changed from 3 to 2 for ~300Hz refresh
@@ -81,8 +81,8 @@ MATRIX_PWM_DITHER_BITS  = 1           # 0 = off; 1-2 = dithering for smoother co
                                       # ANTI-FLICKER: Changed from 0 to 1 for smoother gradients
                                       # 1 = Temporal dithering (reduces banding, smoother on camera)
                                       # 0 = No dithering (crisper but may show banding)
-MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
-                                      # Try if colors look wrong
+MATRIX_LED_RGB_SEQUENCE = "BGR"      # Color order for 128×64 panel: BGR (not RGB!)
+                                      # Try if colors look wrong: RGB, RBG, GRB, GBR, BRG, BGR
 MATRIX_REFRESH_LIMIT    = 0         # Hz; 0 = no limit, 200 = stable refresh
                                       # ANTI-FLICKER: Changed from 200 to 0 for maximum refresh rate
                                       # 0 = Uncapped (best for filming, higher CPU usage)

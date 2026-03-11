@@ -27,15 +27,15 @@ import udp_handler
 
 logger = logging.getLogger(__name__)
 
-# Expanded font size range for maximum granularity (tries every size from 32 down to 6)
-_FONT_SIZES = [32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 13, 12, 11, 10, 9, 8, 7, 6]
+# Expanded font size range for 128×64 display (6-64px)
+_FONT_SIZES = [64, 60, 56, 52, 48, 44, 40, 36, 32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 13, 12, 11, 10, 9, 8, 7, 6]
 
-# Size mode ranges
+# Size mode ranges for 128×64 display
 _SIZE_RANGES = {
-    'auto': _FONT_SIZES,  # Full range, auto-scale
+    'auto': _FONT_SIZES,  # Full range, auto-scale (6-64px)
     'small': [12, 11, 10, 9, 8, 7, 6],  # Small readable fonts
-    'medium': [20, 18, 16, 14, 13],  # Medium fonts
-    'large': [32, 30, 28, 26, 24, 22],  # Large fonts
+    'medium': [28, 26, 24, 22, 20, 18, 16, 14, 13],  # Medium fonts
+    'large': [64, 60, 56, 52, 48, 44, 40, 36, 32, 30],  # Large fonts
 }
 
 # Cache loaded fonts keyed by (path, size) to avoid repeated disk I/O.
@@ -197,8 +197,8 @@ class TextRenderer:
         logger.info("[FONT] Prewarming font cache...")
         start_time = time_module.time()
         
-        # Common sizes that are actually used
-        common_sizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32]
+        # Common sizes for 128×64 display (wider range up to 64px)
+        common_sizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64]
         common_fonts = ["arial", "dejavu"]  # Only fonts we actually use
         
         loaded_count = 0
