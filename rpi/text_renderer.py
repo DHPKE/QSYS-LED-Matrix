@@ -41,8 +41,24 @@ _SIZE_RANGES = {
 # Cache loaded fonts keyed by (path, size) to avoid repeated disk I/O.
 _font_cache: dict[tuple, ImageFont.FreeTypeFont] = {}
 
-# Cache for hex to RGB conversions
-_color_cache: dict[str, tuple[int, int, int]] = {}
+# Cache for hex to RGB conversions (prepopulated with common colors)
+_color_cache: dict[str, tuple[int, int, int]] = {
+    "FFFFFF": (255, 255, 255),  # White
+    "000000": (0, 0, 0),         # Black
+    "FF0000": (255, 0, 0),       # Red
+    "00FF00": (0, 255, 0),       # Green
+    "0000FF": (0, 0, 255),       # Blue
+    "FFFF00": (255, 255, 0),     # Yellow
+    "FF00FF": (255, 0, 255),     # Magenta
+    "00FFFF": (0, 255, 255),     # Cyan
+    "FFA500": (255, 165, 0),     # Orange
+    "800080": (128, 0, 128),     # Purple
+    "808080": (128, 128, 128),   # Gray
+    "010101": (1, 1, 1),         # Almost black (test mode)
+    "C0C0C0": (192, 192, 192),   # Silver
+    "800000": (128, 0, 0),       # Maroon
+    "008000": (0, 128, 0),       # Dark Green
+}
 
 # Cache for text measurements: (text, size) -> (width, height)
 _text_measurement_cache: dict[tuple, tuple[int, int]] = {}
@@ -171,6 +187,31 @@ class TextRenderer:
         self._cached_group_color = GROUP_COLORS.get(self._cached_group_id, (0, 0, 0))
         # Rotation override: when set to a value, ignores get_rotation()
         self._rotation_override = None
+        
+        # Prewarm font cache to eliminate first-render lag
+        self._prewarm_font_cache()
+    
+    def _prewarm_font_cache(self):
+        """Load common font sizes into cache during init (one-time cost)"""
+        import time as time_module
+        logger.info("[FONT] Prewarming font cache...")
+        start_time = time_module.time()
+        
+        # Common sizes that are actually used
+        common_sizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32]
+        common_fonts = ["arial", "dejavu"]  # Only fonts we actually use
+        
+        loaded_count = 0
+        for font_name in common_fonts:
+            for size in common_sizes:
+                try:
+                    _load_font(font_name, size)
+                    loaded_count += 1
+                except Exception as e:
+                    logger.debug(f"[FONT] Could not prewarm {font_name}/{size}: {e}")
+        
+        elapsed = (time_module.time() - start_time) * 1000
+        logger.info(f"[FONT] Prewarmed {loaded_count} fonts in {elapsed:.1f}ms")
 
     def set_rotation_override(self, rotation: Optional[int]):
         """

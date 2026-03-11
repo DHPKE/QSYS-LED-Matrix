@@ -222,13 +222,15 @@ def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
     Background thread: monitor network IP and update splash screen if it changes.
     Scans all UP interfaces for IP changes.
     Runs until the first UDP command is received, then exits.
+    Uses exponential backoff to reduce CPU wake-ups after IP stabilizes.
     """
     import threading
     last_ip = _get_first_up_ip()
+    poll_interval = 5.0  # Start at 5 seconds
     logger.info(f"[NET-MON] Starting network monitor (current IP: {last_ip})")
     
     while True:
-        time.sleep(5.0)  # Check every 5 seconds
+        time.sleep(poll_interval)
         
         # Stop monitoring after first command
         if udp.has_received_command():
@@ -241,6 +243,7 @@ def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
         if current_ip and current_ip != last_ip:
             logger.info(f"[NET-MON] IP changed: {last_ip} → {current_ip}")
             last_ip = current_ip
+            poll_interval = 5.0  # Reset interval on change
             
             # Update splash screen with new IP
             sm.update_text(0, current_ip, color="FFFFFF", bgcolor="000000", align="C")
@@ -250,6 +253,10 @@ def _network_monitor(sm: SegmentManager, udp: 'UDPHandler', ip_splash_callback):
             
             # Notify callback to update device_ip variable
             ip_splash_callback(current_ip)
+        else:
+            # No change, exponentially back off (max 30 seconds)
+            poll_interval = min(poll_interval * 1.5, 30.0)
+            logger.debug(f"[NET-MON] No IP change, backing off to {poll_interval:.1f}s")
 
 
 
@@ -491,12 +498,15 @@ def main():
     while True:
         now = time.monotonic()
         
-        # ── Check for test mode ──────────────────────────────────────────
-        try:
-            with open("/tmp/led-matrix-testmode", "r") as f:
-                test_mode_active = (f.read().strip() == "1")
-        except FileNotFoundError:
-            test_mode_active = False
+        # ── Check for test mode (optimized: every 10 frames) ─────────────
+        test_mode_poll_counter += 1
+        if test_mode_poll_counter >= 10:  # Poll every 10 frames instead of every frame
+            test_mode_poll_counter = 0
+            try:
+                with open("/tmp/led-matrix-testmode", "r") as f:
+                    test_mode_active = (f.read().strip() == "1")
+            except FileNotFoundError:
+                test_mode_active = False
         
         # Clear display and force 0° rotation when entering test mode
         if test_mode_active and not test_mode_was_active:
@@ -530,6 +540,9 @@ def main():
             test_cycle_state = 0
             last_cycle_switch = now
             frame_counter = 0
+            # Optimization: counters for reduced polling frequency
+            test_mode_poll_counter = 0
+            watchdog_check_counter = 0
             # Force immediate refresh of hostname and IP
             hostname = socket.gethostname()
             test_device_ip = _get_first_up_ip() or "No IP"
@@ -661,19 +674,22 @@ def main():
 
         # ── Normal mode rendering ────────────────────────────────────────
 
-        # Watchdog: Auto-blank if no UDP commands for 30 seconds (Q-SYS plugin disabled)
-        time_since_last_command = now - udp.get_last_command_time()
-        if time_since_last_command > WATCHDOG_TIMEOUT and not watchdog_blanked and not ip_splash_active:
-            logger.warning(f"[WATCHDOG] No UDP commands for {WATCHDOG_TIMEOUT}s - blanking display")
-            if canvas and matrix:
-                canvas.Clear()
-                canvas = matrix.SwapOnVSync(canvas)
-            elif matrix:
-                matrix.Clear()
-            watchdog_blanked = True
-        elif time_since_last_command <= WATCHDOG_TIMEOUT and watchdog_blanked:
-            # Commands resumed - restore display
-            logger.info("[WATCHDOG] Commands resumed - restoring display")
+        # Watchdog: Check less frequently (every 10 frames) to reduce overhead
+        watchdog_check_counter += 1
+        if watchdog_check_counter >= 10:
+            watchdog_check_counter = 0
+            time_since_last_command = now - udp.get_last_command_time()
+            if time_since_last_command > WATCHDOG_TIMEOUT and not watchdog_blanked and not ip_splash_active:
+                logger.warning(f"[WATCHDOG] No UDP commands for {WATCHDOG_TIMEOUT}s - blanking display")
+                if canvas and matrix:
+                    canvas.Clear()
+                    canvas = matrix.SwapOnVSync(canvas)
+                elif matrix:
+                    matrix.Clear()
+                watchdog_blanked = True
+            elif time_since_last_command <= WATCHDOG_TIMEOUT and watchdog_blanked:
+                # Commands resumed - restore display
+                logger.info("[WATCHDOG] Commands resumed - restoring display")
             watchdog_blanked = False
             sm.mark_all_dirty()
 
@@ -707,13 +723,20 @@ def main():
 
             if renderer:
                 try:
+                    render_start = time.monotonic()
                     renderer.render_all()
+                    render_time = time.monotonic() - render_start
+                    
+                    # Log slow renders (> 50ms)
+                    if render_time > 0.050:
+                        logger.warning(f"[RENDER] Slow render: {render_time*1000:.1f}ms")
                 except Exception as exc:
                     logger.error(f"[RENDER] Exception: {exc}")
         
-        # Sleep to yield CPU and allow matrix library clean refresh cycles
-        # Aligned with EFFECT_INTERVAL for consistent timing
-        time.sleep(EFFECT_INTERVAL)
+        # Adaptive sleep based on actual loop time
+        loop_elapsed = time.monotonic() - now
+        sleep_time = max(0.001, EFFECT_INTERVAL - loop_elapsed)
+        time.sleep(sleep_time)
 
 
 if __name__ == "__main__":
