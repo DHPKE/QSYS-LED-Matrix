@@ -47,15 +47,19 @@ MATRIX_CHAIN   = 1       # Number of panels chained
 MATRIX_PARALLEL = 1      # Number of parallel chains
 # Scan rate: 32px tall panel = 1/16 scan (set automatically by library)
 MATRIX_HARDWARE_MAPPING = "regular"   # regular, adafruit-hat, adafruit-hat-pwm
-MATRIX_GPIO_SLOWDOWN    = 3           # 0–4; Controls LED refresh rate
+MATRIX_GPIO_SLOWDOWN    = 2           # 0–4; Controls LED refresh rate
+                                      # ANTI-FLICKER: Changed from 3 to 2 for ~300Hz refresh
                                       # RPi 4: Use 1-2 for best balance
-                                      # RPi Zero 2 W: Use 3 for maximum stability
+                                      # RPi Zero 2 W: Use 2-3 (2 is safe, test for stability)
                                       # 0 = Fastest (~1000Hz+) - may cause glitches
                                       # 1 = Fast (~500Hz) - high refresh, may glitch
-                                      # 2 = Balanced (~250-300Hz) - BEST for RPi 4
-                                      # 3 = Slower (~200Hz) - maximum stability, no flicker
-MATRIX_BRIGHTNESS       = 50          # 0–100 percent (library uses percent, not 0-255)
-MATRIX_PWM_BITS        = 8           # 1-11; PWM bits for color depth (11=2048 levels, default)
+                                      # 2 = Balanced (~250-300Hz) - BEST for filming
+                                      # 3 = Slower (~200Hz) - maximum stability
+MATRIX_BRIGHTNESS       = 60          # 0–100 percent (increased for dithering compensation)
+MATRIX_PWM_BITS        = 11           # 1-11; PWM bits for color depth
+                                      # ANTI-FLICKER: Changed from 8 to 11 for smoother appearance
+                                      # 11 = Best color (2048 levels, smoother on camera)
+                                      # 8 = Excellent compromise (256 levels, faster)
                                       # Lower values = faster refresh but less color accuracy
                                       # 11 = Best color (slower refresh)
                                       # 8 = Excellent compromise (256 levels, stable)
@@ -73,12 +77,16 @@ MATRIX_MULTIPLEXING     = 0           # 0-18; Panel multiplexing mode
                                       # 0 = default (best for most panels)
                                       # Try 1,2,3,4 if lines flicker
                                       # Different panels use different modes
-MATRIX_PWM_DITHER_BITS  = 0           # 0 = off; 1-2 = dithering for smoother color
-                                      # 0 = no dithering for stable, flicker-free display
+MATRIX_PWM_DITHER_BITS  = 1           # 0 = off; 1-2 = dithering for smoother color
+                                      # ANTI-FLICKER: Changed from 0 to 1 for smoother gradients
+                                      # 1 = Temporal dithering (reduces banding, smoother on camera)
+                                      # 0 = No dithering (crisper but may show banding)
 MATRIX_LED_RGB_SEQUENCE = "RGB"      # Color order: RGB, RBG, GRB, GBR, BRG, BGR
                                       # Try if colors look wrong
-MATRIX_REFRESH_LIMIT    = 200         # Hz; 0 = no limit, 200 = stable refresh
-                                      # Limiting refresh reduces flicker and power usage
+MATRIX_REFRESH_LIMIT    = 0         # Hz; 0 = no limit, 200 = stable refresh
+                                      # ANTI-FLICKER: Changed from 200 to 0 for maximum refresh rate
+                                      # 0 = Uncapped (best for filming, higher CPU usage)
+                                      # 200 = Capped at 200Hz (more stable, lower CPU)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Display Orientation & Rotation
