@@ -494,6 +494,10 @@ def main():
     last_udp_command_time = time.monotonic()
     watchdog_blanked = False
     WATCHDOG_TIMEOUT = 30.0  # seconds
+    
+    # Optimization: counters for reduced polling frequency
+    test_mode_poll_counter = 0
+    watchdog_check_counter = 0
 
     while True:
         now = time.monotonic()
@@ -540,9 +544,6 @@ def main():
             test_cycle_state = 0
             last_cycle_switch = now
             frame_counter = 0
-            # Optimization: counters for reduced polling frequency
-            test_mode_poll_counter = 0
-            watchdog_check_counter = 0
             # Force immediate refresh of hostname and IP
             hostname = socket.gethostname()
             test_device_ip = _get_first_up_ip() or "No IP"
